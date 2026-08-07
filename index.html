@@ -1,0 +1,2244 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tagescockpit – UpgradeHomes</title>
+<style>
+:root{
+  --bg1:#F4F1E9; --bg2:#EFEBDF; --ink:#241F17; --ink-soft:#5B564A; --ink-faint:#938C7A;
+  --navy:#2A4E80; --navy-d:#16294B; --gold:#B4892B; --gold-d:#8A6A1F; --gold-soft:#EADFC0;
+  --glass:#FCFBF6; --glass-brd:rgba(40,32,12,0.13);
+  --green:#1E9E5A; --red:#C0392B;
+  --band-red:#E05555; --band-orange:#E38A2B; --band-yellow:#D6A400; --band-green:#3E9E63;
+  --shadow:0 1px 2px rgba(40,32,12,.05),0 10px 26px rgba(60,50,20,.07); --radius:16px;
+}
+*{box-sizing:border-box} html,body{margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);
+  background:linear-gradient(135deg,var(--bg1),var(--bg2));min-height:100vh;overflow-x:hidden;position:relative}
+.blob{position:fixed;border-radius:50%;filter:blur(70px);opacity:.5;z-index:0;pointer-events:none}
+.blob.a{width:420px;height:420px;background:#C9A227;top:-120px;right:-80px}
+.blob.b{width:380px;height:380px;background:#12335C;bottom:-140px;left:-100px}
+.blob.c{width:300px;height:300px;background:#E3C264;opacity:.14;top:40%;left:55%}
+.wrap{position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:18px 20px 60px}
+
+/* Login */
+#login{min-height:90vh;display:flex;align-items:center;justify-content:center}
+#login .box{background:var(--glass);backdrop-filter:blur(14px);border:1px solid var(--glass-brd);border-radius:20px;padding:40px;text-align:center;max-width:420px;box-shadow:var(--shadow)}
+#login h1{font-size:24px;margin:0 0 6px} #login p{color:var(--ink-soft);font-size:14px;margin:0 0 22px}
+.btn{border:0;background:linear-gradient(135deg,#EBCB6E,#C9A227);color:#16294B;font-weight:800;font-size:15px;border-radius:12px;padding:12px 22px;cursor:pointer;box-shadow:0 6px 18px rgba(201,162,39,.3)}
+.btn:hover{filter:brightness(1.08)} .btn:disabled{opacity:.5;cursor:not-allowed}
+#loginStatus{font-size:12.5px;margin-top:14px;color:var(--ink-faint)} .err{color:var(--red)!important}
+
+/* Topbar */
+.topbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.logo{font-weight:800;font-size:19px;display:flex;align-items:center;gap:8px}
+.logo .tag{font-size:10px;font-weight:700;background:var(--gold-soft);color:#5c4708;padding:3px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.5px}
+.spacer{flex:1}
+.userswitch{display:flex;background:var(--glass);border:1px solid var(--glass-brd);border-radius:999px;padding:4px;backdrop-filter:blur(14px)}
+.userswitch button{border:0;background:transparent;padding:7px 15px;border-radius:999px;font-weight:700;color:var(--ink-soft);cursor:pointer;font-size:13.5px}
+.userswitch button.active{background:var(--navy);color:#fff}
+.userswitch.small button{padding:5px 12px;font-size:12.5px}
+.iconbtn{border:1px solid var(--glass-brd);background:var(--glass);border-radius:12px;padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-soft)}
+.iconbtn:hover{color:var(--ink)}
+.mockbanner{background:rgba(227,194,100,.12);border:1px dashed var(--gold);color:var(--gold);border-radius:10px;padding:7px 12px;font-size:12px;font-weight:600;margin-bottom:14px;text-align:center}
+
+.card{background:var(--glass);backdrop-filter:blur(14px);border:1px solid var(--glass-brd);box-shadow:var(--shadow);border-radius:var(--radius);padding:18px}
+.nav-tabs{display:flex;gap:6px;padding:8px;margin-bottom:18px}
+.nav-tabs button{flex:1;border:0;background:transparent;padding:9px 6px;border-radius:12px;font-weight:700;font-size:13px;color:var(--ink-soft);cursor:pointer}
+.nav-tabs button.active{background:var(--navy);color:#fff}
+.stack{display:flex;flex-direction:column;gap:18px}
+.section-t{font-weight:800;font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.section-t small{font-weight:600;color:var(--ink-faint);font-size:11px}
+.empty{color:var(--ink-faint);font-size:13px;font-style:italic;padding:8px 0}
+.dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.owner{font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;white-space:nowrap}
+.owner.Nele{background:rgba(139,92,246,.26);color:#C4B5FD}
+.owner.Niklas{background:rgba(59,130,246,.26);color:#93C5FD}
+.owner.Beide,.owner.Gemeinsam{background:rgba(201,162,39,.24);color:#E3C264}
+.urg{font-weight:800;border-radius:999px;padding:3px 10px;color:#16294B;font-size:11px;white-space:nowrap;cursor:default}
+.status-chip{font-size:10px;font-weight:700;color:var(--ink-soft);background:rgba(255,255,255,.09);border-radius:6px;padding:2px 8px}
+
+/* Greeting / KPI */
+.greet .l1{font-weight:800;font-size:19px;margin-bottom:4px} .greet b{color:var(--gold)}
+.kpis{display:flex;gap:10px;flex-wrap:wrap}
+.kpi{flex:1;min-width:105px;background:rgba(255,255,255,.07);border-radius:12px;padding:12px 14px;text-align:center}
+.kpi .n{font-size:23px;font-weight:800;line-height:1} .kpi .l{font-size:11px;color:var(--ink-faint);margin-top:4px;font-weight:600}
+
+/* Daystrip / Maklercall */
+.daystrip .ds-h{font-weight:800;font-size:14px;margin-bottom:9px}
+.ds-list{display:flex;gap:8px;flex-wrap:wrap}
+.ds-chip{background:rgba(255,255,255,.08);border:1px solid rgba(227,194,100,.28);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px}
+.ds-chip .pill{width:9px;height:9px;border-radius:3px}
+.maklercall{background:linear-gradient(135deg,#EBCB6E,#C9A227);color:#16294B;border:1px solid rgba(255,255,255,.3);box-shadow:0 10px 30px rgba(201,162,39,.28)}
+.maklercall .mc-h{font-weight:800;font-size:17px;display:flex;align-items:center;gap:9px}
+.maklercall .mc-sub{opacity:.82;font-size:13px;margin-top:5px}
+.maklercall button{background:#16294B;color:#F1E1AC;border:0;border-radius:12px;padding:11px 22px;font-weight:800;cursor:pointer;margin-top:14px;font-size:15px}
+.maklercall.done{background:linear-gradient(135deg,#15803D,#22C55E);color:#fff}
+.maklercall.done .mc-h{font-size:15px;line-height:1.4;font-weight:700}
+
+/* Focus */
+.focus-track{position:relative;height:44px;margin:6px 4px}
+.focus-rail{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:14px;border-radius:999px;background:rgba(255,255,255,.12)}
+.focus-fill{position:absolute;left:0;top:50%;transform:translateY(-50%);height:14px;border-radius:999px;background:linear-gradient(90deg,#4ADE80,#16A34A);transition:width .5s}
+.fm{position:absolute;top:50%;transform:translate(-50%,-50%) scale(.8);font-size:25px;opacity:.35;transition:all .4s;filter:grayscale(.4)}
+.fm.on{opacity:1;transform:translate(-50%,-50%) scale(1.15);filter:none}
+.focus-msg{font-size:13px;color:var(--ink-soft);font-weight:700}
+.focus-items{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.focus-item{display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.07)}
+.focus-item.done{opacity:.5;text-decoration:line-through}
+.focus-item button{margin-left:auto;border:0;background:var(--green);color:#fff;border-radius:8px;padding:4px 10px;font-weight:700;cursor:pointer;font-size:12px}
+
+/* Heute zuerst / lists */
+.hz-item{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;background:rgba(255,255,255,.07);margin-bottom:7px;cursor:pointer}
+.hz-item:hover{background:rgba(255,255,255,.14)}
+.hz-rank{font-weight:800;width:20px;text-align:center}
+.hz-body{flex:1;min-width:0}
+.hz-title{font-weight:700;font-size:13px}
+.hz-sub{font-size:11px;color:var(--ink-faint)}
+.hz-item.hzdone{opacity:.6} .hz-item.hzdone .hz-title{text-decoration:line-through}
+.mini{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.07);margin-bottom:6px}
+.mini .mt{font-weight:700;font-size:13px;flex:1;min-width:0}
+.mini .ms{font-size:11px;color:var(--ink-faint)}
+.kp-h{font-size:12px;font-weight:800;color:var(--ink-soft);margin:12px 0 6px}
+.kp-h:first-child{margin-top:0}
+/* Feste Wochen-To-dos in Heute */
+.wt-item{cursor:default}
+.wt-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex:0 0 auto}
+.wt-item.wtdone .mt{text-decoration:line-through;color:var(--ink-faint)}
+.wt-hint{font-size:11px;color:var(--ink-faint);margin-top:2px}
+/* Morning-Briefing-Einbettung (eigenes helles Feld, damit die Mail-Optik lesbar bleibt) */
+.briefing{background:#fff;color:#16294B;border-radius:12px;padding:12px 14px;margin-top:8px;overflow-x:auto;font-size:13px;line-height:1.45}
+.briefing table{border-collapse:collapse;max-width:100%}
+.briefing td,.briefing th{border:1px solid #e2e8f0;padding:4px 7px;vertical-align:top}
+.briefing a{color:#1D4ED8}
+.briefing h1,.briefing h2,.briefing h3{font-size:15px;margin:10px 0 6px}
+.briefing img{max-width:100%}
+
+/* Heute zuerst – Briefing-Tabelle */
+.hz-lage{font-size:12px;color:var(--ink-faint);margin:2px 0 12px;line-height:1.5}
+.hz-lage b{color:var(--ink-soft)}
+.hzt-wrap{overflow-x:auto}
+.hzt{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;min-width:640px}
+.hzt th{text-align:left;font-size:10px;color:var(--ink-faint);font-weight:800;padding:2px 6px 6px;text-transform:uppercase;letter-spacing:.03em}
+.hzt td{padding:9px 6px;vertical-align:top;border-top:1px solid rgba(255,255,255,.09)}
+.hzt tr.hzt-row{cursor:pointer}
+.hzt tr.hzt-row:hover td{background:rgba(255,255,255,.07)}
+.hzt tr.hzt-cat td{border-top:0;padding:12px 6px 2px}
+.hz-cat{font-size:12px;font-weight:800;display:inline-flex;align-items:center;gap:6px}
+.hzt-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.hzt-obj{font-weight:700}
+.hzt-meta{font-size:10.5px;color:var(--ink-faint);margin-top:2px}
+.hzt .stand,.hzt .vor{color:var(--ink-soft);line-height:1.35}
+.hzt-chk{width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex:0 0 auto}
+.hzt tr.done td{opacity:.5} .hzt tr.done .hzt-obj{text-decoration:line-through}
+.hzt a.link{white-space:nowrap}
+.hz-brieflink{font-size:11px;color:var(--ink-faint);margin-top:14px;display:inline-flex;gap:5px;align-items:center;text-decoration:none}
+.hz-brieflink:hover{color:var(--ink-soft)}
+
+/* Kanban */
+.board-wrap{overflow-x:auto;padding-bottom:8px}
+.board{display:flex;gap:14px;min-width:min-content}
+.col{background:rgba(255,255,255,.05);border-radius:14px;padding:10px;width:250px;flex:0 0 auto;min-height:120px}
+.col.drop{outline:2px dashed var(--gold);background:rgba(255,255,255,.12)}
+.col-head{display:flex;align-items:center;justify-content:space-between;font-weight:800;font-size:13px;padding:2px 6px 10px;color:var(--ink-soft)}
+.col-head .cnt{background:rgba(255,255,255,.14);border-radius:999px;padding:1px 8px;font-size:12px}
+.kc-card{background:#1C3557;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.35);margin-bottom:10px;overflow:hidden;cursor:grab;border:1px solid rgba(227,194,100,.16)}
+.kc-card.dragging{opacity:.4}
+.kc-bar{min-height:24px;display:flex;align-items:center;padding:4px 10px;color:#16294B;font-weight:800;font-size:11px;gap:6px}
+.kc-body{padding:10px 12px}
+.kc-title{font-weight:700;font-size:13px;line-height:1.3}
+.kc-sub{font-size:11.5px;color:var(--ink-faint);margin-top:2px}
+.kc-foot{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+.kc-foot .sp{flex:1}
+.kc-due{font-size:11px;font-weight:700;color:#FCA5A5}
+.mail-flag{margin-top:8px;font-size:11px;font-weight:800;border-radius:8px;padding:4px 9px;display:flex;align-items:center;gap:5px}
+.mail-flag.draft{background:rgba(234,179,8,.16);color:#EAB308}
+.mail-flag.open{background:rgba(248,113,113,.16);color:#F87171}
+/* Punkt 5: Follow-up-Zeile auf der Objektkachel */
+.kc-follow{margin-top:8px;display:flex;gap:6px;align-items:flex-start;font-size:11.5px;line-height:1.35;background:rgba(180,137,43,.10);border-left:3px solid var(--gold);border-radius:0 8px 8px 0;padding:6px 8px}
+.kc-follow-k{flex:none}
+.kc-follow-t{flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;color:var(--ink-soft)}
+.kc-follow-src{flex:none;font-size:9px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--gold);align-self:flex-end}
+.kc-snooze{margin-top:6px;font-size:11px;font-weight:700;color:var(--ink-faint)}
+.kc-card.snoozed{opacity:.6}
+.kc-avatar{width:20px;height:20px;border-radius:50%;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}
+
+/* Woche */
+.today-focus{background:rgba(201,162,39,.12);border-radius:var(--radius);padding:16px 18px;margin-bottom:18px;border:1px solid rgba(227,194,100,.4)}
+.today-focus .tf-h{font-weight:800;font-size:16px;margin-bottom:10px;color:var(--gold)}
+.tf-list{display:flex;gap:10px;flex-wrap:wrap}
+.tf-chip{background:rgba(255,255,255,.09);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
+.tf-chip .pill{width:9px;height:9px;border-radius:3px}
+.week-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+.wcol{width:220px;flex:0 0 auto;background:rgba(255,255,255,.05);border-radius:14px;padding:10px}
+.wcol.today{outline:2px solid var(--gold);background:rgba(255,255,255,.10)}
+.wcol-head{font-weight:800;font-size:13.5px;padding:2px 4px 10px;display:flex;justify-content:space-between;align-items:center}
+.wcol-head .badge{background:rgba(255,255,255,.14);border-radius:999px;padding:1px 8px;font-size:12px}
+.wcol-head .now{color:var(--gold);font-size:11px}
+.wc-card{background:#1C3557;border-radius:12px;box-shadow:0 3px 12px rgba(0,0,0,.3);margin-bottom:9px;overflow:hidden;border:1px solid rgba(227,194,100,.14)}
+.wc-body{padding:9px 11px}
+.wc-title{font-weight:700;font-size:12.5px} .wc-sub{font-size:11px;color:var(--ink-faint);margin-top:2px}
+.wc-items{margin-top:7px;display:flex;flex-direction:column;gap:3px}
+.wc-ci{display:flex;gap:6px;font-size:11.5px;color:var(--ink-soft);line-height:1.3}
+.track{display:flex;gap:14px;flex-wrap:wrap}
+.track .t-item{flex:1;min-width:130px;background:rgba(255,255,255,.07);border-radius:12px;padding:12px}
+.track .t-top{font-size:12px;color:var(--ink-faint);font-weight:700} .track .t-val{font-size:22px;font-weight:800;margin-top:3px} .track .t-sub{font-size:11px;color:var(--ink-faint);margin-top:2px}
+
+/* Modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);z-index:40;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.overlay.open{display:flex}
+.modal{background:#16294B;color:var(--ink);border-radius:18px;max-width:640px;width:100%;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.6);border:1px solid rgba(227,194,100,.28)}
+.modal-close{float:right;border:0;background:rgba(255,255,255,.12);color:var(--ink);border-radius:10px;padding:6px 12px;cursor:pointer;font-weight:700}
+.detail-head h2{margin:0;font-size:19px}
+.kv{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-top:10px}
+.kv b{display:block;color:var(--ink-faint);font-weight:600;font-size:11px}
+.deeplinks{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+.link{color:var(--gold);font-weight:700;text-decoration:none;font-size:12px}
+.link:hover{text-decoration:underline}
+.hist{font-size:12px;color:var(--ink-soft);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.12)}
+.phbtns{display:flex;gap:6px;flex-wrap:wrap}
+.phbtn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:var(--ink-soft);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer}
+.phbtn:hover{background:rgba(255,255,255,.16)}
+.phbtn.on{background:var(--gold);color:#16294B;border-color:var(--gold)}
+.field{margin:12px 0}
+.field label{display:block;font-weight:700;font-size:12px;color:var(--ink-soft);margin-bottom:5px}
+.field input,.field select{width:100%;padding:9px;border:1px solid var(--glass-brd);border-radius:10px;font-family:inherit;font-size:14px;background:#fff;color:#16294B}
+.ew-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.ew-row input[type=text]{flex:1;padding:7px;border:1px solid var(--glass-brd);border-radius:8px;font-family:inherit;font-size:13px;background:#fff;color:#16294B}
+.ew-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--green)}
+.ew-row .rm{border:0;background:#FEE2E2;color:#B91C1C;border-radius:7px;padding:6px 10px;cursor:pointer;font-weight:800}
+.ew-row input[type=color]{width:38px;height:34px;padding:2px;border:1px solid var(--glass-brd);border-radius:8px;background:#fff;cursor:pointer;flex:none}
+.ew-add{border:1px dashed var(--gold);background:transparent;color:var(--gold);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:700;font-size:13px;margin-top:2px}
+.savebtn{border:0;background:var(--navy);color:#fff;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px;margin-top:8px}
+.wc-editb{float:right;border:0;background:rgba(255,255,255,.1);color:var(--ink-faint);border-radius:6px;padding:1px 7px;cursor:pointer;font-size:11px}
+.wc-editb:hover{background:rgba(255,255,255,.2)}
+/* Punkt 7: Kanban-Funktionen im Wochenüberblick */
+.wcol{display:flex;flex-direction:column}
+.wcol-body{flex:1;min-height:60px;border-radius:10px;transition:background .12s}
+.wcol-body.drop{background:rgba(180,137,43,.16);outline:2px dashed var(--gold);outline-offset:-3px}
+.wc-card{cursor:grab}
+.wc-card.dragging{opacity:.45}
+.wc-addb{margin-top:6px;width:100%;border:1px dashed var(--gold);background:transparent;color:var(--gold);border-radius:9px;padding:6px 8px;cursor:pointer;font-weight:800;font-size:11.5px}
+.wc-addb:hover{background:rgba(180,137,43,.12)}
+.wc-ci input{accent-color:var(--green);cursor:pointer;margin-right:2px}
+.wc-ci.done{text-decoration:line-through;color:var(--ink-faint)}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#16294B;color:var(--ink);border:1px solid var(--gold);border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;z-index:60;display:none;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
+@media(max-width:900px){ .wrap{padding:14px} }
+
+/* ===================== HELLES DESIGN (Reskin) ===================== */
+body{background:var(--bg1)}
+.blob{display:none!important}
+/* Kopf: Überzeiler + „Moin" */
+.topbar{align-items:center;margin-bottom:22px}
+.brandhead .overline{font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--gold-d)}
+.brandhead .moin{font-family:"Iowan Old Style","Palatino Linotype","Book Antiqua",Georgia,serif;font-weight:800;font-size:30px;line-height:1.06;color:var(--ink);margin-top:3px}
+.iconbtn{width:40px;height:40px;padding:0;border-radius:50%;background:#fff;border:1px solid var(--glass-brd);color:var(--ink-soft);display:inline-flex;align-items:center;justify-content:center;font-size:16px;box-shadow:var(--shadow)}
+.iconbtn:hover{color:var(--ink);background:#fff}
+.userswitch{background:#fff;border:1px solid var(--glass-brd);box-shadow:var(--shadow)}
+.userswitch button{color:var(--ink-soft)}
+.userswitch button.active,.nav-tabs button.active{background:var(--gold);color:#fff}
+.btn{color:#fff}
+.mockbanner{background:var(--gold-soft);border:1px solid var(--glass-brd);color:var(--gold-d)}
+/* Sektionslabels wie im Screenshot: klein, gesperrt, groß */
+.section-t{text-transform:uppercase;letter-spacing:.12em;font-size:12px;color:var(--ink-faint);font-weight:800}
+.section-t small{text-transform:none;letter-spacing:0}
+/* Kacheln / Listen (vorher helles Weiß auf Dunkel) */
+.greet-msg{font-size:14px;color:var(--ink-soft);line-height:1.5} .greet-msg b{color:var(--gold-d)}
+.kpi{background:#F5F2E9} .kpi .n{color:var(--ink)}
+.ds-chip{background:#F5F2E9;border:1px solid var(--glass-brd)}
+.focus-item{background:#F5F2E9} .focus-rail{background:rgba(40,32,12,.10)}
+.hz-item{background:#F5F2E9} .hz-item:hover{background:#EFEBDD}
+.mini{background:#F5F2E9}
+.kon-row{cursor:pointer} .kon-row:hover{background:#EFEBDD}
+.hzt td{border-top:1px solid rgba(40,32,12,.09)}
+.hzt tr.hzt-row:hover td{background:#F7F4EC}
+.status-chip{background:#EEEADD;color:var(--ink-soft)}
+.owner.Nele{background:#EDE7FB;color:#6D28D9} .owner.Niklas{background:#E1ECFB;color:#1D4ED8}
+.owner.Beide,.owner.Gemeinsam{background:var(--gold-soft);color:var(--gold-d)}
+/* Kanban / Woche */
+.col{background:#F1EDE1} .col-head .cnt{background:rgba(40,32,12,.07)}
+.kc-card{background:#fff;border:1px solid var(--glass-brd);box-shadow:var(--shadow)}
+.kc-title{color:var(--ink)} .kc-due{color:#C0392B}
+.tf-chip{background:#F5F2E9} .wcol{background:#F1EDE1}
+.wcol-head .badge{background:rgba(40,32,12,.07)}
+.wc-card{background:#fff;border:1px solid var(--glass-brd);box-shadow:var(--shadow)} .wc-title{color:var(--ink)}
+.wc-editb{background:rgba(40,32,12,.07);color:var(--ink-faint)}
+.track .t-item{background:#F5F2E9}
+/* Pipeline: Board in beschränkter Höhe → waagerechter Schiebebalken bleibt sichtbar/erreichbar */
+.board-wrap{overflow:auto;max-height:calc(100vh - 230px)}
+/* Modal / Detail */
+.overlay{background:rgba(30,24,10,.42)}
+.modal{background:#FFFDF7;color:var(--ink);border:1px solid var(--glass-brd)}
+.modal-close{background:#F0ECE0;color:var(--ink-soft)}
+.detail-head h2{color:var(--ink)}
+.hist{border-bottom:1px solid rgba(40,32,12,.1)}
+.phbtn{background:#F3EFE4;border:1px solid var(--glass-brd);color:var(--ink-soft)}
+.phbtn:hover{background:#EAE5D6}
+.link{color:var(--gold-d)}
+#toast{background:#241F17;color:#F4F1E9}
+/* Erledigt-Popup */
+.field textarea{width:100%;padding:9px;border:1px solid var(--glass-brd);border-radius:10px;font-family:inherit;font-size:14px;background:#fff;color:var(--ink);resize:vertical;min-height:64px}
+.erl-cur{background:#F5F2E9;border:1px solid var(--glass-brd);border-radius:10px;padding:9px 11px;font-size:12px;color:var(--ink-soft);white-space:pre-wrap;max-height:120px;overflow:auto;margin-top:4px}
+.erl-err{color:var(--red);font-size:12px;font-weight:700;margin-top:8px}
+.erl-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.erl-choice{display:flex;flex-direction:column;gap:7px;margin:6px 0 12px}
+.erl-radio{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--ink-soft);background:#F5F2E9;border:1px solid var(--glass-brd);border-radius:10px;padding:9px 11px;cursor:pointer}
+.erl-radio input{margin-top:2px;flex:none}
+.hz-nolink{font-size:11px;color:var(--ink-faint);font-weight:700;white-space:nowrap}
+/* Punkt 8: Partner & Dienstleister */
+.pt-bar{display:flex;gap:10px;margin:0 0 12px;flex-wrap:wrap}
+.pt-bar input{flex:1;min-width:200px;background:#FCFBF6;border:1px solid var(--glass-brd);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:13px;font-family:inherit}
+.pt-row{cursor:pointer;align-items:flex-start!important}
+.pt-sub{font-size:11.5px;color:var(--ink-faint);font-weight:500;margin-top:1px}
+.pt-schwer{font-size:11.5px;color:var(--ink-soft);margin-top:3px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.kon-last{display:block;font-size:11px;color:var(--ink-faint);font-weight:600;margin-top:1px}
+.hzt-row.snoozed{opacity:.62}
+.hzt-row.snoozed .hzt-obj{font-weight:600}
+.btn-ghost{border:1px solid var(--glass-brd);background:#fff;color:var(--ink-soft);border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer;font-size:14px}
+/* Termin-Formular + Inserat-Link im Objekt-Popup */
+.tm-row{display:flex;gap:10px;flex-wrap:wrap}
+.tm-row>div{flex:1;min-width:120px}
+.tm-row input[type=time],.tm-row select{min-width:90px}
+.linkrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.linkrow input[type=text]{flex:1;min-width:180px;padding:9px;border:1px solid var(--glass-brd);border-radius:10px;font-family:inherit;font-size:13px;background:#fff;color:#16294B}
+.copybtn{border:1px solid var(--glass-brd);background:#fff;color:var(--ink-soft);border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer;font-size:13px;white-space:nowrap}
+.copybtn:hover{background:#F3EFE4}
+</style>
+</head>
+<body>
+<div class="blob a"></div><div class="blob b"></div><div class="blob c"></div>
+<canvas id="confetti"></canvas>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="box">
+    <h1>⚡ Tagescockpit</h1>
+    <p>UpgradeHomes eGbR — melde dich mit dem gemeinsamen Konto an.</p>
+    <button class="btn" id="loginBtn">Mit Google anmelden</button>
+    <div id="loginStatus">Lädt …</div>
+  </div>
+</div>
+
+<!-- COCKPIT -->
+<div class="wrap" id="cockpit" style="display:none">
+  <div class="topbar">
+    <div class="brandhead"><div class="overline">UpgradeHomes</div><div class="moin" id="moinTitle">Moin 👋</div></div>
+    <div class="spacer"></div>
+    <div class="userswitch" id="userswitch">
+      <button data-u="Nele">Nele</button>
+      <button data-u="Niklas" class="active">Niklas</button>
+    </div>
+    <button class="iconbtn" id="refreshBtn" title="Daten neu laden">↻</button>
+  </div>
+  <div class="mockbanner" id="banner">Live-Daten aus eurer Leadliste. Erledigt/Zuweisen/Verschieben wirken vorerst nur in dieser Sitzung (Rückschreibung folgt).</div>
+
+  <div class="nav-tabs card">
+    <button data-tab="heute" class="active">☀️ Heute</button>
+    <button data-tab="pipeline">🏠 Pipeline</button>
+    <button data-tab="kontakte">🧑 Kontakte</button>
+    <button data-tab="woche">🗓️ Mein Wochenüberblick</button>
+  </div>
+
+  <div id="tab-heute"><div class="stack">
+    <div class="card greet" id="greetCard"></div>
+    <div class="card daystrip" id="dayStrip"></div>
+    <div class="card" id="calCard" style="display:none"></div>
+    <div class="card"><div class="kpis" id="kpis"></div></div>
+    <div id="maklercallSlot"></div>
+    <div class="card" id="wochenTodosCard" style="display:none"></div>
+    <div class="card">
+      <div class="section-t">🎯 Tagesfokus – deine Top 3</div>
+      <div class="focus-track" id="focusTrack"></div>
+      <div class="focus-msg" id="focusMsg"></div>
+      <div class="focus-items" id="focusItems"></div>
+    </div>
+    <div class="card"><div class="section-t">🔥 Heute zuerst <small>– dein Tages-Briefing · nach Dringlichkeit gruppiert</small></div><div id="heuteZuerst"></div></div>
+    <div class="card" id="kontaktCard"><div class="section-t">🌱 Kontaktpflege <small>– Netzwerk & offene Mails</small></div><div id="kontaktMini"></div></div>
+    <div class="card" id="neueObjekteCard" style="display:none"><div class="section-t">🔎 Neue Objekte anfragen <small>– aus dem Gmail-Label „neu"</small></div><div id="neueObjekteList"></div></div>
+  </div></div>
+
+  <div id="tab-pipeline" style="display:none">
+    <div class="card" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="userswitch small" id="pipeToggle">
+        <button data-p="ankauf" class="active">🏠 Ankauf</button>
+        <button data-p="verkauf">💰 Verkauf</button>
+      </div>
+      <span style="font-size:12px;color:var(--ink-faint)">Karten per Drag &amp; Drop zwischen Phasen ziehen · Klick öffnet Detail</span>
+    </div>
+    <div class="card"><div class="board-wrap"><div class="board" id="board"></div></div></div>
+  </div>
+
+  <div id="tab-kontakte" style="display:none">
+    <div class="card" style="margin-bottom:18px"><div class="section-t">🏦 Partner &amp; Dienstleister <small>– Banken, Notare, Gutachter · kein Kontakt-Takt, reines Nachschlagen</small></div>
+      <div class="pt-bar"><input id="ptSearch" type="text" placeholder="Suchen: Name, Institut, Ort, Schwerpunkt …"><button class="copybtn" id="ptNew">＋ Partner anlegen</button></div>
+      <div id="partnerList"></div></div>
+    <div class="card"><div class="section-t">🧑 Netzwerk-Kontakte <small>– Makler &amp; Co., nach Überfälligkeit</small></div><div id="kontaktList"></div></div>
+  </div>
+
+
+  <div id="tab-woche" style="display:none">
+    <div class="card" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="font-weight:800">Ansicht:</span>
+      <div class="userswitch small" id="weekViewSwitch">
+        <button data-v="Nele">Nele</button><button data-v="Niklas" class="active">Niklas</button><button data-v="Gemeinsam">Gemeinsam</button>
+      </div>
+      <span style="flex:1"></span>
+      <button type="button" class="link" id="labelMgrBtn">🏷️ Labels verwalten</button>
+    </div>
+    <div class="today-focus" id="todayFocus"></div>
+    <div class="card" style="margin-bottom:18px"><div class="section-t">🗓️ Feste Wochenstruktur</div><div class="week-board" id="weekBoard"></div></div>
+    <div class="card"><div class="section-t">📈 Mein Vorsprung – 1 % besser pro Tag</div><div class="track" id="track"></div></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+<div class="overlay" id="erlOverlay"><div class="modal" id="erlModal"></div></div>
+<div id="toast"></div>
+
+<script src="config.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+const CFG=window.COCKPIT_CONFIG||{};
+let tokenClient=null, accessToken=null;
+const $=id=>document.getElementById(id);
+const NOW=new Date(), CURRENT_WEEKDAY=NOW.getDay(), MS=86400000;
+
+/* ============ AUTH ============ */
+// Google-Tokens laufen nach ~1 Std ab. Ohne Erneuerung kommt beim nächsten Schreiben ein HTTP 401
+// („invalid authentication credentials"). Deshalb: Ablaufzeit merken, im Hintergrund still erneuern
+// und jede API-Anfrage bei 401 genau einmal mit frischem Token wiederholen.
+let tokenExp=0, _signedIn=false, _tokenWaiters=[], _tokenInFlight=false;
+function loginStatus(m,e){ const s=$('loginStatus'); if(s){ s.textContent=m; s.className=e?'err':''; } }
+function initClient(){
+  if(!CFG.CLIENT_ID){ loginStatus('⚠ CLIENT_ID fehlt in config.js',1); return; }
+  if(!window.google||!google.accounts){ loginStatus('Google-Login lädt …'); return; }
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:CFG.CLIENT_ID, scope:(CFG.SCOPES||[]).join(' '),
+    callback:(r)=>{
+      _tokenInFlight=false;
+      if(r.error){
+        const err=new Error('Anmeldung fehlgeschlagen: '+r.error);
+        _tokenWaiters.splice(0).forEach(w=>w.reject(err));
+        loginStatus('Anmeldung fehlgeschlagen: '+r.error,1); return;
+      }
+      accessToken=r.access_token;
+      tokenExp=Date.now()+(((+r.expires_in||3600)-90)*1000);   // 90 Sek Puffer vor echtem Ablauf
+      _tokenWaiters.splice(0).forEach(w=>w.resolve(accessToken));
+      if(!_signedIn){ _signedIn=true; onSignedIn(); }
+    }
+  });
+  loginStatus('Bereit.');
+}
+// Fordert ein Token an (still oder mit Consent). Mehrfachanfragen werden gebündelt, damit nicht mehrere
+// gleichzeitige 401-Retries je ein eigenes Popup auslösen.
+function requestToken(interactive){
+  return new Promise((resolve,reject)=>{
+    if(!tokenClient){ initClient(); if(!tokenClient){ reject(new Error('Login noch nicht bereit – bitte kurz warten und erneut versuchen.')); return; } }
+    _tokenWaiters.push({resolve,reject});
+    if(_tokenInFlight) return;
+    _tokenInFlight=true;
+    try{ tokenClient.requestAccessToken({prompt: interactive?'consent':''}); }
+    catch(e){ _tokenInFlight=false; _tokenWaiters.splice(0).forEach(w=>w.reject(e)); }
+  });
+}
+async function ensureToken(){
+  if(accessToken && Date.now()<tokenExp) return accessToken;
+  return requestToken(false);
+}
+// Zentrale, token-bewusste fetch-Hülle: hängt den Bearer an und wiederholt bei 401 einmal mit neuem Token.
+async function gfetch(url,opts){
+  opts=opts||{};
+  await ensureToken();
+  const build=()=>Object.assign({},opts,{headers:Object.assign({},opts.headers,{Authorization:'Bearer '+accessToken})});
+  let res=await fetch(url,build());
+  if(res.status===401){
+    try{ await requestToken(false); res=await fetch(url,build()); }catch(e){ /* Fehler unten als 401 behandelt */ }
+  }
+  return res;
+}
+async function gjson(url,opts){
+  const res=await gfetch(url,opts);
+  if(!res.ok){ let d=''; try{ d=(await res.json()).error?.message||''; }catch(e){} throw new Error('HTTP '+res.status+(d?(' – '+d):'')); }
+  return res.json();
+}
+$('loginBtn').onclick=()=>{ requestToken(!accessToken).catch(e=>loginStatus(e.message,1)); };
+window.addEventListener('load',()=>setTimeout(initClient,400));
+async function onSignedIn(){ $('login').style.display='none'; $('cockpit').style.display=''; await loadData(); }
+
+/* ============ SHEETS ============ */
+async function sheetsGet(path){ return gjson('https://sheets.googleapis.com/v4/spreadsheets/'+path); }
+const readTab=(name,range)=>sheetsGet(CFG.SHEET_ID+'/values/'+encodeURIComponent(name)+'!'+range).then(d=>d.values||[]);
+async function apiPost(url,body){ return gjson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); }
+async function apiPut(url,body){ return gjson(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); }
+const sheetsBatchWrite=data=>apiPost('https://sheets.googleapis.com/v4/spreadsheets/'+CFG.SHEET_ID+'/values:batchUpdate',{valueInputOption:'USER_ENTERED',data});
+const sheetsWrite=(range,values)=>apiPut('https://sheets.googleapis.com/v4/spreadsheets/'+CFG.SHEET_ID+'/values/'+encodeURIComponent(range)+'?valueInputOption=USER_ENTERED',{values:[values]});
+const sheetsAppend=(range,values)=>apiPost('https://sheets.googleapis.com/v4/spreadsheets/'+CFG.SHEET_ID+'/values/'+encodeURIComponent(range)+':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS',{values:[values]});
+function fmtDate(d){ const p=n=>String(n).padStart(2,'0'); return p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear(); }
+function saveToast(msg,ok,err){ const t=$('toast'); if(!t) return; t.textContent=msg; t.style.display='block'; t.style.borderColor=err?'var(--red)':ok?'var(--green)':'var(--gold)'; clearTimeout(t._t); if(ok||err) t._t=setTimeout(()=>{t.style.display='none';},2600); }
+async function persistPhase(o){
+  if(o.kind!=='ankauf'||!o._row) return;
+  o.owner=markerOwner(o)||phaseOwner(o.phase);   // Zuständigkeit neu ableiten: Text-Marker (NELE/NIKLAS) vor Phasen-Standard; manuelle Zuweisung via ownerMap überschreibt weiterhin
+  saveToast('Speichere Phase …');
+  try{
+    const data=[{range:'Leadliste!J'+o._row,values:[[o.phase]]}];
+    if(o.phase==='Beobachten'){
+      const d1=new Date(); d1.setDate(d1.getDate()+30); const d2=new Date(); d2.setDate(d2.getDate()+60);
+      data.push({range:'Leadliste!U'+o._row,values:[[fmtDate(d1)]]},{range:'Leadliste!V'+o._row,values:[[fmtDate(d2)]]});
+      o.nachfass1=d1; o.nachfass2=d2; o.fael=faellig(o); o.score=scoreOf(o);
+    }
+    await sheetsBatchWrite(data); o.status=o.phase; saveToast('✓ Gespeichert',1);
+  }catch(e){ saveToast('⚠ Nicht gespeichert: '+e.message,0,1); }
+}
+let stateTabReady=false;
+async function ensureStateTab(){
+  if(stateTabReady) return;
+  let exists=true; try{ await readTab('Cockpit-State','A1:D1'); }catch(e){ exists=false; }
+  if(!exists){
+    await apiPost('https://sheets.googleapis.com/v4/spreadsheets/'+CFG.SHEET_ID+':batchUpdate',{requests:[{addSheet:{properties:{title:'Cockpit-State'}}}]});
+    await sheetsWrite('Cockpit-State!A1:E1',['Key','Feld','Wert','Nutzer','Zeit']);
+  }
+  stateTabReady=true;
+}
+async function persistState(key,feld,wert){
+  try{ await ensureStateTab(); await sheetsAppend('Cockpit-State!A:E',[key,feld,wert,currentUser,new Date().toLocaleString('sv-SE')]); saveToast('✓ Gespeichert',1); }
+  catch(e){ saveToast('⚠ Nicht gespeichert: '+e.message,0,1); }
+}
+// wie persistState, aber ohne eigenen Toast (für Neben-Speicherungen, damit nicht zwei Meldungen erscheinen)
+async function persistStateSilent(key,feld,wert){
+  try{ await ensureStateTab(); await sheetsAppend('Cockpit-State!A:E',[key,feld,wert,currentUser,new Date().toLocaleString('sv-SE')]); }catch(e){}
+}
+
+/* ============ HELPERS ============ */
+function esc(s){ return String(s==null?'':s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+function parseDate(s){ if(!s) return null; const m=String(s).match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/); if(!m) return null; let y=+m[3]; if(y<100)y+=2000; return new Date(y,(+m[2])-1,+m[1]); }
+// Alle Datumsangaben aus einem Text (z. B. mehrere „[TT.MM.JJJJ] …"-Notizen) ziehen.
+function parseAllDates(s){ const out=[]; const re=/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/g; let m; while((m=re.exec(String(s||'')))){ let y=+m[3]; if(y<100)y+=2000; out.push(new Date(y,(+m[2])-1,+m[1])); } return out; }
+const daysUntil=d=>d?Math.floor((d-NOW)/MS):null, daysSince=d=>d?Math.floor((NOW-d)/MS):null;
+function parseISO(s){ const m=String(s||'').match(/(\d{4})-(\d{2})-(\d{2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; }
+function norm(s){ return String(s||'').toLowerCase().trim(); }
+const REJECT=['passt nicht','nicht passend','abgesagt','kein interesse','abgelehnt','storniert'];
+const isRejected=v=>REJECT.some(x=>norm(v).includes(x));
+// Punkt 5: Zuständigkeit aus dem Text erkennen – NUR wenn „NIKLAS" bzw. „NELE" in GROSSBUCHSTABEN als ganzes Wort steht.
+// (Klein-/gemischt geschrieben zählt bewusst nicht, damit z. B. „Nele ruft an" die Standard-Logik nicht überschreibt.)
+function detectOwnerMarker(text){
+  const s=String(text||'');
+  const hasNiklas=/(^|[^A-Za-zÄÖÜ])NIKLAS([^A-Za-zÄÖÜ]|$)/.test(s);
+  const hasNele=/(^|[^A-Za-zÄÖÜ])NELE([^A-Za-zÄÖÜ]|$)/.test(s);
+  if(hasNiklas&&!hasNele) return 'Niklas';
+  if(hasNele&&!hasNiklas) return 'Nele';
+  return null;   // keiner oder beide → keine eindeutige Zuweisung
+}
+// Zuständigkeit aus Status- ODER Nächster-Schritt-Text; Status hat Vorrang.
+function markerOwner(o){ return detectOwnerMarker(o.status)||detectOwnerMarker(o.nextStep); }
+
+/* ============ PHASE / SCORE ============ */
+const FUNNEL=['Neu','Vorqualifikation','Kalkulieren','Angebot vorbereiten','Angebot raus','Verhandlung','Kaufvertrag'];
+const BOARD_COLS=[...FUNNEL,'Absage senden','Beobachten'];
+// ANZEIGENAME ≠ SPEICHERWERT: in der Leadliste (Spalte J) steht weiterhin der kurze Wert, angezeigt wird der lange.
+// So bleiben Sheet, phaseOf() und alte Einträge kompatibel, auch wenn wir die Beschriftung später wieder ändern.
+const PHASE_LABEL={'Vorqualifikation':'Vorqualifikation inkl. Besichtigung'};
+function phaseLabel(ph){ return PHASE_LABEL[ph]||ph; }
+function phaseLabelShort(ph){ return ph==='Vorqualifikation'?'Vorqual. + Besichtigung':phaseLabel(ph); }
+// Punkteskala (31.07.2026 gespreizt): Rangfolge bleibt Angebot raus > Kalkulieren > neue Objekte anfragen,
+// aber die Abstände sind so gewählt, dass „Kalkulieren“ die Schwelle 30 (= 🟡 Bald) von sich aus erreicht und
+// nicht mehr zusammen mit den frischen Sichtungen in 🟢 „Im Plan“ verschwindet. Schwellen: 30 🟡 / 60 🟠 / 100 🔴.
+const PHASE_PTS={'Neu':10,'Vorqualifikation':24,'Kalkulieren':32,'Angebot vorbereiten':38,'Angebot raus':44,'Verhandlung':62,'Kaufvertrag':78,'Absage senden':34,'Beobachten':0};
+// Eine Kalkulation, die liegen bleibt, ist unser Engpass → schneller hochstufen als andere Phasen.
+const KALK_STALE_DAYS=3;
+// Standard-Zuständigkeit je Phase: Nele = Neu (Intake) + Kalkulieren + Angebot vorbereiten; Niklas = Vorqualifikation + ab „Angebot raus".
+const NELE_PHASES=new Set(['Neu','Kalkulieren','Angebot vorbereiten']);
+function phaseOwner(phase){ return NELE_PHASES.has(phase)?'Nele':'Niklas'; }
+function phaseOf(o){
+  const s=norm(o.status);
+  if(s){
+    if(s.includes('beobacht')) return 'Beobachten';
+    if(s.includes('absage')||s==='absagen') return 'Absage senden';
+    if(s.includes('kaufvertrag')||s.includes('notar')) return 'Kaufvertrag';
+    if(s.includes('verhand')) return 'Verhandlung';              // "Verhandlung", "verhandeln", "in Verhandlung"
+    if(s.includes('vorbereit')||s.includes('angebot machen')) return 'Angebot vorbereiten';
+    if(s.includes('vorquali')||s.includes('nachfass')||s.includes('follow')) return 'Vorqualifikation';
+    if(s.includes('angebot')) return 'Angebot raus';             // "Angebot raus", "Angebot gemacht"
+    if(s.includes('kalkul')) return 'Kalkulieren';
+    if(s.includes('neu')) return 'Neu';
+  }
+  const hasAngebot=o.angebot && !/^offen|^nein/i.test(o.angebot);
+  if(hasAngebot) return (o.angebotGueltig&&daysUntil(o.angebotGueltig)>=0)?'Verhandlung':'Angebot raus';
+  if(o.besichtigung||o.anruf) return 'Vorqualifikation';
+  return 'Neu';
+}
+function faellig(o){
+  // Nur echte Wiedervorlage-Termine (Nachfassen 1/2). Abgelaufene "Angebot gültig" NICHT als Dringlichkeit werten.
+  const ds=[o.nachfass1,o.nachfass2].filter(Boolean).map(daysUntil);
+  if(!ds.length) return {state:'none',pts:0,txt:'—'};
+  const du=Math.min(...ds);
+  if(du<0) return {state:'overdue',pts:100,txt:'Wiedervorlage überfällig ('+(-du)+' T)'};
+  if(du===0) return {state:'today',pts:80,txt:'Wiedervorlage heute'};
+  if(du<=3) return {state:'soon',pts:40,txt:'Wiedervorlage in '+du+' T'};
+  return {state:'later',pts:0,txt:'Wiedervorlage in '+du+' T'};
+}
+// Jüngste ECHTE Aktivität an einem Objekt: Anruf/Besichtigung, datierte Notiz in Spalte W, oder eine zugeordnete Mail.
+// (Nachfass-Termine zählen NICHT als Aktivität – das sind Zukunfts-Wiedervorlagen.) null = keine bekannte Aktivität.
+function lastActivity(o){
+  const ds=[];
+  if(o.anruf) ds.push(+o.anruf);
+  if(o.besichtigung) ds.push(+o.besichtigung);
+  parseAllDates(o.nextStep).forEach(d=>{ if(daysUntil(d)<=0) ds.push(+d); });   // nur vergangene Notiz-Daten
+  const mails=(typeof GMAIL!=='undefined'&&GMAIL.byObj&&GMAIL.byObj[o._id])||[];
+  mails.forEach(m=>{ if(m.ts) ds.push(m.ts); });
+  return ds.length?new Date(Math.max(...ds)):null;
+}
+const STALE_YELLOW=7, STALE_RED=14;   // Punkt 2: ≥7 T ohne Aktivität → 🟡 Bald, ≥14 T → 🔴 dringend
+function scoreOf(o){
+  const f=o.fael, last=[o.anruf,o.besichtigung,o.nachfass1,o.nachfass2].filter(Boolean).map(daysSince).filter(x=>x!=null&&x>=0);
+  const alter=last.length?Math.min(Math.max(...last),15):0;   // nur leichter Aktualitäts-Nudge
+  let base=(PHASE_PTS[o.phase]||0)+f.pts+alter+(o.prio==='A'?20:o.prio==='B'?10:0);
+  // Eskalation (Punkt 2): aktiver Trichter-Vorgang ohne Aktivität → hochstufen. ≥7 T = mind. 🟡 Bald, ≥14 T = 🔴 dringend.
+  // Ausgenommen: Beobachten / Absage senden / passt nicht (nicht im FUNNEL). Nur bei bekannter letzter Aktivität
+  // (frisch angelegte, nie berührte Objekte werden nicht geflutet). Stuft nur HOCH, nie herab.
+  o._eskaliert=0;
+  if(FUNNEL.includes(o.phase)){
+    const la=lastActivity(o), st=la?daysSince(la):null;
+    if(st!=null && st>=STALE_RED){ base=Math.max(base,100); o._eskaliert=st; }
+    else if(st!=null && st>=STALE_YELLOW){ base=Math.max(base,30); o._eskaliert=st; }
+    // Engpass Kalkulation: liegt sie länger als KALK_STALE_DAYS, geht sie sofort auf 🟠 „Diese Woche“.
+    if(o.phase==='Kalkulieren' && st!=null && st>=KALK_STALE_DAYS){ base=Math.max(base,60); o._eskaliert=st; }
+  }
+  return base;
+}
+function urgency(s){ return s>=100?['var(--band-red)','🔴 Sofort']:s>=60?['var(--band-orange)','🟠 Diese Woche']:s>=30?['var(--band-yellow)','🟡 Bald']:['var(--band-green)','🟢 Im Plan']; }
+function urgBadge(s){ const [c,w]=urgency(s); return `<span class="urg" style="background:${c}" title="Punkte ${s}">${w}</span>`; }
+function bandColor(s){ return urgency(s)[0]; }
+function prioLetter(v){ const c=(String(v||'').trim().toUpperCase()[0]||''); return ['A','B','C'].includes(c)?c:''; }
+function crmPrio(v){ const s=String(v||'').trim().toUpperCase(); if(s.replace(/\s/g,'').startsWith('A+')) return 'A+'; const c=s[0]||''; return ['A','B','C'].includes(c)?c:''; }
+const TIER_ORDER=['A+','A','B','C',''];
+const TIER_LABEL={'A+':'A+ Makler','A':'A Makler','B':'B Makler','C':'C Makler','':'Ohne Priorität'};
+// Bugfix 31.07.2026: Es gab ZWEI verschiedene Kontakt-Takte (Heute-Ansicht rechnete A+ = 7 Tage,
+// der Kontakte-Reiter mit 14). Ab jetzt EINE Quelle für beide Ansichten.
+// Takt (31.07.2026, von Nele festgelegt): A+ alle 7 T · A alle 14 T · B alle 21 T · C gar nicht (nur Nachschlagen).
+const CADENCE={'A+':7,'A':14,'B':21,'C':null,'':null};
+const TIER_TARGET=CADENCE;
+const TIER_TAKT_TXT={'A+':'alle 7 Tage','A':'alle 14 Tage','B':'alle 21 Tage','C':'kein fester Takt','':'kein fester Takt'};
+
+/* ============ DATEN LADEN ============ */
+let OBJ=[], KON=[], SALE=[], PARTNER=[], loadErr=null;
+async function loadData(){
+  $('banner').textContent='Lade eure Daten …';
+  try{
+    const [lead,crm,obj,part]=await Promise.all([
+      readTab(CFG.TABS.leadliste,'A1:X400'),
+      readTab(CFG.TABS.crm,'A1:Z1000'),
+      readTab(CFG.TABS.objektliste,'A1:L60').catch(()=>[]),
+      readTab(CFG.TABS.partner||'Partner','A1:J400').catch(()=>null),   // null = Reiter existiert noch nicht
+    ]);
+    OBJ=mapLeadliste(lead); KON=mapCRM(crm); SALE=mapObjektliste(obj); loadErr=null;
+    PARTNER=part?mapPartner(part):[]; partnerTabReady=!!part;
+    // Gespeicherten Erledigt-Stand laden (Reiter Cockpit-State, append-only, letzter Eintrag je Key gewinnt)
+    let st=[]; try{ st=await readTab('Cockpit-State','A2:E8000'); stateTabReady=true; }catch(e){ st=[]; }
+    doneSet.clear(); for(const k in ownerMap) delete ownerMap[k]; for(const k in META) delete META[k];
+    st.forEach(r=>{ const key=r[0]; if(!key) return; const feld=String(r[1]||''), wert=String(r[2]||'');
+      if(feld==='owner'){ ownerMap[key]=wert; }
+      else if(feld==='done'){ if(wert==='1') doneSet.add(key); else doneSet.delete(key); }
+      else if(feld==='1'||feld==='0'){ if(feld==='1') doneSet.add(key); else doneSet.delete(key); } // Altformat
+      else { META[key+'|'+feld]=wert; }
+    });
+    if(META['week|json']){ try{ const w=JSON.parse(META['week|json']); if(Array.isArray(w)&&w.length) WEEK=w; }catch(e){} }
+    if(META['weeklabels|json']){ try{ const l=JSON.parse(META['weeklabels|json']); if(l&&typeof l==='object'&&!Array.isArray(l)) LBL=l; }catch(e){} }
+    $('banner').innerHTML='Live-Daten aus eurer Leadliste. <b>Phasen-Verschieben &amp; Erledigt werden gespeichert</b> (beide sehen denselben Stand). Woche &amp; Zuweisung folgen.';
+  }catch(e){ loadErr=e.message; $('banner').innerHTML='<span class="err">Daten laden fehlgeschlagen: '+esc(e.message)+'</span>'; }
+  focusSnapshot=null; renderAll();
+  if(hasGmailScope()&&!loadErr) loadGmail();       // im Hintergrund nachladen, danach neu rendern
+  if(hasCalScope()&&!loadErr) loadCalendar();      // Kalender heute laden → Tagesfokus an freie Zeit anpassen
+}
+function mapLeadliste(rows){
+  const out=[];
+  rows.slice(1).forEach((r,i)=>{
+    const o={ _id:'L'+i, _row:i+2, seller:(r[1]||'').trim(), tel:(r[2]||'').trim(),
+      anruf:parseDate(r[3]), besichtigung:parseDate(r[4]),
+      typ:(r[7]||'').trim(), adresse:(r[8]||'').trim(), status:(r[9]||'').trim(),
+      kaufpreis:(r[12]||'').trim(), kalkVK:(r[14]||'').trim(),
+      angebot:(r[16]||'').trim(), angebotGueltig:parseDate(r[19]),
+      nachfass1:parseDate(r[20]), nachfass2:parseDate(r[21]),
+      nextStep:(r[22]||'').trim(), prio:prioLetter(r[23]), owner:'Niklas', kind:'ankauf' };
+    if(!o.seller && !o.adresse && !o.typ) return;
+    o.rejected=isRejected(o.status)&&norm(o.status)!=='absage senden'&&norm(o.status)!=='absagen';
+    o.active=!o.rejected && (!!o.status||!!o.angebot||!!o.nextStep||!!o.nachfass1||!!o.nachfass2);
+    o.phase=phaseOf(o); o.owner=markerOwner(o)||phaseOwner(o.phase); o.fael=faellig(o); o.score=scoreOf(o);
+    o.titel=o.adresse||o.typ||'(ohne Adresse)';
+    o.task=o.nextStep||({'Absage senden':'Absage an Verkäufer/Makler senden','Angebot vorbereiten':'Angebot vorbereiten','Angebot raus':'Angebot nachfassen','Vorqualifikation':'Vorqualifizieren & Daten sammeln','Kalkulieren':'Kalkulieren & bewerten'}[o.phase])||'Nächsten Schritt festlegen';
+    out.push(o);
+  });
+  return out;
+}
+let CRM_NOTES_IDX=17;   // Spalte für Notizen/Update im CRM (Standard R) – aus der Kopfzeile erkannt
+function mapCRM(rows){
+  const head=(rows[0]||[]).map(norm);
+  let ni=head.findIndex(x=>x.includes('notiz')); if(ni<0) ni=head.findIndex(x=>x.includes('update')); if(ni<0) ni=17;
+  CRM_NOTES_IDX=ni;
+  return rows.slice(1).map((r,i)=>({ _id:'C'+i, _row:i+2, prio:crmPrio(r[0]), name:(r[1]||'').trim(), firma:(r[2]||'').trim(),
+    funktion:(r[3]||'').trim(), tel:(r[4]||'').trim(), email:(r[5]||'').trim(), letzter:parseDate(r[6]),
+    art:(r[7]||'').trim(), statusK:(r[8]||'').trim(), notiz:(r[ni]||'').trim() })).filter(k=>k.name);
+}
+/* ===== Punkt 8 (31.07.2026): Reiter „Partner“ – Banken, Notare, Gutachter & Co.
+   Bewusst GETRENNT vom CRM: hier gibt es keinen Kontakt-Takt und keine Überfälligkeit, weil das Ziel nicht
+   regelmäßiger Kontakt ist, sondern Nachschlagen („wo fragen wir die nächste Finanzierung an?“).
+   Spalten: A Kategorie · B Institut/Firma · C Name · D Funktion · E Telefon · F E-Mail · G Region ·
+            H Schwerpunkt / Konditionen · I Zuletzt Kontakt · J Notizen ===== */
+const PARTNER_HEAD=['Kategorie','Institut / Firma','Name','Funktion','Telefon','E-Mail','Region','Schwerpunkt / Konditionen','Zuletzt Kontakt','Notizen'];
+const PARTNER_CATS=['Bank / Finanzierung','Notar','Gutachter','Steuerberater','Rechtsanwalt','Versicherung','Verwalter','Handwerk','Sonstige'];
+const PARTNER_ICON={'Bank / Finanzierung':'🏦','Notar':'⚖️','Gutachter':'📐','Steuerberater':'🧾','Rechtsanwalt':'⚖️','Versicherung':'🛡️','Verwalter':'🏢','Handwerk':'🔧','Sonstige':'📇'};
+function partnerCat(v){ const s=norm(v); if(!s) return 'Sonstige';
+  if(/bank|finanz|sparkasse|volksbank|kredit|darlehen/.test(s)) return 'Bank / Finanzierung';
+  if(/notar/.test(s)) return 'Notar';
+  if(/gutacht|sachverst|wertermitt/.test(s)) return 'Gutachter';
+  if(/steuer/.test(s)) return 'Steuerberater';
+  if(/anwalt|jurist|kanzlei/.test(s)) return 'Rechtsanwalt';
+  if(/versicher/.test(s)) return 'Versicherung';
+  if(/verwalt|weg|hausverwalt/.test(s)) return 'Verwalter';
+  if(/handwerk|bau|maler|elektr|sanit|dach/.test(s)) return 'Handwerk';
+  return PARTNER_CATS.includes(String(v||'').trim())?String(v).trim():'Sonstige';
+}
+function mapPartner(rows){
+  return (rows||[]).slice(1).map((r,i)=>({ _id:'P'+i, _row:i+2,
+    // Ist die Kategorie-Spalte leer, aus Funktion/Institut ableiten – sonst landet alles unter „Sonstige".
+    kategorie:partnerCat((r[0]||'').trim()||[r[3],r[1]].filter(Boolean).join(' ')),
+    institut:(r[1]||'').trim(), name:(r[2]||'').trim(), funktion:(r[3]||'').trim(),
+    tel:(r[4]||'').trim(), email:(r[5]||'').trim(), region:(r[6]||'').trim(),
+    schwerpunkt:(r[7]||'').trim(), letzter:parseDate(r[8]), notiz:(r[9]||'').trim()
+  })).filter(p=>p.institut||p.name);
+}
+function mapObjektliste(rows){
+  if(!rows.length) return [];
+  const head=rows[0].map(norm);
+  const col=n=>head.findIndex(h=>h.includes(n));
+  const iA=col('objekt'), iAd=col('adresse'), iE=col('einheit'), iSt=col('status'), iZ=col('zielpreis'), iInt=col('interessent'), iN=col('nächster')>=0?col('nächster'):col('schritt'), iF=col('fällig'), iNo=col('notiz');
+  return rows.slice(1).filter(r=>r.some(c=>String(c).trim())).map((r,i)=>({ _id:'S'+i, kind:'verkauf', owner:'Nele',
+    titel:(r[iA]||r[iAd]||'').trim()||'Verkaufsobjekt', adresse:(r[iAd]||'').trim(), einheit:(r[iE]||'').trim(),
+    status:(r[iSt]||'').trim(), zielpreis:(r[iZ]||'').trim(), interessent:(r[iInt]||'').trim(),
+    task:(r[iN]||'').trim(), faelligTxt:(r[iF]||'').trim(), notiz:(r[iNo]||'').trim() }));
+}
+function activeObjs(){ return OBJ.filter(o=>o.active); }
+function absagen(){ return OBJ.filter(o=>o.phase==='Absage senden'&&!isDone(o)&&mine(o)); }
+function beobachten(){ return OBJ.filter(o=>o.phase==='Beobachten'); }
+
+/* ============ STATE ============ */
+let currentUser='Niklas', currentTab='heute', focusSnapshot=null, weekView='Niklas', pipeView='ankauf';
+const MC=['🎉 Stark, Niklas! Maklercall erledigt – die wichtigste Weiche des Tages steht. 🚀','🔥 Durch! Genau so füllt man die Pipeline.','💪 Boom – Maklercall gemacht! Das ist die 1 %-Disziplin.','🏆 Erledigt! Wer den wichtigsten Call zuerst macht, dem gehört der Tag.'];
+function mcKey(){ return dkey('MC'); }              // tagesbezogen
+function doneCount(){ let n=0; doneSet.forEach(k=>{ if(!k.startsWith('MC|') && k.endsWith('|'+TODAY_STR)) n++; }); return n; }
+const doneSet=new Set();       // datierte Schlüssel "<id>|<datum>"
+const ownerMap={};             // "<id>" -> "Nele"/"Niklas"
+const META={};                 // generische key|feld -> wert (z. B. week|json)
+const TODAY_STR=NOW.toISOString().slice(0,10);
+function dkey(id){ return id+'|'+TODAY_STR; }
+function isDone(o){ return doneSet.has(dkey(o._id)); }
+function effOwner(o){ return ownerMap[o._id]||o.owner; }
+// Punkt 4: Nach dem Erledigen (mit Vermerk) wird ein „berührt"-Datum gemerkt → das Objekt kommt für ein paar Tage
+// NICHT wieder in den Tagesfokus, außer es steht eine Wiedervorlage an (heute/überfällig). So verschwindet die täglich
+// wiederkehrende Aufgabe (z. B. Lange Straße), bis sie wirklich wieder dran ist.
+const SNOOZE_DAYS=3;
+function focusSuppressed(o){
+  if(isSnoozed(o)) return true;                          // gesetzter Wiedervorlage-Termin schlägt alles
+  const t=META[o._id+'|touched']; if(!t) return false;
+  const d=parseISO(t); if(!d) return false;
+  const ds=daysSince(d);
+  if(ds==null||ds<=0||ds>=SNOOZE_DAYS) return false;   // heute erledigt bleibt sichtbar; nach SNOOZE_DAYS wieder sichtbar
+  if(o.fael&&(o.fael.state==='overdue'||o.fael.state==='today')) return false;   // echte Wiedervorlage sticht die Pause
+  return true;
+}
+/* ===== Wiedervorlage-Pause (31.07.2026): Beim Erledigen kann ein Termin gesetzt werden. Bis dahin verschwindet
+   der Vorgang aus „Heute zuerst“ UND aus dem Tagesfokus und taucht nur unter „⏳ Wiedervorlage geplant“ auf.
+   Gespeichert wird der Termin doppelt: als Datum in Leadliste Spalte U (im Sheet sichtbar) und als
+   Cockpit-State-Feld „snooze“ (damit die Pause auch dann greift, wenn das Sheet noch nicht neu geladen wurde). ===== */
+function snoozeDate(o){ const s=META[o._id+'|snooze']; return s?parseISO(s):null; }
+/* Punkt 3 (31.07.2026): Die Leadliste rechnet bei Status „Beobachten" automatisch Wiedervorlage-Termine
+   in die Spalten U/V (Apps-Script bzw. das Cockpit selbst: heute+30 / heute+60). Diese AUTOMATISCHEN Termine
+   steuern jetzt, wann ein beobachtetes Objekt wieder in der Tagesliste auftaucht.
+   Ein im Cockpit von Hand gesetztes Datum (snooze) STICHT den automatischen Termin immer. */
+function wvAutoDate(o){
+  const ds=[o.nachfass1,o.nachfass2].filter(Boolean).sort((a,b)=>a-b);
+  if(!ds.length) return null;
+  const erreicht=ds.filter(d=>daysUntil(d)<=0);
+  // Ist ein Termin erreicht, ist DIESER der maßgebliche (sonst stünde „in 23 T", obwohl das Objekt längst fällig ist).
+  return erreicht.length?erreicht[erreicht.length-1]:ds[0];
+}
+function wvDateOf(o){ return snoozeDate(o)||wvAutoDate(o); }        // manuell sticht automatisch
+function wvQuelle(o){ return snoozeDate(o)?'manuell':'aus der Leadliste'; }
+// Ist eine Wiedervorlage erreicht/überfällig? (manuelles Datum hat Vorrang; sonst zählt jeder erreichte U/V-Termin)
+function wvFaellig(o){
+  const m=snoozeDate(o); if(m) return daysUntil(m)<=0;
+  const ds=[o.nachfass1,o.nachfass2].filter(Boolean);
+  return ds.length?Math.min(...ds.map(daysUntil))<=0:false;
+}
+function isSnoozed(o){
+  const d=snoozeDate(o); if(!d) return false;
+  const du=daysUntil(d);
+  return du!=null && du>0;                        // am Termin selbst wieder sichtbar
+}
+function snoozeTxt(o){ const d=snoozeDate(o); if(!d) return ''; const du=daysUntil(d); return fmtDate(d)+(du>0?' (in '+du+' T)':''); }
+// Gehört der Vorgang heute in die Tagesliste? Trichter immer; „Beobachten" erst, wenn die Wiedervorlage erreicht ist.
+function inTagesliste(o){
+  if(FUNNEL.includes(o.phase)) return true;
+  if(o.phase==='Beobachten') return wvFaellig(o);
+  return false;
+}
+// Nächste Phase im Trichter – Vorbelegung im Erledigt-Popup.
+function nextPhaseOf(ph){ const i=FUNNEL.indexOf(ph); return (i>=0&&i<FUNNEL.length-1)?FUNNEL[i+1]:null; }
+// Tagesfokus/Heute-zuerst = nur aktive Trichter-Phasen (Beobachten & Absage senden bleiben draußen), nur EIGENE To-dos
+function mine(o){ return effOwner(o)===currentUser; }
+function openTasks(){ return activeObjs().filter(o=>inTagesliste(o)&&!isDone(o)&&mine(o)&&!isSnoozed(o)).sort((a,b)=>b.score-a.score); }
+// Vorgänge mit gesetzter Wiedervorlage – nicht verloren, nur nach hinten gestellt.
+function snoozedTasks(){ return activeObjs().filter(o=>(FUNNEL.includes(o.phase)||o.phase==='Beobachten')&&!isDone(o)&&mine(o)&&isSnoozed(o)).sort((a,b)=>snoozeDate(a)-snoozeDate(b)); }
+function doneObjs(){ return activeObjs().filter(o=>inTagesliste(o)&&isDone(o)&&mine(o)); }
+function setOwner(id,val){ ownerMap[id]=val; persistState(id,'owner',val); }
+// Fehlen noch Kalkulationsdaten? (dann „vorqualifizieren")
+function needsData(o){ return !o.kaufpreis||!o.kalkVK; }
+// Kurzes Stichwort „was ist zu tun" – Mail geht vor Phase, ändert aber NICHT die Priorität.
+function actionKeyword(o){
+  if(o.mail&&o.mail.state==='draft') return '✉️ Mail abschicken';
+  if(o.mail&&o.mail.state==='open') return '✉️ Mail schreiben';
+  if(typeof kanalOf==='function'&&kanalOf(o)==='tel') return '📞 anrufen';   // Punkt 4: Telefonate im Tagesfokus benennen
+  switch(o.phase){
+    case 'Neu': return 'sichten';
+    case 'Vorqualifikation': return 'vorqualifizieren';
+    case 'Kalkulieren': return needsData(o)?'vorqualifizieren':'kalkulieren';
+    case 'Angebot vorbereiten': return 'Angebot vorbereiten';
+    case 'Angebot raus': return 'nachfassen';
+    case 'Verhandlung': return 'verhandeln';
+    case 'Kaufvertrag': return 'Kaufvertrag/Notar';
+    default: return 'nächster Schritt';
+  }
+}
+
+/* ============ WEEK (feste Struktur, sitzungsweise) ============ */
+let LBL={Mindset:'#EC4899',Wichtig:'#FF5C5C',Call:'#F5A623',Abends:'#93C5FD',Privat:'#9CA3AF',Buchhaltung:'#14B8A6'};
+let WEEK=[
+ {day:'Sonntag',cards:[{label:'Mindset',owner:'Gemeinsam',title:'Die beste Version von MIR',check:[["Ho’oponopono",0],['Avatar',0]]},{label:'Mindset',owner:'Gemeinsam',title:'Routinen checken'},{label:'',owner:'Gemeinsam',title:'Review'},{label:'Wichtig',owner:'Gemeinsam',title:'Wochenplanung + Weekly Review',sub:'Sonntagabend',check:[['Weekly Review lesen',0],['Woche planen',0],['Top-3-Ziele setzen',0]]}]},
+ {day:'Montag',cards:[{label:'',owner:'Nele',title:'Vormittag mit Claude',sub:'Fokus-Arbeit'},{label:'Mindset',owner:'Gemeinsam',title:'8:15–8:45 ME TIME',sub:'Laufband/Meditation'},{label:'Wichtig',owner:'Niklas',title:'Akquise',check:[['Makler-Recherche',0],['Makler-Calls',0],['Finanzierung klären',0]]},{label:'Call',owner:'Niklas',title:'Maklercall',sub:'täglich'},{label:'Privat',owner:'Nele',title:'Familien-To-dos'},{label:'Abends',owner:'Gemeinsam',title:'Objekte besprechen',sub:'Mo abend',check:[['Akquise & Calls',0],['Kalkulationen',0],['Leadliste',0]]}]},
+ {day:'Dienstag',cards:[{label:'',owner:'Nele',title:'Vormittag mit Claude'},{label:'Mindset',owner:'Niklas',title:'Lerneinheit Stein'},{label:'Call',owner:'Niklas',title:'Maklercall',sub:'täglich'},{label:'Call',owner:'Niklas',title:'Call 10–11',sub:'MFH'},{label:'Privat',owner:'Nele',title:'Besprechung Pferdehaus',check:[['Status quo',0]]}]},
+ {day:'Mittwoch',cards:[{label:'',owner:'Nele',title:'Vormittag mit Claude'},{label:'Mindset',owner:'Gemeinsam',title:'8:15–8:45 ME TIME'},{label:'Buchhaltung',owner:'Niklas',title:'Buchhaltung',check:[['Rechnungen bezahlen',0],['Kontoauszüge ziehen',0],['Kontostände hochladen',0],['Steuercockpit checken',0]]},{label:'Call',owner:'Niklas',title:'Maklercall',sub:'täglich'},{label:'Privat',owner:'Gemeinsam',title:'Familien-To-dos besprechen'}]},
+ {day:'Donnerstag',cards:[{label:'',owner:'Nele',title:'Akquise: Objekte & Kalkulationen'},{label:'Mindset',owner:'Gemeinsam',title:'8:15–8:45 ME TIME'},{label:'Mindset',owner:'Gemeinsam',title:'Spaziergang 30 Min'},{label:'Call',owner:'Niklas',title:'Maklercall',sub:'täglich'},{label:'Wichtig',owner:'Gemeinsam',title:'KVP',check:[['Bauherrenversicherung',0],['Eigene Webseite',0],['Kontenstruktur',0]]}]},
+ {day:'Freitag',cards:[{label:'',owner:'Nele',title:'Akquise: Objekte & Kalkulationen'},{label:'Mindset',owner:'Gemeinsam',title:'8:15–8:45 ME TIME'},{label:'Mindset',owner:'Gemeinsam',title:'Die beste Version von MIR',sub:'wöchentlich'},{label:'Call',owner:'Niklas',title:'Maklercall',sub:'täglich'},{label:'Privat',owner:'Gemeinsam',title:'Date-Night ❤️'}]},
+ {day:'Samstag',cards:[{label:'',owner:'Nele',title:'Akquise: Objekte & Kalkulationen'},{label:'Mindset',owner:'Niklas',title:'Stein Events'},{label:'Wichtig',owner:'Gemeinsam',title:'Strategie-Meeting',check:[['Wochenziele erreicht?',0]]},{label:'Abends',owner:'Nele',title:'Review Finanzen'},{label:'Buchhaltung',owner:'Nele',title:'Offene Rechnungen'},{label:'Abends',owner:'Gemeinsam',title:'Freunde & Soziales'}]},
+];
+const weekVisibleFor=(c,v)=>v==='Gemeinsam'?c.owner==='Gemeinsam':(c.owner===v||c.owner==='Gemeinsam');
+
+/* ============ RENDER: HEUTE ============ */
+function renderGreet(){
+  const t=openTasks(), n=t.length, red=t.filter(o=>urgency(o.score)[1].includes('Sofort')).length, top=t[0]?t[0].titel:'';
+  const gr=NOW.getHours()<11?'Guten Morgen':'Hallo'; let l2;
+  if(n===0) l2=`🎯 Stark, ${currentUser}! Alles abgehakt – so wächst der Vorsprung: 1 % pro Tag.`;
+  else if(red>=3) l2=`Nicht alles auf einmal – die 1 %-Regel: <b>einen</b> Schritt jetzt. <b>${red} dringende</b> Vorgänge, Nr. 1: <b>${esc(top)}</b>.`;
+  else if(n<=2) l2=`Leichter Tag – perfekt fürs 1 %. <b>${n} offen</b>, zuerst <b>${esc(top)}</b>.`;
+  else l2=`1 % besser heute – jeder Punkt bringt UpgradeHomes weiter. <b>${n} offen</b>, starte mit <b>${esc(top)}</b>.`;
+  $('greetCard').innerHTML=`<div class="greet-msg">${l2}</div>`;
+}
+function renderKpis(){
+  const t=openTasks(), red=t.filter(o=>o.fael.state==='overdue'||o.fael.state==='today').length;
+  const d=[['🏠',t.length,'in Pipeline'],['🔥',red,'fällig/überf.'],['📤',absagen().length,'Absagen offen'],['👁️',beobachten().length,'Beobachten'],['✅',doneCount(),'erledigt']];
+  $('kpis').innerHTML=d.map(x=>`<div class="kpi"><div class="n">${x[0]} ${x[1]}</div><div class="l">${x[2]}</div></div>`).join('');
+}
+function renderDayStrip(){
+  const td=WEEK[CURRENT_WEEKDAY], vis=td.cards.filter(c=>weekVisibleFor(c,currentUser));
+  $('dayStrip').innerHTML=`<div class="ds-h">🗓️ Dein ${td.day} – Fokusblöcke</div><div class="ds-list">${vis.length?vis.map(c=>`<span class="ds-chip"><span class="pill" style="background:${c.label?LBL[c.label]:'#94a3b8'}"></span>${esc(c.title)}</span>`).join(''):'<span class="empty">Heute keine festen Blöcke.</span>'}</div>`;
+}
+function renderMaklercall(){
+  const slot=$('maklercallSlot'), show=currentUser==='Niklas'&&(CURRENT_WEEKDAY>=1&&CURRENT_WEEKDAY<=5);
+  if(!show){ slot.innerHTML=''; return; }
+  if(!doneSet.has(mcKey())){ slot.innerHTML=`<div class="card maklercall"><div class="mc-h">📞 Dein wichtigster Call heute</div><div class="mc-sub">Der tägliche Maklercall – Priorität Nr. 1. Erst der Call, dann der Rest.</div><button id="mcBtn">✓ Maklercall erledigt</button></div>`;
+    $('mcBtn').onclick=()=>{ doneSet.add(mcKey()); persistState(mcKey(),'done','1'); bigBurst(); renderMaklercall(); };
+  } else slot.innerHTML=`<div class="card maklercall done"><div class="mc-h">${MC[NOW.getDate()%MC.length]}</div></div>`;
+}
+function ensureSnapshot(){ if(focusSnapshot) return;
+  const snap=activeObjs().filter(o=>inTagesliste(o)&&mine(o)&&!focusSuppressed(o)).sort((a,b)=>b.score-a.score).slice(0,3).map(o=>({id:o._id,label:phaseLabelShort(o.phase)+' · '+actionKeyword(o)+' – '+o.titel}));
+  if(snap.length<3&&hasGmailScope()&&GMAIL.state==='ready'){   // Bisherige Priorisierung; nur auffüllen mit dem dringendsten Mail-Entwurf
+    for(const m of userMailItems()){ if(snap.length>=3)break; if(m.objId&&snap.some(s=>s.id===m.objId))continue; const id='mail|'+m.tid; if(snap.some(s=>s.id===id))continue; snap.push({id,label:'✉️ '+(m.hasDraft?'Entwurf senden':'Antwort schreiben')+' – '+m.subj,gmail:m.tid}); }
+  }
+  focusSnapshot=snap;
+}
+function renderFocus(){
+  ensureSnapshot();
+  const total=focusSnapshot.length||1, done=focusSnapshot.filter(f=>doneSet.has(dkey(f.id))).length, pct=Math.round(done/total*100);
+  const marks=[['🙂',1],['😃',2],['🤩',3]], at=[33,66,100];
+  $('focusTrack').innerHTML=`<div class="focus-rail"></div><div class="focus-fill" style="width:${pct}%"></div>`+marks.map((m,i)=>`<span class="fm ${done>=m[1]?'on':''}" style="left:${at[i]}%">${m[0]}</span>`).join('');
+  $('focusMsg').textContent=['Auf geht’s – schon der Start zählt. 🙂 wartet.','Guter Start! Weiter zum 😃','Stark dran – ein Schritt zum 🤩!','🤩 Tagesziel erreicht!'][Math.min(done,3)];
+  $('focusItems').innerHTML=focusSnapshot.length?focusSnapshot.map(f=>{ const d=doneSet.has(dkey(f.id));
+    return `<div class="focus-item${d?' done':''}"><span>${d?'✅':'⭕'}</span><span style="flex:1">${esc(f.label)}</span>${f.gmail?`<a class="link" target="_blank" href="${gmailThreadLink(f.gmail)}">öffnen</a>`:''}<button data-id="${f.id}">${d?'erledigt':'✓ erledigt'}</button></div>`; }).join(''):'<div class="empty">Keine offenen Aufgaben 🎯</div>';
+  $('focusItems').querySelectorAll('button').forEach(b=>b.onclick=()=>handleErledigtClick(b.dataset.id));
+}
+// „Stand" = aktueller Zustand (Leadliste-Status J), plus Mail-Hinweis. To-do = die eine nächste Handlung.
+function hzStand(o){
+  const bits=[o.status||phaseLabelShort(o.phase)];
+  if(o.mail&&o.mail.state==='draft') bits.push('✉️ Entwurf offen');
+  else if(o.mail&&o.mail.state==='open') bits.push('✉️ Antwort offen'+(o.mail.ageDays?' ('+o.mail.ageDays+' T)':''));
+  // Punkt 4: Telefon-Stand sichtbar machen – ein geführtes Telefonat ist genauso ein Stand wie eine Mail.
+  // Punkt 3: bei Wiedervorlage aus „Beobachten" den Termin und seine Herkunft zeigen
+  if(o.phase==='Beobachten'){ const d=wvDateOf(o); if(d){ const du=daysUntil(d);
+    bits.push('👁️ Wiedervorlage '+fmtDate(d)+(du<0?' (seit '+(-du)+' T fällig)':du===0?' (heute)':'')+' · '+wvQuelle(o)); } }
+  const k=kanalOf(o);
+  const telT=o.anruf?daysSince(o.anruf):null;
+  if(k==='tel') bits.push(telT==null?'📞 noch nicht telefoniert':(telT===0?'📞 heute telefoniert':'📞 zuletzt telefoniert vor '+telT+' T'));
+  // Eskalations-Hinweis nur, wenn er etwas Neues sagt (sonst stünde „vor 16 T" zweimal in der Zeile).
+  if(o._eskaliert>=STALE_YELLOW && o._eskaliert!==telT) bits.push('⚠ seit '+o._eskaliert+' T ohne Bewegung');
+  return bits.filter(Boolean).join(' · ');
+}
+const HZ_TODO={Neu:'Sichten',Vorqualifikation:'Vorqualifizieren & Daten sammeln',Kalkulieren:'Kalkulieren & bewerten','Angebot vorbereiten':'Angebot vorbereiten','Angebot raus':'Nachfassen',Verhandlung:'Verhandeln',Kaufvertrag:'Kaufvertrag/Notar anstoßen',Beobachten:'Wiedervorlage – reaktivieren oder vertagen'};
+function hzTodo(o){
+  const bi=briefingInfo(o); if(bi&&bi.todo&&bi.todo.length>2) return bi.todo;   // Briefing-To-do hat Vorrang
+  const k=kanalOf(o);
+  if(k==='mail'&&o.mail&&o.mail.state==='draft') return '✉️ Entwurf prüfen & senden';
+  if(k==='mail'&&o.mail&&o.mail.state==='open') return '✉️ Antworten';
+  if(k==='tel') return '📞 Anrufen';
+  return (KANAL_ICON[k]||'')+' '+(HZ_TODO[o.phase]||'Nächsten Schritt festlegen');
+}
+const HZ_VOR={Neu:'Objekt kurz gegen das Ankaufsprofil prüfen.',Vorqualifikation:'Verkäufer/Makler anrufen: Baujahr, Miete, Zustand erfragen.',Kalkulieren:'Kalkulation aufsetzen (Kaufpreis, Sanierung, Verkaufserlös).','Angebot vorbereiten':'Angebot final machen und rausschicken.','Angebot raus':'Freundlich nachfassen, ggf. Frist setzen.',Verhandlung:'Konditionen abstimmen – Preis und Übergabe klären.',Kaufvertrag:'Notartermin vereinbaren, Unterlagen zusammenstellen.',Beobachten:'Wiedervorlage erreicht: kurz prüfen, ob das Objekt noch am Markt ist – dann reaktivieren oder neu vertagen.'};
+// „Vorschlag" = kombiniert: bevorzugt der Text aus dem Morning-Briefing-Entwurf (echte Einschätzung), sonst interne Notiz (Spalte W), sonst Phasen-Standard.
+function hzVorschlag(o){
+  const b=briefingVorschlag(o); if(b) return b;
+  const k=kanalOf(o);
+  if(k==='mail'&&o.mail&&o.mail.state==='draft') return 'Entwurf in Gmail kurz prüfen und abschicken.';
+  if(k==='mail'&&o.mail&&o.mail.state==='open') return 'Freundlich beantworten und offene Punkte klären.';
+  if(k==='tel'){
+    const t=o.anruf?daysSince(o.anruf):null;
+    if(o.phase==='Vorqualifikation') return 'Anrufen: Baujahr, Mieten, Zustand und Leerstand erfragen.';
+    if(o.phase==='Angebot raus') return 'Kurz anrufen und nach dem Stand des Angebots fragen.';
+    if(o.phase==='Verhandlung') return 'Telefonisch abstimmen – Preis und Übergabe klären.';
+    return t!=null?('Nachtelefonieren – letzter Anruf vor '+t+' T.'):'Erstkontakt telefonisch herstellen.';
+  }
+  // Interne Notiz nur noch als letzte Reserve und ohne den führenden [Datum]-Block, damit „Vorschlag“ nicht „Stand“ doppelt.
+  if(o.nextStep){ const letzte=String(o.nextStep).split('\n').filter(Boolean).pop()||''; const clean=letzte.replace(/^\[\d{1,2}\.\d{1,2}\.\d{2,4}\]\s*/,'').trim(); if(clean.length>3) return clean; }
+  return HZ_VOR[o.phase]||'Nächsten Schritt festlegen.';
+}
+// Vorschläge aus dem eingebetteten Briefing je Objekt herauslesen (heuristisch, mit sicherem Fallback).
+// Punkt 4 (31.07.2026): Der Briefing-Parser liest jetzt zusätzlich den KANAL je Vorgang aus –
+// 📞 Telefon / ✉️ Mail / 🧮 intern. Der Morning-Briefing-Skill schreibt ihn ausdrücklich in die Tabelle;
+// zusätzlich erkennen wir ihn heuristisch am Zeilentext, damit ältere Briefings weiter funktionieren.
+function kanalAusText(txt){
+  const t=norm(txt);
+  if(/📞|☎|\btelefon|telefonier|anruf|anrufen|zur[üu]ckrufen|r[üu]ckruf|\bcall\b/.test(t)) return 'tel';
+  if(/✉|📧|\bmail\b|e-mail|entwurf|anschreiben|antworten/.test(t)) return 'mail';
+  if(/🧮|\bintern\b|kalkul|bewert|pr[üu]fen|unterlagen sichten/.test(t)) return 'intern';
+  return '';
+}
+function briefingVorschlagMap(){
+  if(!GMAIL.briefingHtml) return {};        // noch kein Briefing geladen → nichts cachen
+  if(GMAIL._vmap) return GMAIL._vmap;
+  const map={};
+  try{
+    const doc=new DOMParser().parseFromString(sanitizeBriefing(GMAIL.briefingHtml),'text/html');
+    doc.querySelectorAll('table tr').forEach(tr=>{
+      const cells=[...tr.children].filter(c=>c.tagName==='TD').map(c=>(c.textContent||'').trim());
+      if(cells.length<3) return;
+      const key=normLoose(cells[0]); if(!key) return;
+      const vor=cells.slice(2).filter(t=>t.length>3).sort((a,b)=>b.length-a.length)[0];
+      const todo=cells[1]||'';
+      const kanal=kanalAusText(cells.join(' '));
+      if(vor||todo) map[key]={vor:vor||'',todo,kanal};
+    });
+  }catch(e){}
+  GMAIL._vmap=map; return map;
+}
+// Liefert den kompletten Briefing-Eintrag {vor,todo,kanal} zu einem Objekt – oder null.
+function briefingInfo(o){
+  const map=briefingVorschlagMap();
+  const toks=normLoose(o.adresse||o.titel).split(/[\s,.\/]+/).filter(w=>w.length>=4&&!/^\d+$/.test(w)&&!MAP_STOP.has(w));
+  if(!toks.length) return null;
+  for(const key in map){ if(toks.some(tk=>key.includes(tk))) return map[key]; }
+  return null;
+}
+function briefingVorschlag(o){ const i=briefingInfo(o); return (i&&i.vor)?i.vor:null; }
+/* ===== Kanal je Vorgang: Briefing hat Vorrang, sonst Regel aus Phase/Mail/Telefonnummer ===== */
+function hasTel(o){ return /\d/.test(String(o.tel||'')); }
+function telHref(o){ const m=String(o.tel||'').match(/[\d+][\d\s\/()-]{5,}/); return m?('tel:'+m[0].replace(/[^\d+]/g,'')):''; }
+const TEL_PHASES=new Set(['Vorqualifikation','Angebot raus','Verhandlung']);      // hier ist Reden schneller als Schreiben
+const INTERN_PHASES=new Set(['Neu','Kalkulieren','Angebot vorbereiten']);
+function kanalOf(o){
+  const bi=briefingInfo(o);
+  if(bi&&bi.kanal) return bi.kanal;                                   // 1. Briefing führt
+  if(o.mail&&(o.mail.state==='draft'||o.mail.state==='open')) return 'mail';   // 2. wartende Mail
+  if(TEL_PHASES.has(o.phase)&&hasTel(o)) return 'tel';                // 3. Phase + Nummer vorhanden
+  if(INTERN_PHASES.has(o.phase)) return 'intern';
+  return hasTel(o)?'tel':'mail';
+}
+const KANAL_ICON={tel:'📞',mail:'✉️',intern:'🧮'};
+const KANAL_WORT={tel:'Telefonat',mail:'E-Mail',intern:'interne Arbeit'};
+// Punkt 4: aus der reinen Mail-Spalte wird eine AKTIONS-Spalte – Telefonat, Mail oder interne Arbeit.
+function hzMailLink(o){
+  const k=kanalOf(o);
+  if(k==='tel'){
+    const href=telHref(o);
+    if(href) return `<a class="link" href="${href}" onclick="event.stopPropagation()" title="${esc(o.tel)}">📞 anrufen</a>`;
+    return `<span class="hz-nolink" title="Keine Telefonnummer in Spalte C der Leadliste">📞 Nr. fehlt</span>`;
+  }
+  if(o.mail&&o.mail.thread){
+    const t=o.mail.thread;
+    return `<a class="link" target="_blank" href="${gmailThreadLink(t.tid)}" onclick="event.stopPropagation()">${o.mail.state==='draft'?'✏️ senden':'✉️ schreiben'}</a>`;
+  }
+  if(k==='mail'){
+    const q=encodeURIComponent(o.adresse||o.titel||o.seller||'');
+    return `<a class="link" target="_blank" href="https://mail.google.com/mail/u/0/#search/${q}" onclick="event.stopPropagation()">✉️ schreiben</a>`;
+  }
+  return `<span class="hz-nolink">🧮 intern</span>`;
+}
+function hztRow(o){
+  const d=isDone(o);
+  return `<tr class="hzt-row${d?' done':''}" data-id="${o._id}">`
+    +`<td><input type="checkbox" class="hzt-chk"${d?' checked':''} onclick="event.stopPropagation();event.preventDefault();handleErledigtClick('${o._id}')"></td>`
+    +`<td><span class="hzt-dot" style="background:${bandColor(o.score)}"></span><span class="hzt-obj">${esc(o.titel)}</span><div class="hzt-meta">${esc(phaseLabelShort(o.phase))} · <span class="owner ${effOwner(o)}">${effOwner(o)}</span></div></td>`
+    +`<td class="stand">${esc(hzStand(o))}</td>`
+    +`<td>${esc(hzTodo(o))}</td>`
+    +`<td class="vor">${esc(hzVorschlag(o))}</td>`
+    +`<td>${hzMailLink(o)}</td></tr>`;
+}
+// Geparkter Vorgang mit Wiedervorlage-Termin – Klick öffnet das Detail (dort kann der Termin geändert werden).
+function hztSnoozeRow(o){
+  return `<tr class="hzt-row snoozed" data-id="${o._id}">`
+    +`<td></td>`
+    +`<td><span class="hzt-dot" style="background:var(--ink-faint)"></span><span class="hzt-obj">${esc(o.titel)}</span><div class="hzt-meta">${esc(phaseLabelShort(o.phase))} · <span class="owner ${effOwner(o)}">${effOwner(o)}</span></div></td>`
+    +`<td class="stand">⏳ pausiert bis ${esc(snoozeTxt(o))}</td>`
+    +`<td>${esc(hzTodo(o))}</td>`
+    +`<td class="vor">${esc(hzVorschlag(o))}</td>`
+    +`<td><button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();unsnooze('${o._id}')">jetzt zeigen</button></td></tr>`;
+}
+// Pause vorzeitig aufheben (der Termin in Spalte U bleibt stehen).
+function unsnooze(id){ META[id+'|snooze']=''; persistStateSilent(id,'snooze',''); saveToast('✓ Wieder in der Liste',1); renderAll(); }
+// Punkt 6: Absage-Zeile direkt in „Heute zuerst" (statt eigenem Block). Klick öffnet das Absage-Popup.
+function hztAbsageRow(o){
+  return `<tr class="hzt-row" data-abs="${o._id}">`
+    +`<td><input type="checkbox" class="hzt-chk" onclick="event.stopPropagation();event.preventDefault();openAbsage('${o._id}')"></td>`
+    +`<td><span class="hzt-dot" style="background:var(--band-orange)"></span><span class="hzt-obj">${esc(o.titel)}</span><div class="hzt-meta">Absage senden · <span class="owner ${effOwner(o)}">${effOwner(o)}</span></div></td>`
+    +`<td class="stand">${esc(o.status||'Absage senden')}</td>`
+    +`<td>Absage senden &amp; vermerken</td>`
+    +`<td class="vor">Absage an Verkäufer/Makler → danach „Beobachten"</td>`
+    +`<td></td></tr>`;
+}
+// Offene Mail-Entwürfe/Antworten ohne Objekt-Zuordnung – damit kein Entwurf verloren geht.
+function hztMailOnlyRow(m){
+  return `<tr class="hzt-row" data-gmail="${m.tid}">`
+    +`<td></td>`
+    +`<td><span class="hzt-dot" style="background:${m.hasDraft?'var(--band-yellow)':'var(--band-red)'}"></span><span class="hzt-obj">${esc(m.subj)}</span><div class="hzt-meta">${esc(m.fromEmail||'')}</div></td>`
+    +`<td class="stand">Mail ${m.hasDraft?'– Entwurf offen':'– Antwort offen'}</td>`
+    +`<td>${m.hasDraft?'Entwurf prüfen & senden':'Antworten'}</td>`
+    +`<td class="vor">—</td>`
+    +`<td><a class="link" target="_blank" href="${gmailThreadLink(m.tid)}" onclick="event.stopPropagation()">${m.hasDraft?'✏️ senden':'✉️ schreiben'}</a></td></tr>`;
+}
+function renderHeuteZuerst(){
+  const objs=openTasks(), done=doneObjs();   // alle EIGENEN offenen Vorgänge, nach Dringlichkeit sortiert
+  const gmailReady=hasGmailScope()&&GMAIL.state==='ready';
+  const mailOnly=gmailReady?userMailItems().filter(m=>!m.objId):[];
+  let h='';
+  // Lage-Zeile (wie im Briefing)
+  const red=objs.filter(o=>o.score>=100).length, mailWait=objs.filter(o=>o.mail).length+mailOnly.length;
+  h+=`<div class="hz-lage">Lage: <b>${objs.length}</b> ${objs.length===1?'offener Vorgang':'offene Vorgänge'}${red?`, davon <b style="color:var(--band-red)">${red} dringend</b>`:''}${mailWait?` · <b>${mailWait}</b> ${mailWait===1?'Mail wartet':'Mails warten'}`:''} · gefiltert für <b>${currentUser}</b>.</div>`;
+  if(currentUser==='Nele'&&gmailReady){ const n=neuThreads().length;
+    if(n) h+=`<div class="mini" style="background:rgba(20,184,166,.14)"><span class="dot" style="background:#14B8A6"></span><span class="mt">🔎 ${n} ${n===1?'neues Objekt':'neue Objekte'} aus Suchaufträgen – sichten &amp; anfragen</span><a class="link" target="_blank" href="${gmailLabelLink(GMAIL.neuLabel||'neu')}">in Gmail öffnen</a></div>`; }
+  if(hasCalScope()&&CAL.state==='ready'){ const c=dayCapacity(); if(c<objs.length) h+=`<div class="wt-hint" style="margin:0 0 8px">🗓️ Nur ~${freeHrsTxt()} Std frei heute – realistisch schaffst du die Top ${c}. Der Rest wartet geordnet.</div>`; }
+  // Kategorien nach Dringlichkeit (wie das Briefing)
+  const cats=[['🔴 Sofort',s=>s>=100],['🟠 Diese Woche',s=>s>=60&&s<100],['🟡 Bald',s=>s>=30&&s<60],['🟢 Im Plan',s=>s<30]];
+  let body='';
+  cats.forEach(([name,test])=>{
+    const arr=objs.filter(o=>test(o.score)); if(!arr.length) return;
+    body+=`<tr class="hzt-cat"><td colspan="6"><span class="hz-cat" style="color:${bandColor(arr[0].score)}">${name} <small style="color:var(--ink-faint);font-weight:600">(${arr.length})</small></span></td></tr>`;
+    body+=arr.map(hztRow).join('');
+  });
+  const abs=absagen();   // Punkt 6: eigene Zuständigkeit, direkt hier statt separater Karte
+  if(abs.length){
+    body+=`<tr class="hzt-cat"><td colspan="6"><span class="hz-cat" style="color:var(--band-orange)">📤 Absagen offen <small style="color:var(--ink-faint);font-weight:600">(${abs.length}) – anklicken, vermerken → „Beobachten"</small></span></td></tr>`;
+    body+=abs.map(hztAbsageRow).join('');
+  }
+  if(mailOnly.length){
+    body+=`<tr class="hzt-cat"><td colspan="6"><span class="hz-cat" style="color:var(--band-yellow)">✉️ Mails ohne Objekt <small style="color:var(--ink-faint);font-weight:600">(${mailOnly.length})</small></span></td></tr>`;
+    body+=mailOnly.map(hztMailOnlyRow).join('');
+  }
+  const snz=snoozedTasks();   // Punkt 2: mit Termin geparkt – sichtbar, aber unten und ausgegraut
+  if(snz.length){
+    body+=`<tr class="hzt-cat"><td colspan="6"><span class="hz-cat" style="color:var(--ink-faint)">⏳ Wiedervorlage geplant <small style="color:var(--ink-faint);font-weight:600">(${snz.length}) – taucht am Termin automatisch wieder oben auf</small></span></td></tr>`;
+    body+=snz.map(hztSnoozeRow).join('');
+  }
+  if(done.length){
+    body+=`<tr class="hzt-cat"><td colspan="6"><span class="hz-cat" style="color:var(--green)">✓ Heute erledigt <small style="color:var(--ink-faint);font-weight:600">(${done.length})</small></span></td></tr>`;
+    body+=done.map(hztRow).join('');
+  }
+  if(body){
+    h+=`<div class="hzt-wrap"><table class="hzt"><colgroup><col style="width:30px"><col style="width:22%"><col style="width:22%"><col style="width:18%"><col><col style="width:78px"></colgroup>`
+      +`<thead><tr><th></th><th>Objekt</th><th>Stand</th><th>To-do</th><th>Vorschlag</th><th>Aktion</th></tr></thead><tbody>${body}</tbody></table></div>`;
+  } else h+='<div class="empty">Nichts offen – stark! 🎯</div>';
+  if(GMAIL.briefingHtml){
+    const bd=GMAIL.briefingDate, alt=bd?daysSince(bd):null;
+    const stand=bd?(alt===0?'von heute':alt===1?'von gestern':'von vor '+alt+' Tagen'):'';
+    h+=`<a class="hz-brieflink" target="_blank" href="https://mail.google.com/mail/u/0/#drafts">📩 Ganzes Morning Briefing in Gmail öffnen${stand?` <small style="font-weight:600;color:var(--ink-faint)">· Briefing ${stand}</small>`:''}</a>`;
+  }
+  $('heuteZuerst').innerHTML=h;
+  $('heuteZuerst').querySelectorAll('tr.hzt-row[data-id]').forEach(tr=>tr.onclick=()=>openDetail(tr.dataset.id));
+  $('heuteZuerst').querySelectorAll('tr.hzt-row[data-abs]').forEach(tr=>tr.onclick=()=>openAbsage(tr.dataset.abs));
+  $('heuteZuerst').querySelectorAll('tr.hzt-row[data-gmail]').forEach(tr=>tr.onclick=e=>{ if(e.target.tagName!=='A') window.open(gmailThreadLink(tr.dataset.gmail),'_blank'); });
+}
+// (entfernt 31.07.2026) renderAbsagen() – die Absagen stehen jetzt direkt in „Heute zuerst" (hztAbsageRow).
+// Netzwerk-Mails je Kontakt (E-Mail) → offene Antwort + letzter Kontakt aus Mail
+function contactMailIndex(){ const m={}; if(!(hasGmailScope()&&GMAIL.state==='ready')) return m;
+  GMAIL.threads.forEach(t=>{ if(t.cat!=='netzwerk') return; const e=norm(t.fromEmail); if(!e||!e.includes('@')) return;
+    const cur=m[e]||{ts:0,owe:false,tid:null}; if(t.ts&&t.ts>cur.ts) cur.ts=t.ts;
+    if(t.hasDraft||(t.weOwe&&!t.noise)){ cur.owe=true; cur.tid=t.tid; } m[e]=cur; });
+  return m;
+}
+// Punkt 1: nächster fälliger Kontakt je Makler.
+// Vorrang hat ein von Niklas notiertes ZUKUNFTS-Datum in der CRM-Notiz (geplantes Telefonat) – das sticht den Takt.
+// Sonst: letzter Kontakt (CRM „Letzter Kontakt", jüngstes vergangenes Notiz-Datum oder jüngste Netzwerk-Mail) + Takt je Prio.
+/* Punkt 5 (31.07.2026): Im Kontakt-Popup kann ein konkreter Telefontermin gesetzt werden.
+   Er wird im Reiter „Cockpit-State" als Feld „calltermin" gespeichert und STICHT den Prio-Takt:
+   Solange der Termin in der Zukunft liegt, ist der Kontakt nicht fällig; ab dem Termin ist er fällig. */
+function callTermin(k){ const s=META[k._id+'|calltermin']; return s?parseISO(s):null; }
+// Letzter belegter Kontakt (CRM-Datum, datierte Notiz oder Mail) – eine Quelle für alle Ansichten.
+function letzterKontakt(k, idx){
+  let last=k.letzter?+k.letzter:0;
+  parseAllDates(k.notiz).forEach(d=>{ if(daysUntil(d)<=0 && +d>last) last=+d; });
+  const mi=idx&&idx[norm(k.email)]; if(mi&&mi.ts&&mi.ts>last) last=mi.ts;
+  return last?new Date(last):null;
+}
+function letzterKontaktTxt(k, idx){
+  const d=letzterKontakt(k,idx); if(!d) return 'noch nie kontaktiert';
+  const t=daysSince(d);
+  return fmtDate(d)+(t===0?' (heute)':t===1?' (gestern)':' (vor '+t+' T)');
+}
+function nextContactInfo(k, idx){
+  const term=callTermin(k);
+  if(term) return {due:term, termin:true};               // gesetzter Termin sticht den Takt – in beide Richtungen
+  const cad=CADENCE[k.prio]; if(cad==null) return null;   // C und ohne Priorität: kein fester Takt
+  const notes=parseAllDates(k.notiz);
+  const futures=notes.filter(d=>daysUntil(d)>0).sort((a,b)=>a-b);
+  if(futures.length) return {due:futures[0], planned:true};
+  const last=letzterKontakt(k,idx);
+  if(!last) return {due:new Date(+NOW-MS), never:true};   // A+/A/B ohne je dokumentierten Kontakt → fällig
+  return {due:new Date(+last+cad*MS)};
+}
+function konRow(k,mode){
+  const overdue=k.overdue||0, cad=CADENCE[k.prio]||999;
+  const c = mode==='owe' ? 'var(--band-red)' : (overdue>=cad?'var(--band-red)':overdue>0?'var(--band-orange)':'var(--band-yellow)');
+  let tag;
+  if(mode==='owe') tag='✉️ Antwort offen';
+  else if(k.never) tag='noch nie kontaktiert';
+  else if(k.termin) tag=overdue>0?`📞 Termin überfällig (${overdue} T)`:'📞 Telefontermin heute';
+  else if(k.planned) tag=overdue>0?`Telefonat geplant – überfällig (${overdue} T)`:'Telefonat heute geplant';
+  else tag=overdue>0?`fällig seit ${overdue} T`:'heute fällig';
+  // Punkt 4: statt Handemoji das letzte Kontaktdatum direkt in der Zeile
+  const lk=k._lkTxt||letzterKontaktTxt(k,null);
+  return `<div class="mini" data-id="${k._id}" style="cursor:pointer"><span class="dot" style="background:${c}"></span>`
+    +`<span class="mt">${esc(k.name)} <span style="color:var(--ink-faint);font-weight:500">· ${esc(k.firma||'')}</span>`
+    +`<span class="kon-last">zuletzt: ${esc(lk)}</span></span>`
+    +`<span class="ms">${tag}</span>${k.tid?`<a class="link" target="_blank" href="${gmailThreadLink(k.tid)}" onclick="event.stopPropagation()">öffnen</a>`:''}</div>`;
+}
+function renderKontaktMini(){
+  const idx=contactMailIndex();
+  // 1) Offene Netzwerk-Antworten – immer relevant (unabhängig vom Takt)
+  const owe=KON.map(k=>{ const mi=idx[norm(k.email)]; return {...k,tid:mi?mi.tid:null,owe:mi?mi.owe:false,_lkTxt:letzterKontaktTxt(k,idx)}; }).filter(k=>k.owe).slice(0,8);
+  // 2) Fällige Makler nach Prio-Takt – nur zeigen, wenn Takt bzw. geplantes Datum erreicht
+  const oweIds=new Set(owe.map(k=>k._id)), due=[];
+  KON.forEach(k=>{ if(oweIds.has(k._id)) return; const info=nextContactInfo(k,idx); if(!info) return;
+    const du=daysUntil(info.due); if(du>0) return; due.push({...k, overdue:-du, planned:info.planned, never:info.never, termin:info.termin, _lkTxt:letzterKontaktTxt(k,idx)}); });
+  let h='';
+  if(owe.length) h+=`<div class="kp-h" style="color:var(--band-red)">✉️ Antwort offen (Netzwerk)</div>`+owe.map(k=>konRow(k,'owe')).join('');
+  let anyDue=false;
+  ['A+','A','B','C'].forEach(t=>{ const arr=due.filter(x=>x.prio===t).sort((a,b)=>b.overdue-a.overdue); if(!arr.length) return; anyDue=true;
+    h+=`<div class="kp-h">${TIER_LABEL[t]} <small style="color:var(--ink-faint);font-weight:600">– ${TIER_TAKT_TXT[t]} · ${arr.length} fällig</small></div>`+arr.map(k=>konRow(k,'due')).join(''); });
+  if(!owe.length&&!anyDue) h='<div class="empty">Kein Makler fällig – alles im Takt 🌱</div>';
+  $('kontaktMini').innerHTML=h;
+  $('kontaktMini').querySelectorAll('.mini[data-id]').forEach(el=>el.onclick=e=>{ if(e.target.tagName!=='A') openKontakt(el.dataset.id); });
+}
+// Nur für Nele: detaillierte Liste aller anzufragenden neuen Objekte aus dem Gmail-Label „neu" (jedes mit Link zur Mail).
+// Ersetzt bei Nele die Kontaktpflege-Karte (die nur Niklas sieht).
+function mailSenderName(t){ const n=String(t.from||'').replace(/<[^>]*>/,'').replace(/["']/g,'').trim(); return n||t.fromEmail||''; }
+function neuRow(t,i){
+  const sender=mailSenderName(t);
+  const tage=t.ts?Math.max(0,Math.floor((NOW-t.ts)/MS)):null;
+  const alter=tage==null?'':(tage===0?' · heute rein':' · vor '+tage+' T');
+  const status=t.objId?` · ✓ schon in der Pipeline${t.objTitel?' ('+esc(t.objTitel)+')':''}`:' · <b style="color:#14B8A6">neu – anfragen</b>';
+  return `<div class="hz-item" data-gmail="${t.tid}">`
+    +`<div class="hz-rank" style="color:#14B8A6">${i+1}</div>`
+    +`<span class="dot" style="background:#14B8A6"></span>`
+    +`<div class="hz-body"><div class="hz-title">${esc(t.subj)}</div>`
+    +`<div class="hz-sub">${esc(sender)}${alter}${status}</div></div>`
+    +`<a class="link" target="_blank" href="${gmailThreadLink(t.tid)}" onclick="event.stopPropagation()">✉️ öffnen</a></div>`;
+}
+function renderNeueObjekte(){
+  const isNele=currentUser==='Nele';
+  $('kontaktCard').style.display=isNele?'none':'';
+  $('neueObjekteCard').style.display=isNele?'':'none';
+  if(!isNele) return;
+  const box=$('neueObjekteList');
+  if(!hasGmailScope()||GMAIL.state!=='ready'){
+    box.innerHTML='<div class="empty">Gmail noch nicht verbunden – oben rechts verbinden, dann erscheinen hier die neuen Objekte aus dem Label „neu".</div>';
+    return;
+  }
+  const list=neuThreads().slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const offen=list.filter(t=>!t.objId).length;
+  let h=`<div class="hz-lage">Lage: <b>${list.length}</b> ${list.length===1?'neues Objekt':'neue Objekte'} im Label „neu"${offen?`, davon <b style="color:#14B8A6">${offen} noch anzufragen</b>`:''}. <a class="link" target="_blank" href="${gmailLabelLink(GMAIL.neuLabel||'neu')}">ganzes Label in Gmail öffnen</a></div>`;
+  h+=list.length?list.map(neuRow).join(''):'<div class="empty">Aktuell keine neuen Objekte im Label „neu" – nichts anzufragen 🎯</div>';
+  box.innerHTML=h;
+  box.querySelectorAll('.hz-item[data-gmail]').forEach(el=>el.onclick=e=>{ if(e.target.tagName!=='A') openNeuObjekt(el.dataset.gmail); });
+}
+/* ===== Punkt 5: Popup zu einem neuen Objekt – „angefragt → Leadliste (Vorqualifikation)" oder „nicht interessant" ===== */
+function openNeuObjekt(tid){
+  const t=GMAIL.threads.find(x=>x.tid===tid); if(!t) return;
+  const sender=mailSenderName(t);
+  $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
+    <div class="detail-head"><h2>🔎 Neues Objekt</h2>
+      <div style="font-size:13px;color:var(--ink-soft);margin-top:4px">${esc(t.subj)}</div>
+      <div class="deeplinks"><a class="link" target="_blank" href="${gmailThreadLink(tid)}">✉️ Mail öffnen</a></div></div>
+    <div class="section-t" style="margin-top:14px">✅ Angefragt → in die Leadliste</div>
+    <div class="field"><label>Adresse / Objekt</label><textarea id="noAdr" style="min-height:38px">${esc(t.subj)}</textarea></div>
+    <div class="field"><label>Makler / Verkäufer</label><textarea id="noSeller" style="min-height:38px">${esc(sender)}</textarea></div>
+    <div class="field"><label>Notiz (was hast du angefragt?)</label><textarea id="noNote" placeholder="z. B. Exposé & Mietaufstellung angefragt am ${fmtDate(new Date())}"></textarea></div>
+    <div id="noErr"></div>
+    <div class="erl-actions"><button class="savebtn" id="noAdd">➕ In Leadliste (Vorqualifikation)</button></div>
+    <div class="section-t" style="margin-top:18px">🗑️ Nicht interessant</div>
+    <div style="font-size:12px;color:var(--ink-faint);margin-bottom:8px">Mail gelöscht bzw. Objekt passt nicht – hier ausblenden. Es verschwindet aus „Neue Objekte".</div>
+    <div class="erl-actions"><button class="btn-ghost" id="noDrop">Mail gelöscht / nicht interessant</button></div>`;
+  $('erlOverlay').classList.add('open');
+  $('noAdd').onclick=()=>saveNeuObjektAdd(tid);
+  $('noDrop').onclick=()=>saveNeuObjektDrop(tid);
+}
+async function saveNeuObjektAdd(tid){
+  const t=GMAIL.threads.find(x=>x.tid===tid); if(!t) return;
+  const adr=($('noAdr').value||'').trim(), seller=($('noSeller').value||'').trim(), note=($('noNote').value||'').trim();
+  const errEl=$('noErr'); errEl.innerHTML='';
+  if(!adr){ errEl.innerHTML='<div class="erl-err">Bitte eine Adresse/Objektbezeichnung eintragen.</div>'; return; }
+  const btn=$('noAdd'); btn.disabled=true; btn.textContent='Speichere …';
+  try{
+    const row=new Array(24).fill('');
+    row[1]=seller;                 // B  Verkäufer/Makler
+    row[2]=t.fromEmail||'';        // C  Kontakt (E-Mail)
+    row[8]=adr;                    // I  Adresse
+    row[9]='Vorqualifikation';     // J  Status/Phase
+    row[22]=`[${fmtDate(new Date())}] angefragt${note?': '+note:''} (aus Gmail „neu")`;   // W  Notizen aktueller Stand
+    await sheetsAppend('Leadliste!A:X',row);
+    await persistState('neu:'+tid,'status','added');   // Thread erledigt → nicht mehr in „Neue Objekte"
+    META['neu:'+tid+'|status']='added';
+    closeErledigt();
+    saveToast('✓ In Leadliste aufgenommen (Vorqualifikation)',1);
+    await loadData();              // frisch laden → neues Objekt taucht in der Pipeline auf
+  }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='➕ In Leadliste (Vorqualifikation)'; }
+}
+async function saveNeuObjektDrop(tid){
+  const btn=$('noDrop'); btn.disabled=true; btn.textContent='Speichere …';
+  await persistState('neu:'+tid,'status','dropped');   // zeigt eigenen Toast bei Erfolg/Fehler
+  META['neu:'+tid+'|status']='dropped';
+  closeErledigt();
+  renderNeueObjekte();
+}
+/* Feste To-dos aus dem heutigen Wochenplan (Checklist-Punkte der heutigen Blöcke des aktuellen Nutzers) */
+function todayWeekTodos(){
+  const di=CURRENT_WEEKDAY, out=[];
+  (WEEK[di]?.cards||[]).forEach((c,ci)=>{
+    if(!weekVisibleFor(c,currentUser)) return;
+    if(c.check&&c.check.length){ c.check.forEach((x,k)=>out.push({di,ci,k,block:c.title,text:x[0],label:c.label})); }
+  });
+  return out;
+}
+function wtKey(t){ return 'wt|'+t.di+'|'+t.ci+'|'+t.k+'|'+TODAY_STR; }   // tagesbezogen → setzt sich täglich zurück
+function toggleWeekTodo(key){ const nowDone=!doneSet.has(key); if(nowDone){ doneSet.add(key); burst(12); } else doneSet.delete(key); persistState(key,'done',nowDone?'1':'0'); renderAll(); }
+function renderWochenTodos(){
+  const card=$('wochenTodosCard'), items=todayWeekTodos();
+  if(!items.length){ card.style.display='none'; card.innerHTML=''; return; }
+  card.style.display='';
+  const done=items.filter(t=>doneSet.has(wtKey(t))).length;
+  let h=`<div class="section-t">📌 Feste To-dos heute <small>– aus deinem Wochenplan (${WEEK[CURRENT_WEEKDAY].day}) · ${done}/${items.length}</small></div>`;
+  h+=items.map(t=>{ const d=doneSet.has(wtKey(t)), col=t.label?LBL[t.label]:'#94a3b8';
+    return `<div class="mini wt-item${d?' wtdone':''}" data-key="${esc(wtKey(t))}"><input type="checkbox" ${d?'checked':''}><span class="dot" style="background:${col}"></span><span class="mt">${esc(t.block)} → <span style="font-weight:500;color:var(--ink-soft)">${esc(t.text)}</span></span></div>`; }).join('');
+  h+=`<div class="wt-hint">Diese Punkte sind fest eingeplant – erst sie, dann die Akquise. Häkchen gelten nur für heute.</div>`;
+  card.innerHTML=h;
+  card.querySelectorAll('.wt-item input').forEach(cb=>cb.onclick=()=>toggleWeekTodo(cb.closest('.wt-item').dataset.key));
+}
+
+/* ============ RENDER: PIPELINE ============ */
+// Bugfix 31.07.2026: „Nele" und „Niklas" fingen beide mit N an – auf der Kachel nicht unterscheidbar.
+// Jetzt zwei Buchstaben (Ne / Ni) plus Klartext im Tooltip.
+const OWNER_KURZ={'Nele':'Ne','Niklas':'Ni','Gemeinsam':'G'};
+function ownerAv(o){ const bg=o==='Nele'?'#EDE9FE':o==='Niklas'?'#DBEAFE':'#F1E1AC', ink=o==='Nele'?'#6D28D9':o==='Niklas'?'#1D4ED8':'#92400E';
+  return `<span class="kc-avatar" style="background:${bg};color:${ink}" title="${esc(o)}">${esc(OWNER_KURZ[o]||String(o).slice(0,2))}</span>`; }
+function mailFlagHTML(objId){ const f=mailFlagsForObj(objId); if(f.draft) return `<div class="mail-flag draft">✏️ Entwurf offen – in Gmail abschicken</div>`; if(f.open) return `<div class="mail-flag open">✉️ Rückmeldung offen</div>`; return ''; }
+// Punkt 3: Link zur Online-Anzeige. Es gibt keine feste Ablage → wir verlinken die zugeordnete Makler-Mail (dort steht der
+// Exposé-Link); ist keine Mail zugeordnet, ein Gmail-Such-Link zur Adresse. Als echter Link ist er aus der Kachel ziehbar.
+function objAnzeigeLink(o){
+  const stored=listingUrl(o);   // Punkt 1: manuell hinterlegter Inserat-Link hat Vorrang
+  if(stored){ const href=/^https?:\/\//i.test(stored)?stored:'https://'+stored; return {href, txt:'🔗 Inserat'}; }
+  const arr=(GMAIL.byObj&&GMAIL.byObj[o._id])||[];
+  if(arr.length){ const t=arr.slice().sort((a,b)=>(b.ts||0)-(a.ts||0))[0]; return {href:gmailThreadLink(t.tid), txt:'🔗 Anzeige / Mail'}; }
+  // Bugfix 31.07.2026: Früher stand auf JEDER Kachel „🔗 Anzeige suchen", auch wenn es nichts zu öffnen gab.
+  // Ein reiner Suchlink ist kein Inhalt → Kachel bleibt sauber, im Detail-Modal gibt es weiterhin die Gmail-Suche.
+  return null;
+}
+/* Punkt 5 (31.07.2026): Follow-up direkt auf der Objektkachel.
+   Quelle in dieser Reihenfolge: 1. Morning-Briefing-Vorschlag (wird bei jedem Laden/↻ neu aus dem Entwurf gezogen),
+   2. letzte Notiz aus Leadliste Spalte W, 3. Phasen-Standard. Dazu der Kanal als Icon, damit auf einen Blick klar ist,
+   ob telefoniert, geschrieben oder gerechnet werden muss. */
+function followUpHTML(o){
+  const bi=briefingInfo(o), k=kanalOf(o);
+  const txt=(bi&&bi.vor)?bi.vor:hzVorschlag(o);
+  if(!txt) return '';
+  const quelle=(bi&&bi.vor)?'Aus dem Morning Briefing':'Aus der Leadliste / Phase';
+  return `<div class="kc-follow" title="${esc(quelle)}: ${esc(txt)}"><span class="kc-follow-k">${KANAL_ICON[k]||'•'}</span><span class="kc-follow-t">${esc(txt)}</span>${(bi&&bi.vor)?'<span class="kc-follow-src">Briefing</span>':''}</div>`;
+}
+function pipeCard(o){
+  const lnk=objAnzeigeLink(o);
+  const snz=isSnoozed(o)?`<div class="kc-snooze">⏳ pausiert bis ${esc(snoozeTxt(o))}</div>`:'';
+  return `<div class="kc-card${isSnoozed(o)?' snoozed':''}" draggable="true" data-id="${o._id}"><div class="kc-bar" style="background:${bandColor(o.score)}">${urgency(o.score)[1]}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}</div><div class="kc-sub">${esc(o.typ||'')}${o.kaufpreis?' · '+esc(o.kaufpreis):''}${o.angebot?' → '+esc(o.angebot):''}</div>${mailFlagHTML(o._id)}${followUpHTML(o)}${snz}${lnk?`<div style="margin-top:6px"><a class="link" target="_blank" href="${lnk.href}" onclick="event.stopPropagation()" ondragstart="event.stopPropagation()">${lnk.txt}</a></div>`:''}<div class="kc-foot">${o.fael.state!=='none'&&o.fael.state!=='later'?`<span class="kc-due">🔥 ${esc(o.fael.txt)}</span>`:''}<span class="sp"></span>${ownerAv(effOwner(o))}</div></div></div>`;
+}
+function saleCard(o){
+  return `<div class="kc-card" data-id="${o._id}"><div class="kc-bar" style="background:#93C5FD">💰 ${esc(o.status||'Verkauf')}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}</div><div class="kc-sub">${esc(o.einheit||'')}${o.zielpreis?' · '+esc(o.zielpreis):''}</div><div class="kc-foot">${o.task?`<span class="kc-due" style="color:var(--ink-faint)">${esc(o.task)}</span>`:''}<span class="sp"></span>${ownerAv('Nele')}</div></div></div>`;
+}
+function renderBoard(){
+  const board=$('board');
+  if(pipeView==='verkauf'){
+    if(SALE.length){ board.innerHTML=`<div class="col" style="width:100%"><div class="col-head"><span>💰 Verkaufsobjekte</span><span class="cnt">${SALE.length}</span></div>${SALE.map(saleCard).join('')}</div>`; }
+    else board.innerHTML=`<div class="col" style="width:100%"><div class="empty">Reiter „Objektliste" ist noch leer. Trag „Steige 9" mit der Kopfzeile aus <b>Leadliste_Optimierung</b> ein (Objekt · Adresse · Einheit · Status · Zielpreis · Nächster Schritt · Fällig · Notiz), dann erscheinen die Verkaufsobjekte hier.</div></div>`;
+    board.querySelectorAll('.kc-card').forEach(c=>c.onclick=()=>openDetail(c.dataset.id));
+    return;
+  }
+  board.innerHTML=BOARD_COLS.map(ph=>{ const objs=activeObjs().filter(o=>o.phase===ph).sort((a,b)=>b.score-a.score);
+    return `<div class="col" data-phase="${ph}"><div class="col-head"><span title="${esc(phaseLabel(ph))}">${esc(phaseLabelShort(ph))}</span><span class="cnt">${objs.length}</span></div>${objs.map(pipeCard).join('')}</div>`; }).join('');
+  board.querySelectorAll('.kc-card').forEach(card=>{
+    card.onclick=()=>openDetail(card.dataset.id);
+    card.addEventListener('dragstart',e=>{ e.dataTransfer.setData('id',card.dataset.id); card.classList.add('dragging'); });
+    card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+  });
+  board.querySelectorAll('.col').forEach(col=>{
+    col.addEventListener('dragover',e=>{ e.preventDefault(); col.classList.add('drop'); });
+    col.addEventListener('dragleave',()=>col.classList.remove('drop'));
+    col.addEventListener('drop',e=>{ e.preventDefault(); col.classList.remove('drop'); const o=OBJ.find(x=>x._id===e.dataTransfer.getData('id')); if(o&&o.phase!==col.dataset.phase){ o.phase=col.dataset.phase; o.score=scoreOf(o); persistPhase(o); renderBoard(); } });
+  });
+}
+
+/* ============ RENDER: KONTAKTE ============ */
+function renderKontakte(){
+  const idx=contactMailIndex();
+  const groups={}; TIER_ORDER.forEach(t=>groups[t]=[]);
+  KON.forEach(k=>{ const p=TIER_ORDER.includes(k.prio)?k.prio:'';
+    const lk=letzterKontakt(k,idx);
+    groups[p].push({...k, _lk:lk, tage:lk?daysSince(lk):null, _term:callTermin(k)}); });
+  let h='';
+  TIER_ORDER.forEach((t,ti)=>{ const arr=groups[t]; if(!arr.length) return; const tgt=TIER_TARGET[t];
+    arr.sort((a,b)=>{ const ra=a.tage==null?1e9:(tgt?a.tage/tgt:a.tage), rb=b.tage==null?1e9:(tgt?b.tage/tgt:b.tage); return rb-ra; });
+    const faellig=tgt?arr.filter(k=>k.tage==null||k.tage>=tgt).length:0;
+    h+=`<div class="section-t"${ti?' style="margin-top:20px"':''}>${TIER_LABEL[t]} <small>· ${arr.length} Kontakte${tgt?` · ${faellig} fällig`:''} · ${TIER_TAKT_TXT[t]}</small></div>`;
+    if(arr.length>40) h+=`<div class="wt-hint" style="margin:0 0 6px">Zeigt die 40 überfälligsten von ${arr.length} Kontakten dieser Stufe.</div>`;
+    h+=arr.slice(0,40).map(k=>{
+      const r=(!tgt||k.tage==null)?null:k.tage/tgt;
+      const c=!tgt?'#94a3b8':k.tage==null?'var(--band-red)':r>=1?'var(--band-red)':r>=.66?'var(--band-orange)':r>=.33?'var(--band-yellow)':'var(--band-green)';
+      // Punkt 4: kein Handemoji mehr – rechts steht das letzte Kontaktdatum, dahinter der Status.
+      const datum=k._lk?fmtDate(k._lk):'noch nie';
+      const zusatz=k._term?`📞 Termin ${fmtDate(k._term)}`:(!tgt?'':(k.tage==null?'fällig':k.tage>=tgt?'fällig':'im Takt'));
+      return `<div class="mini kon-row" data-id="${k._id}" style="padding:10px 12px"><span class="dot" style="background:${c}"></span>`
+        +`<span class="mt">${esc(k.name)} <span style="color:var(--ink-faint);font-weight:500">· ${esc(k.firma||'')}${k.funktion?' · '+esc(k.funktion):''}</span></span>`
+        +`<span class="ms">zuletzt ${datum}${k.tage!=null?' (vor '+k.tage+' T)':''}${zusatz?' · '+zusatz:''}${k.notiz?' · 📝':''}</span></div>`; }).join('');
+  });
+  $('kontaktList').innerHTML=h||'<div class="empty">Keine Kontakte gefunden.</div>';
+  $('kontaktList').querySelectorAll('.kon-row[data-id]').forEach(el=>el.onclick=()=>openKontakt(el.dataset.id));
+}
+
+/* ============ RENDER: PARTNER (Banken, Notare, Gutachter …) ============ */
+let partnerTabReady=false, partnerFilter='';
+async function ensurePartnerTab(){
+  if(partnerTabReady) return;
+  const tab=CFG.TABS.partner||'Partner';
+  let exists=true; try{ await readTab(tab,'A1:A1'); }catch(e){ exists=false; }
+  if(!exists){
+    await apiPost('https://sheets.googleapis.com/v4/spreadsheets/'+CFG.SHEET_ID+':batchUpdate',{requests:[{addSheet:{properties:{title:tab}}}]});
+    await sheetsWrite(tab+'!A1:J1',PARTNER_HEAD);
+  }
+  partnerTabReady=true;
+}
+function partnerRow(p){
+  const tel=p.tel?`<a class="link" href="tel:${esc(String(p.tel).replace(/\s/g,''))}" onclick="event.stopPropagation()">📞</a>`:'';
+  const mail=p.email?`<a class="link" target="_blank" href="https://mail.google.com/mail/u/0/#search/${encodeURIComponent(p.email)}" onclick="event.stopPropagation()">✉️</a>`:'';
+  const sub=[p.funktion,p.region].filter(Boolean).join(' · ');
+  return `<div class="mini pt-row" data-id="${p._id}" style="padding:10px 12px">`
+    +`<span class="mt"><b>${esc(p.institut||p.name)}</b>${p.name&&p.institut?` <span style="color:var(--ink-faint);font-weight:500">· ${esc(p.name)}</span>`:''}`
+    +`${sub?`<div class="pt-sub">${esc(sub)}</div>`:''}`
+    +`${p.schwerpunkt?`<div class="pt-schwer">${esc(p.schwerpunkt)}</div>`:''}</span>`
+    +`<span class="ms">${p.letzter?'zuletzt '+fmtDate(p.letzter):'—'}${p.notiz?' · 📝':''} ${tel}${mail}</span></div>`;
+}
+function renderPartner(){
+  const box=$('partnerList'); if(!box) return;
+  if(!PARTNER.length){
+    box.innerHTML=`<div class="empty">Noch keine Partner erfasst.${partnerTabReady?'':' Der Reiter „Partner" wird beim ersten Anlegen automatisch in der Leadliste erstellt.'}<br>Über <b>＋ Partner anlegen</b> die erste Bank, den Notar oder einen Gutachter eintragen.</div>`;
+    return;
+  }
+  const q=norm(partnerFilter);
+  const list=q?PARTNER.filter(p=>norm([p.institut,p.name,p.funktion,p.region,p.schwerpunkt,p.notiz,p.kategorie].join(' ')).includes(q)):PARTNER;
+  if(!list.length){ box.innerHTML='<div class="empty">Kein Partner passt zu „'+esc(partnerFilter)+'".</div>'; return; }
+  let h='';
+  PARTNER_CATS.forEach((cat,i)=>{
+    const arr=list.filter(p=>p.kategorie===cat); if(!arr.length) return;
+    arr.sort((a,b)=>(a.institut||a.name).localeCompare(b.institut||b.name,'de'));
+    h+=`<div class="section-t"${i?' style="margin-top:16px"':''}>${PARTNER_ICON[cat]||'📇'} ${esc(cat)} <small>· ${arr.length}</small></div>`;
+    h+=arr.map(partnerRow).join('');
+  });
+  box.innerHTML=h;
+  box.querySelectorAll('.pt-row[data-id]').forEach(el=>el.onclick=()=>openPartner(el.dataset.id));
+}
+function openPartner(id){
+  const p=id?PARTNER.find(x=>x._id===id):null;
+  const neu=!p;
+  const v=p||{kategorie:'Bank / Finanzierung',institut:'',name:'',funktion:'',tel:'',email:'',region:'',schwerpunkt:'',letzter:null,notiz:''};
+  const catOpts=PARTNER_CATS.map(c=>`<option value="${c}" ${v.kategorie===c?'selected':''}>${PARTNER_ICON[c]} ${c}</option>`).join('');
+  const iso=v.letzter?new Date(+v.letzter-v.letzter.getTimezoneOffset()*60000).toISOString().slice(0,10):'';
+  const A=(s)=>esc(s||'').replace(/"/g,'&quot;');
+  $('modal').innerHTML=`<button class="modal-close" onclick="closeDetail()">✕ schließen</button>
+    <h2 style="margin:0 0 4px">${neu?'＋ Partner anlegen':'🏦 '+esc(v.institut||v.name)}</h2>
+    <div style="color:var(--ink-faint);font-size:12.5px;margin-bottom:8px">Nachschlagewerk für Finanzierung, Beurkundung und Bewertung – ohne Wiedervorlage-Takt.</div>
+    <div class="field"><label>Kategorie</label><select id="ptCat">${catOpts}</select></div>
+    <div class="field"><label>Institut / Firma</label><input id="ptInst" type="text" value="${A(v.institut)}" placeholder="z. B. Sparkasse Vorpommern"></div>
+    <div class="field"><label>Ansprechpartner</label><input id="ptName" type="text" value="${A(v.name)}" placeholder="Vor- und Nachname"></div>
+    <div class="field"><label>Funktion</label><input id="ptFunk" type="text" value="${A(v.funktion)}" placeholder="z. B. Firmenkundenberater"></div>
+    <div class="tm-row">
+      <div class="field" style="flex:1"><label>Telefon</label><input id="ptTel" type="text" value="${A(v.tel)}"></div>
+      <div class="field" style="flex:1"><label>E-Mail</label><input id="ptMail" type="text" value="${A(v.email)}"></div>
+    </div>
+    <div class="tm-row">
+      <div class="field" style="flex:1"><label>Region / Ort</label><input id="ptReg" type="text" value="${A(v.region)}" placeholder="z. B. Rostock / MV"></div>
+      <div class="field" style="flex:1"><label>Zuletzt Kontakt</label><input id="ptLast" type="date" value="${iso}"></div>
+    </div>
+    <div class="field"><label>Schwerpunkt / Konditionen</label><textarea id="ptSchwer" placeholder="z. B. finanziert MFH bis 1,5 Mio, 90 % Beleihung, Zins ~4,1 %, braucht Mieterliste + Objektunterlagen">${esc(v.schwerpunkt)}</textarea></div>
+    <div class="field"><label>Notizen${p&&p.notiz?' (bisherige bleiben erhalten, neuer Text wird angehängt)':''}</label>
+      ${p&&p.notiz?`<div class="erl-cur" style="margin-bottom:6px">${esc(p.notiz)}</div>`:''}
+      <textarea id="ptNote" placeholder="z. B. 12.07. Gespräch: grundsätzlich offen für Aufteilungsobjekte"></textarea></div>
+    <div id="ptErr"></div>
+    <div class="erl-actions"><button class="savebtn" id="ptSave">${neu?'Anlegen':'Speichern'}</button><button class="btn-ghost" onclick="closeDetail()">Abbrechen</button></div>`;
+  $('ptSave').onclick=()=>savePartner(neu?null:id);
+  $('overlay').classList.add('open');
+  setTimeout(()=>{ const t=$('ptInst'); if(t) t.focus(); },40);
+}
+async function savePartner(id){
+  const errEl=$('ptErr'); errEl.innerHTML='';
+  const inst=($('ptInst').value||'').trim(), name=($('ptName').value||'').trim();
+  if(!inst&&!name){ errEl.innerHTML='<div class="erl-err">Bitte mindestens Institut oder Name angeben.</div>'; return; }
+  const btn=$('ptSave'); const lbl=btn.textContent; btn.disabled=true; btn.textContent='Speichere …';
+  const lastIso=($('ptLast').value||'').trim(), lastD=lastIso?parseISO(lastIso):null;
+  const neueNotiz=($('ptNote').value||'').trim();
+  const alt=id?PARTNER.find(x=>x._id===id):null;
+  const notiz=neueNotiz?((alt&&alt.notiz?alt.notiz+'\n':'')+`[${fmtDate(new Date())}] ${neueNotiz}`):(alt?alt.notiz:'');
+  const vals=[$('ptCat').value, inst, name, ($('ptFunk').value||'').trim(), ($('ptTel').value||'').trim(),
+    ($('ptMail').value||'').trim(), ($('ptReg').value||'').trim(), ($('ptSchwer').value||'').trim(),
+    lastD?fmtDate(lastD):'', notiz];
+  const tab=CFG.TABS.partner||'Partner';
+  try{
+    await ensurePartnerTab();
+    if(alt&&alt._row) await sheetsWrite(tab+'!A'+alt._row+':J'+alt._row,vals);
+    else await sheetsAppend(tab+'!A:J',vals);
+    const rows=await readTab(tab,'A1:J400'); PARTNER=mapPartner(rows);
+    saveToast('✓ Partner gespeichert',1);
+    closeDetail(); renderPartner();
+  }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent=lbl; }
+}
+
+/* ============ GMAIL – objektzentriert: speist Tagesfokus / Heute zuerst / Kontaktpflege ============ */
+const ME_MAIL='value.estate.group@gmail.com';
+let GMAIL={state:'idle',error:null,threads:[],byObj:{},neuLabel:'',briefingHtml:null,briefingSubject:''};
+function hasGmailScope(){ return (CFG.SCOPES||[]).some(s=>s.includes('gmail')); }
+async function gmailGet(path){ return gjson('https://gmail.googleapis.com/gmail/v1/users/me/'+path); }
+function mailHeaders(msg){ const h={}; (msg.payload&&msg.payload.headers||[]).forEach(x=>h[(x.name||'').toLowerCase()]=x.value||''); return h; }
+function emailOf(from){ const m=String(from||'').match(/<([^>]+)>/); return norm(m?m[1]:from); }
+// Reines no-reply/Newsletter-Rauschen (nie eine Antwort-Aufgabe). Suchauftrags-Objekte (Label „neu") sind KEIN Rauschen.
+function isMailNoise(fe,subj){
+  const f=norm(fe), s=norm(subj);
+  const senders=['no-reply','noreply','no_reply','newsletter','mailer-daemon','postmaster','donotreply','mailings','notifications@','notification@'];
+  if(senders.some(x=>f.includes(x))) return true;
+  if(s.includes('neue nachricht auf')) return true;
+  return false;
+}
+// Kategorie aus dem (Live-)Label-Namen – robust gegen die tatsächliche Benennung im Konto.
+const CAT_RANK={kaufvertrag:5,angebot:4,followup:3,netzwerk:2,neu:1,projekt:0,other:0};
+function mailCat(labelName){
+  const l=norm(labelName);
+  if(l.includes('kaufvertrag')) return 'kaufvertrag';
+  if(l.includes('angebot')) return 'angebot';
+  if(l.includes('netzwerk')) return 'netzwerk';
+  if(l.includes('follow')||l.includes('vorqualifik')||l.includes('telefoniert')) return 'followup';
+  if(l.includes('neu')) return 'neu';
+  if(l.includes('aufwert')||l.includes('aufteil')) return 'projekt';
+  return 'other';
+}
+// Locker normalisieren: Umlaute/ß auflösen + „straße/str." → „str" (damit Hafenstraße == Hafenstr).
+function normLoose(s){ return String(s||'').toLowerCase()
+  .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+  .replace(/strasse/g,'str').replace(/str\./g,'str'); }
+function wordHit(hay,tk){ try{ return new RegExp('\\b'+tk+'\\b').test(hay); }catch(e){ return hay.includes(tk); } }
+const MAP_STOP=new Set(['haus','wohnung','objekt','immobilie','mehrfamilienhaus','etage','zimmer','allee','platz','ring','weg']);  // zu generische Wörter
+// Ordnet eine Mail dem besten Leadliste-Objekt zu (Punkte: exakte Kontakt-Mail > Straßen-Token > Verkäufer-/Absendername). Schwelle gegen Fehltreffer.
+function mapMailToObject(fromEmail,subject,fromName){
+  const fe=norm(fromEmail), hay=normLoose((subject||'')+' '+(fromName||''));
+  let best=null, bestScore=0;
+  for(const o of OBJ){
+    let score=0;
+    if(fe&&fe.includes('@')&&o.tel){ const emails=(norm(o.tel).match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/g)||[]); if(emails.includes(fe)) score+=100; }
+    const adr=normLoose(o.adresse);
+    if(adr) adr.split(/[\s,.\/]+/).filter(w=>w.length>=4&&!/^\d+$/.test(w)&&!MAP_STOP.has(w)).forEach(tk=>{ if(wordHit(hay,tk)) score+=(tk.length>=5?40:25); });
+    const seller=normLoose(o.seller);
+    if(seller) seller.split(/[\s,]+/).filter(w=>w.length>=4&&!MAP_STOP.has(w)).forEach(tk=>{ if(wordHit(hay,tk)) score+=30; });
+    if(score>bestScore){ bestScore=score; best=o; }
+  }
+  return bestScore>=30?best:null;
+}
+async function loadGmail(){
+  if(!hasGmailScope()){ GMAIL.state='noscope'; return; }
+  GMAIL={state:'loading',error:null,threads:[],byObj:{},neuLabel:'',briefingHtml:null,briefingSubject:''};
+  try{
+    const labels={}; const lab=await gmailGet('labels'); (lab.labels||[]).forEach(l=>labels[l.id]=l.name);
+    const draftThreads=new Set();
+    try{ const dr=await gmailGet('drafts?maxResults=100');
+      for(const d of (dr.drafts||[])){ const tid=d.message&&d.message.threadId; if(tid) draftThreads.add(tid); }
+    }catch(e){}
+    // Threads je konfiguriertem Label sammeln; bei Mehrfach-Label gewinnt die „höchste" Kategorie.
+    const labelIds=Object.keys(CFG.LABELS||{}).filter(id=>labels[id]);
+    const seen=new Map();   // tid -> {labelName, cat}
+    for(const id of labelIds){
+      const cat=mailCat(labels[id]); if(cat==='neu'&&!GMAIL.neuLabel) GMAIL.neuLabel=labels[id];
+      let tl; try{ tl=await gmailGet('threads?labelIds='+encodeURIComponent(id)+'&maxResults=25'); }catch(e){ continue; }
+      for(const t of (tl.threads||[])){ const cur=seen.get(t.id); if(!cur||CAT_RANK[cat]>CAT_RANK[cur.cat]) seen.set(t.id,{labelName:labels[id],cat}); }
+    }
+    const out=[];
+    for(const [tid,meta] of seen){
+      let th; try{ th=await gmailGet('threads/'+tid+'?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date'); }catch(e){ continue; }
+      const msgs=th.messages||[]; if(!msgs.length) continue;
+      const h=mailHeaders(msgs[msgs.length-1]);
+      const from=h.from||'', fe=emailOf(from), subj=h.subject||'(kein Betreff)';
+      const fromName=from.replace(/<[^>]*>/,'').replace(/["']/g,'').trim();
+      const ts=h.date?(new Date(h.date)).getTime():null;
+      const weOwe=!fe.includes('value.estate.group');
+      const obj=mapMailToObject(fe,subj,fromName);
+      // „neu"-Suchauftrags-Objekte sind nie Rauschen; sonst no-reply/Newsletter filtern
+      const noise=meta.cat==='neu'?false:isMailNoise(fe,subj);
+      out.push({tid,subj,from,fromEmail:fe,ts,weOwe,hasDraft:draftThreads.has(tid),cat:meta.cat,label:meta.labelName,objTitel:obj?obj.titel:null,objId:obj?obj._id:null,noise});
+    }
+    const byObj={}; out.forEach(t=>{ if(t.objId) (byObj[t.objId]=byObj[t.objId]||[]).push(t); });
+    GMAIL.threads=out; GMAIL.byObj=byObj; GMAIL.state='ready';
+    applyMailToObjects();
+    // Morning-Briefing-Entwurf holen → als Inhalt für den „Offene Mails"-Block (die dortige Priorisierung übernehmen)
+    try{
+      // Punkt 5: nur ein FRISCHES Briefing verwenden – ein Entwurf von letzter Woche wäre schlechter als gar keiner.
+      let mb=await gmailGet('messages?maxResults=3&q='+encodeURIComponent('in:drafts subject:"Morning Briefing" newer_than:2d'));
+      if(!(mb.messages&&mb.messages.length)) mb=await gmailGet('messages?maxResults=3&q='+encodeURIComponent('in:drafts subject:"Morning Briefing" newer_than:7d'));
+      const mid=mb.messages&&mb.messages[0]&&mb.messages[0].id;
+      if(mid){ const full=await gmailGet('messages/'+mid+'?format=full'); GMAIL.briefingHtml=extractHtmlBody(full.payload);
+        const bh=mailHeaders(full); GMAIL.briefingSubject=bh.subject||'Morning Briefing';
+        GMAIL.briefingDate=bh.date?new Date(bh.date):null; }
+    }catch(e){}
+  }catch(e){ GMAIL.error=e.message; GMAIL.state='error'; }
+  renderAll();
+}
+function b64urlDecode(s){ try{ s=String(s||'').replace(/-/g,'+').replace(/_/g,'/'); return decodeURIComponent(escape(atob(s))); }catch(e){ try{ return atob(String(s||'').replace(/-/g,'+').replace(/_/g,'/')); }catch(_){ return ''; } } }
+function findMimePart(payload,mime){ if(!payload) return null; if(payload.mimeType===mime&&payload.body&&payload.body.data) return payload.body.data; if(payload.parts){ for(const p of payload.parts){ const r=findMimePart(p,mime); if(r) return r; } } return null; }
+function extractHtmlBody(payload){ const html=findMimePart(payload,'text/html'); if(html) return b64urlDecode(html); const txt=findMimePart(payload,'text/plain'); if(txt) return '<pre style="white-space:pre-wrap;font-family:inherit;margin:0">'+esc(b64urlDecode(txt))+'</pre>'; return ''; }
+function sanitizeBriefing(h){ return String(h||'').replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<link[^>]*>/gi,'').replace(/ on\w+="[^"]*"/gi,'').replace(/ on\w+='[^']*'/gi,''); }
+// Mail-Zustand je Objekt anhängen (nur Deal-Labels). WICHTIG: Mail ändert NICHT die Priorität – die kommt allein aus der Leadliste.
+const DEAL_CATS=new Set(['followup','angebot','kaufvertrag']);
+function applyMailToObjects(){
+  OBJ.forEach(o=>{
+    const arr=(GMAIL.byObj[o._id]||[]).filter(t=>DEAL_CATS.has(t.cat));
+    const draft=arr.find(t=>t.hasDraft);
+    const open=arr.find(t=>t.weOwe&&!t.hasDraft&&!t.noise);
+    if(draft) o.mail={state:'draft',cat:draft.cat,thread:draft};
+    else if(open){ const age=open.ts?Math.max(0,Math.floor((NOW-open.ts)/MS)):0; o.mail={state:'open',cat:open.cat,ageDays:age,thread:open}; }
+    else o.mail=null;
+    // Score NEU berechnen, sobald Mails da sind: die 7-Tage-Eskalation (Punkt 2) berücksichtigt die jüngste Mail als Aktivität.
+    o.score=scoreOf(o);
+  });
+  focusSnapshot=null;   // Tagesfokus neu bilden (Mail-Hinweise + Stichworte aktualisieren)
+}
+function mailFlagsForObj(objId){ const a=GMAIL.byObj[objId]||[]; return {draft:a.some(m=>m.hasDraft), open:a.some(m=>m.weOwe&&!m.hasDraft&&!m.noise&&DEAL_CATS.has(m.cat))}; }
+function gmailThreadLink(tid){ return 'https://mail.google.com/mail/u/0/#all/'+tid; }
+function gmailLabelLink(name){ return 'https://mail.google.com/mail/u/0/#search/'+encodeURIComponent('label:"'+name+'"'); }
+// Punkt 5: als erledigt markierte „neu"-Threads (in Leadliste aufgenommen ODER als nicht interessant ausgeblendet) nicht mehr zeigen.
+function neuHandled(tid){ return !!META['neu:'+tid+'|status']; }
+function neuThreads(){ return GMAIL.threads.filter(t=>t.cat==='neu'&&!neuHandled(t.tid)); }
+// Mail-Items (offene Entwürfe + unbeantwortete = für uns gleichbedeutend) als eigene To-dos. Niklas bekommt alle (er macht die Mails), Nele nur ihre Objekt-Mails.
+function userMailItems(){
+  const all=GMAIL.threads.filter(t=>DEAL_CATS.has(t.cat)&&(t.hasDraft||(t.weOwe&&!t.noise)));
+  const pool=currentUser==='Niklas'?all:all.filter(t=>{ const o=t.objId&&OBJ.find(x=>x._id===t.objId); return o&&effOwner(o)==='Nele'; });
+  return pool.slice().sort((a,b)=>(b.hasDraft-a.hasDraft)||(CAT_RANK[b.cat]-CAT_RANK[a.cat]));
+}
+// Kontaktpflege-Liste (offene Netzwerk-Antworten zuerst, dann länger still) – auch zum Auffüllen von „Heute zuerst".
+function kontaktToDoList(){
+  const idx=contactMailIndex();
+  const en=KON.map(k=>{ const mi=idx[norm(k.email)]; let tage=daysSince(k.letzter);
+    if(mi&&mi.ts){ const mt=Math.floor((NOW-mi.ts)/MS); if(mt>=0&&(tage==null||mt<tage)) tage=mt; }
+    return {...k,tage,owe:mi?mi.owe:false,tid:mi?mi.tid:null}; });
+  const owe=en.filter(k=>k.owe);
+  const stale=en.filter(k=>!k.owe&&k.tage!=null&&k.tage>30).sort((a,b)=>b.tage-a.tage);
+  return owe.concat(stale);
+}
+/* (entfernt 31.07.2026) hzMailRow/hzKonRow/objMailGroups/threadLine/renderOffeneMails – Reste des alten
+   „Offene Mails"-Blocks. Die Mail-Priorisierung steckt seit 16.07.2026 in der „Heute zuerst"-Tabelle. */
+
+/* ============ KALENDER – Tagesfokus an freie Zeit anpassen + Besichtigungen sehen ============ */
+let CAL={state:'idle',error:null,events:[],busyMin:0,freeMin:600,besichtigung:false};
+function hasCalScope(){ return (CFG.SCOPES||[]).some(s=>s.includes('calendar')); }
+async function calGet(path){ return gjson('https://www.googleapis.com/calendar/v3/'+path); }
+const WORK_START=6, WORK_END=19;   // Arbeitsfenster für die „freie Zeit"-Rechnung
+function isBesichtigung(s){ const t=norm(s); return t.includes('besichtig')||t.includes('viewing')||t.includes('objektbesichtig'); }
+async function loadCalendar(){
+  if(!hasCalScope()){ CAL.state='noscope'; return; }
+  CAL={state:'loading',error:null,events:[],busyMin:0,freeMin:(WORK_END-WORK_START)*60,besichtigung:false};
+  try{
+    const s0=new Date(NOW); s0.setHours(0,0,0,0); const e0=new Date(NOW); e0.setHours(23,59,59,999);
+    const q='calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=50&timeMin='+encodeURIComponent(s0.toISOString())+'&timeMax='+encodeURIComponent(e0.toISOString());
+    const data=await calGet(q);
+    const ws=new Date(NOW); ws.setHours(WORK_START,0,0,0); const we=new Date(NOW); we.setHours(WORK_END,0,0,0);
+    const evs=[]; let busy=0;
+    (data.items||[]).forEach(e=>{
+      if(e.status==='cancelled') return;
+      const allDay=!!(e.start&&e.start.date);
+      const s=allDay?null:new Date(e.start.dateTime), en=allDay?null:new Date(e.end.dateTime);
+      const bes=isBesichtigung((e.summary||'')+' '+(e.description||''));
+      let mins=0;
+      if(!allDay&&s&&en){ const a=Math.max(s.getTime(),ws.getTime()), b=Math.min(en.getTime(),we.getTime()); mins=Math.max(0,Math.round((b-a)/60000)); }
+      busy+=mins;
+      if(bes) CAL.besichtigung=true;
+      evs.push({title:e.summary||'(ohne Titel)',allDay,start:s,end:en,loc:e.location||'',bes});
+    });
+    CAL.events=evs; CAL.busyMin=busy; CAL.freeMin=Math.max(0,(WORK_END-WORK_START)*60-busy); CAL.state='ready';
+  }catch(e){ CAL.error=e.message; CAL.state='error'; }
+  renderAll();
+}
+// Wie viele Akquise-To-dos sind heute realistisch? An freie Zeit gekoppelt (grob 1/Std), aber weiterhin max 5.
+function dayCapacity(){ if(!(hasCalScope()&&CAL.state==='ready')) return 5; return Math.max(1,Math.min(5,Math.round(CAL.freeMin/60))); }
+function freeHrsTxt(){ return (CAL.freeMin/60).toFixed(1).replace('.',',').replace(',0',''); }
+function fmtTime(d){ return d?String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'):''; }
+function calEventRow(e){
+  const when=e.allDay?'ganztägig':`${fmtTime(e.start)}–${fmtTime(e.end)}`;
+  return `<div class="mini"><span class="dot" style="background:${e.bes?'#14B8A6':'#93C5FD'}"></span><span class="mt">${esc(e.title)}${e.bes?' 👀 Besichtigung':''}${e.loc?` <span style="color:var(--ink-faint);font-weight:500">· ${esc(e.loc)}</span>`:''}</span><span class="ms">${when}</span></div>`;
+}
+function renderCalendar(){
+  const card=$('calCard');
+  if(!hasCalScope()||CAL.state==='idle'||CAL.state==='noscope'){ card.style.display='none'; return; }
+  card.style.display='';
+  if(CAL.state==='loading'){ card.innerHTML=`<div class="section-t">🗓️ Heute im Kalender</div><div class="empty">Lade Kalender …</div>`; return; }
+  if(CAL.state==='error'){ card.innerHTML=`<div class="section-t">🗓️ Heute im Kalender</div><div class="empty err">Kalender nicht erreichbar: ${esc(CAL.error||'')}<br>Ist die Calendar-API im Google-Projekt aktiviert und die Berechtigung bestätigt?</div>`; return; }
+  const evs=CAL.events.slice().sort((a,b)=>(a.allDay?-1:b.allDay?1:(a.start-b.start)));
+  let h=`<div class="section-t">🗓️ Heute im Kalender <small>– ${CAL.events.length} Termine · ~${freeHrsTxt()} Std frei (${WORK_START}–${WORK_END} Uhr)${CAL.besichtigung?' · 👀 Besichtigung!':''}</small></div>`;
+  h+=evs.length?evs.map(calEventRow).join(''):'<div class="empty">Keine Termine – der Tag gehört dir. 🎯</div>';
+  card.innerHTML=h;
+}
+
+/* ============ RENDER: WOCHE ============ */
+function renderWeek(){
+  const wb=$('weekBoard');
+  wb.innerHTML=WEEK.map((d,i)=>{ const today=i===CURRENT_WEEKDAY;
+    const cards=d.cards.map((c,ci)=>weekVisibleFor(c,weekView)?weekCard(c,i,ci):'').join('');
+    const n=d.cards.filter(c=>weekVisibleFor(c,weekView)).length;
+    return `<div class="wcol${today?' today':''}" data-di="${i}"><div class="wcol-head"><span>${d.day}</span>${today?'<span class="now">● heute</span>':`<span class="badge">${n}</span>`}</div>`
+      +`<div class="wcol-body" data-di="${i}">${cards||'<div class="empty" style="font-size:11px">–</div>'}</div>`
+      +`<button class="wc-addb" data-di="${i}">＋ Karte</button></div>`; }).join('');
+  wb.querySelectorAll('.wc-items input[type=checkbox]').forEach(cb=>cb.onclick=e=>{ e.stopPropagation(); toggleWeekCheck(+cb.dataset.di,+cb.dataset.ci,+cb.dataset.k); });
+  wb.querySelectorAll('.wc-editb').forEach(b=>b.onclick=e=>{ e.stopPropagation(); openWeekEdit(+b.dataset.di,+b.dataset.ci); });
+  wb.querySelectorAll('.wc-addb').forEach(b=>b.onclick=e=>{ e.stopPropagation(); addWeekCard(+b.dataset.di); });
+  // Punkt 7: Karten per Drag & Drop zwischen den Tagen verschieben
+  wb.querySelectorAll('.wc-card').forEach(card=>{
+    card.addEventListener('dragstart',e=>{ e.dataTransfer.setData('wk',card.dataset.di+':'+card.dataset.ci); e.dataTransfer.effectAllowed='move'; card.classList.add('dragging'); });
+    card.addEventListener('dragend',()=>{ card.classList.remove('dragging'); wb.querySelectorAll('.wcol-body.drop').forEach(x=>x.classList.remove('drop')); });
+  });
+  // Punkt 7 (07.08.2026): Karten auch INNERHALB einer Spalte sortieren – Zielposition aus der Maushöhe ableiten.
+  const dropIndexFor=(colb,y)=>{
+    const cards=[...colb.querySelectorAll('.wc-card:not(.dragging)')];
+    for(let i=0;i<cards.length;i++){ const r=cards[i].getBoundingClientRect(); if(y < r.top + r.height/2) return +cards[i].dataset.ci; }
+    return null;   // ans Ende
+  };
+  wb.querySelectorAll('.wcol-body').forEach(colb=>{
+    colb.addEventListener('dragover',e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; colb.classList.add('drop'); });
+    colb.addEventListener('dragleave',e=>{ if(!colb.contains(e.relatedTarget)) colb.classList.remove('drop'); });
+    colb.addEventListener('drop',e=>{ e.preventDefault(); colb.classList.remove('drop');
+      const raw=e.dataTransfer.getData('wk'); if(!raw) return;
+      const [fd,fc]=raw.split(':').map(Number), td=+colb.dataset.di;
+      moveWeekCard(fd,fc,td,dropIndexFor(colb,e.clientY));
+    });
+  });
+  const td=WEEK[CURRENT_WEEKDAY], vis=td.cards.filter(c=>weekVisibleFor(c,weekView));
+  $('todayFocus').innerHTML=`<div class="tf-h">🎯 Heute ist ${td.day} – dein Fokus</div><div class="tf-list">${vis.length?vis.map(c=>`<div class="tf-chip"><span class="pill" style="background:${c.label?LBL[c.label]:'#94a3b8'}"></span>${esc(c.title)}</div>`).join(''):'<div class="empty">Keine festen Blöcke.</div>'}</div>`;
+}
+function weekCard(c,di,ci){
+  let ch='';
+  if(c.check&&c.check.length){ const done=c.check.filter(x=>x[1]).length;
+    ch=`<div class="wc-items"><div style="font-size:10px;color:var(--green);font-weight:700">Checklist ${done}/${c.check.length}</div>`+
+      c.check.map((x,k)=>`<label class="wc-ci${x[1]?' done':''}"><input type="checkbox" ${x[1]?'checked':''} data-di="${di}" data-ci="${ci}" data-k="${k}">${esc(x[0])}</label>`).join('')+'</div>'; }
+  return `<div class="wc-card" draggable="true" data-di="${di}" data-ci="${ci}">${c.label?`<div class="kc-bar" style="background:${LBL[c.label]}">${c.label}</div>`:''}<div class="wc-body"><button class="wc-editb" data-di="${di}" data-ci="${ci}">✎</button><div class="wc-title">${esc(c.title)}</div>${c.sub?`<div class="wc-sub">${esc(c.sub)}</div>`:''}${ch}</div></div>`;
+}
+/* ===== Punkt 7 (31.07.2026): Wochenüberblick als echtes Kanban – Karte anlegen, verschieben, löschen ===== */
+function addWeekCard(di){
+  const owner=(weekView==='Gemeinsam')?'Gemeinsam':weekView;
+  WEEK[di].cards.push({label:'',owner,title:'Neue Karte',check:[]});
+  persistWeek(); renderWeek();
+  openWeekEdit(di, WEEK[di].cards.length-1);       // direkt zum Benennen öffnen
+}
+// toCi = ci der Karte, VOR der eingefügt werden soll; null = ans Ende. Erlaubt Sortieren innerhalb einer Spalte
+// und positionsgenaues Ablegen in einer anderen Spalte.
+function moveWeekCard(fromDi,fromCi,toDi,toCi){
+  if(!WEEK[fromDi]||!WEEK[fromDi].cards[fromCi]||!WEEK[toDi]) return;
+  const src=WEEK[fromDi].cards, dst=WEEK[toDi].cards;
+  const card=src[fromCi];
+  const refCard=(toCi==null)?null:dst[toCi];
+  if(refCard===card) return;                         // auf sich selbst abgelegt → nichts tun
+  src.splice(fromCi,1);
+  let idx=(refCard==null)?dst.length:dst.indexOf(refCard);
+  if(idx<0) idx=dst.length;
+  dst.splice(idx,0,card);
+  persistWeek(); renderWeek();
+  if(fromDi!==toDi) saveToast('✓ Verschoben nach '+WEEK[toDi].day,1);
+}
+function deleteWeekCard(di,ci){
+  const c=WEEK[di]&&WEEK[di].cards[ci]; if(!c) return;
+  if(!confirm('Karte „'+(c.title||'')+'" wirklich löschen?')) return;
+  WEEK[di].cards.splice(ci,1);
+  persistWeek(); closeDetail(); renderWeek();
+  saveToast('✓ Karte gelöscht',1);
+}
+function duplicateWeekCard(di,ci){
+  const c=WEEK[di]&&WEEK[di].cards[ci]; if(!c) return;
+  const copy=JSON.parse(JSON.stringify(c));
+  if(copy.check) copy.check=copy.check.map(x=>[x[0],0]);   // Häkchen der Kopie zurücksetzen
+  WEEK[di].cards.splice(ci+1,0,copy);
+  persistWeek(); closeDetail(); renderWeek();
+  saveToast('✓ Karte dupliziert',1);
+}
+function persistWeek(){ persistState('week','json',JSON.stringify(WEEK)); }
+/* ===== Labels verwalten (07.08.2026): anlegen, umbenennen, löschen, Farbe wählen. Umbenennen zieht Karten mit. ===== */
+let _lblRows=[];
+function openLabelManager(){
+  _lblRows=Object.keys(LBL).map(k=>({orig:k,name:k,color:LBL[k]||'#94a3b8'}));
+  renderLabelManager();
+  $('overlay').classList.add('open');
+}
+function renderLabelManager(){
+  const rows=_lblRows.map((r,i)=>`<div class="ew-row" data-i="${i}">
+      <input type="color" class="lblColor" value="${/^#[0-9a-fA-F]{6}$/.test(r.color)?r.color:'#94a3b8'}">
+      <input type="text" class="lblName" value="${esc(r.name).replace(/"/g,'&quot;')}" placeholder="Label-Name">
+      <button type="button" class="rm lblDel">✕</button>
+    </div>`).join('')||'<div class="empty" style="font-size:12px">Noch keine Labels.</div>';
+  $('modal').innerHTML=`<button class="modal-close" onclick="closeDetail()">✕ schließen</button>
+    <h2 style="margin:0 0 4px">🏷️ Labels verwalten</h2>
+    <div style="color:var(--ink-faint);font-size:12.5px;margin-bottom:12px">Farbe und Name je Label. <b>Umbenennen</b> aktualisiert alle Karten mit diesem Label. <b>Löschen</b> (✕) entfernt nur das Label – die Karten bleiben erhalten.</div>
+    <div id="lblRows">${rows}</div>
+    <button class="ew-add" id="lblAdd">＋ Label hinzufügen</button>
+    <div class="erl-actions" style="margin-top:14px">
+      <button class="savebtn" id="lblSave">Speichern</button>
+      <button class="btn-ghost" onclick="closeDetail()">Abbrechen</button>
+    </div>
+    <div id="lblErr"></div>`;
+  $('lblAdd').onclick=()=>{ syncLabelRows(); _lblRows.push({orig:null,name:'',color:'#94a3b8'}); renderLabelManager(); };
+  $('lblSave').onclick=saveLabelManager;
+  document.querySelectorAll('#lblRows .lblDel').forEach(b=>b.onclick=()=>{ syncLabelRows(); const i=+b.closest('.ew-row').dataset.i; _lblRows.splice(i,1); renderLabelManager(); });
+  setTimeout(()=>{ const last=document.querySelector('#lblRows .ew-row:last-child .lblName'); if(last&&!last.value) last.focus(); },40);
+}
+function syncLabelRows(){
+  document.querySelectorAll('#lblRows .ew-row').forEach(row=>{ const i=+row.dataset.i; if(!_lblRows[i]) return;
+    _lblRows[i].name=row.querySelector('.lblName').value;
+    _lblRows[i].color=row.querySelector('.lblColor').value; });
+}
+function saveLabelManager(){
+  syncLabelRows();
+  const errEl=$('lblErr'); errEl.innerHTML='';
+  const finalRows=_lblRows.map(r=>({orig:r.orig,name:(r.name||'').trim(),color:r.color})).filter(r=>r.name);   // leerer Name = löschen
+  const names=finalRows.map(r=>r.name.toLowerCase());
+  if(new Set(names).size!==names.length){ errEl.innerHTML='<div class="erl-err">Label-Namen müssen eindeutig sein.</div>'; return; }
+  const newLBL={}, rename={};
+  finalRows.forEach(r=>{ newLBL[r.name]=/^#[0-9a-fA-F]{6}$/.test(r.color)?r.color:'#94a3b8'; if(r.orig&&r.orig!==r.name) rename[r.orig]=r.name; });
+  WEEK.forEach(d=>d.cards.forEach(c=>{ if(!c.label) return;
+    if(rename[c.label]) c.label=rename[c.label];        // umbenannt → Karte mitziehen
+    else if(!newLBL[c.label]) c.label='';               // gelöscht → Label von der Karte entfernen
+  }));
+  LBL=newLBL;
+  persistWeek();
+  persistState('weeklabels','json',JSON.stringify(LBL));
+  closeDetail(); renderWeek();
+  saveToast('✓ Labels gespeichert',1);
+}
+function toggleWeekCheck(di,ci,k){ const c=WEEK[di].cards[ci].check; c[k][1]=c[k][1]?0:1; persistWeek(); renderWeek(); }
+let editItems=[], editRef=null;
+function openWeekEdit(di,ci){
+  editRef={di,ci}; const card=WEEK[di].cards[ci]; editItems=(card.check||[]).map(c=>({t:c[0],d:c[1]}));
+  const LK=Object.keys(LBL);
+  const labelOpts=['<option value="">(kein Label)</option>'].concat(LK.map(k=>`<option value="${k}" ${card.label===k?'selected':''}>${k}</option>`)).join('');
+  const ownerOpts=['Nele','Niklas','Gemeinsam'].map(o=>`<option value="${o}" ${card.owner===o?'selected':''}>${o}</option>`).join('');
+  const dayOpts=WEEK.map((d,i)=>`<option value="${i}" ${i===di?'selected':''}>${esc(d.day)}</option>`).join('');
+  $('modal').innerHTML=`<button class="modal-close" onclick="closeDetail()">✕</button>
+    <h2 style="margin:0 0 4px">Karte bearbeiten</h2><div style="color:var(--ink-faint);font-size:13px">${WEEK[di].day}</div>
+    <div class="field"><label>Titel</label><input id="edTitle" type="text" value="${esc(card.title).replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label>Untertitel (optional)</label><input id="edSub" type="text" value="${esc(card.sub||'').replace(/"/g,'&quot;')}" placeholder="z. B. Uhrzeit oder Zusatz"></div>
+    <div class="field"><label>Tag</label><select id="edDay">${dayOpts}</select></div>
+    <div class="field"><label>Kategorie / Label</label><select id="edLabel">${labelOpts}</select>
+      <button type="button" class="link" id="edLabelMgr" style="margin-top:6px">🏷️ Labels verwalten</button></div>
+    <div class="field"><label>Zuständigkeit</label><select id="edOwner">${ownerOpts}</select></div>
+    <div class="field"><label>Checkliste (Details)</label><div id="ewRows"></div><button class="ew-add" onclick="addEditItem()">＋ Punkt hinzufügen</button></div>
+    <div class="erl-actions">
+      <button class="savebtn" onclick="saveWeekEdit()">Speichern</button>
+      <button class="btn-ghost" onclick="duplicateWeekCard(${di},${ci})">⧉ Duplizieren</button>
+      <button class="btn-ghost" style="color:var(--red)" onclick="deleteWeekCard(${di},${ci})">🗑 Karte löschen</button>
+    </div>`;
+  renderEditRows(); $('overlay').classList.add('open');
+  { const lm=$('edLabelMgr'); if(lm) lm.onclick=()=>openLabelManager(); }
+  setTimeout(()=>{ const t=$('edTitle'); if(t){ t.focus(); t.select(); } },40);
+}
+function renderEditRows(){
+  $('ewRows').innerHTML=editItems.map(it=>`<div class="ew-row"><input type="checkbox" class="ewdone" ${it.d?'checked':''}><input type="text" class="ewtext" value="${esc(it.t).replace(/"/g,'&quot;')}" placeholder="Detail …"><button class="rm">✕</button></div>`).join('')||'<div class="empty" style="font-size:12px">Noch keine Punkte.</div>';
+  $('ewRows').querySelectorAll('.rm').forEach((b,i)=>b.onclick=()=>{ syncEdit(); editItems.splice(i,1); renderEditRows(); });
+}
+function syncEdit(){ $('ewRows').querySelectorAll('.ew-row').forEach((row,i)=>{ if(!editItems[i])return; editItems[i].t=row.querySelector('.ewtext').value; editItems[i].d=row.querySelector('.ewdone').checked?1:0; }); }
+function addEditItem(){ syncEdit(); editItems.push({t:'',d:0}); renderEditRows(); }
+function saveWeekEdit(){
+  syncEdit();
+  const c=WEEK[editRef.di].cards[editRef.ci];
+  c.title=$('edTitle').value||c.title;
+  const sub=($('edSub')?$('edSub').value:'').trim(); if(sub) c.sub=sub; else delete c.sub;
+  c.label=$('edLabel').value; c.owner=$('edOwner').value;
+  const it=editItems.filter(x=>x.t.trim()); if(it.length) c.check=it.map(x=>[x.t,x.d?1:0]); else delete c.check;
+  // Tageswechsel direkt aus dem Popup (Alternative zu Drag & Drop)
+  const newDi=+($('edDay')?$('edDay').value:editRef.di);
+  if(newDi!==editRef.di&&WEEK[newDi]){ const [card]=WEEK[editRef.di].cards.splice(editRef.ci,1); WEEK[newDi].cards.push(card); }
+  persistWeek(); closeDetail();
+}
+function renderTrack(){ $('track').innerHTML=`<div class="t-item"><div class="t-top">🔥 Serie</div><div class="t-val">–</div><div class="t-sub">wird verfügbar mit Verlauf-Speicherung</div></div><div class="t-item"><div class="t-top">✅ Heute erledigt</div><div class="t-val">${doneCount()}</div><div class="t-sub">diese Sitzung</div></div><div class="t-item"><div class="t-top">🏠 Aktive Objekte</div><div class="t-val">${activeObjs().length}</div><div class="t-sub">in der Pipeline</div></div>`; }
+
+/* ============ DETAIL-HELFER: Inserat-Link (Punkt 1) + Termin/Kalender (Punkt 2) ============ */
+// Inserat-URL wird pro Objekt im Reiter „Cockpit-State" gespeichert (Feld „url").
+function listingUrl(o){ return (o&&META[o._id+'|url'])||''; }
+async function saveListingUrl(id){
+  const o=[...OBJ,...SALE].find(x=>x._id===id); if(!o) return;
+  const v=($('lsUrl').value||'').trim();
+  META[o._id+'|url']=v;
+  await persistState(o._id,'url',v);   // zeigt eigenen Toast
+  openDetail(id);
+}
+function copyListingUrl(){ const el=$('lsUrl'); if(!el) return; el.select(); el.setSelectionRange(0,99999);
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(el.value); } else { document.execCommand('copy'); } saveToast('✓ Link kopiert',1); }catch(e){ document.execCommand&&document.execCommand('copy'); saveToast('✓ Link kopiert',1); } }
+function listingSectionHTML(o){
+  const url=listingUrl(o);
+  return `<div class="section-t" style="margin-top:16px">🔗 Online-Inserat</div>
+    <div style="font-size:12px;color:var(--ink-faint);margin-bottom:2px">Link zum Inserat/Exposé hier einfügen – zum Kopieren &amp; Öffnen.</div>
+    <div class="linkrow">
+      <input id="lsUrl" type="text" value="${esc(url).replace(/"/g,'&quot;')}" placeholder="https://… (Portal- oder Exposé-Link)">
+      <button class="copybtn" type="button" onclick="copyListingUrl()">📋 Kopieren</button>
+      <button class="copybtn" type="button" id="lsSave">💾 Speichern</button>
+      ${url?`<a class="copybtn" href="${esc(url)}" target="_blank" rel="noopener" style="text-decoration:none">🔗 Öffnen</a>`:''}
+    </div>`;
+}
+// --- Termin/Kalender ---
+async function calPost(path,body){ return apiPost('https://www.googleapis.com/calendar/v3/'+path,body); }
+function terminSectionHTML(o){
+  const today=new Date().toISOString().slice(0,10);
+  return `<div class="section-t" style="margin-top:16px">📅 Termin</div>
+    <button class="phbtn" type="button" id="tmToggle">📅 Termin terminieren (Telefonat / Besichtigung)</button>
+    <div id="tmForm" style="display:none;margin-top:10px">
+      ${hasCalScope()?'':'<div class="erl-err" style="margin-bottom:8px">⚠ Kalender-Berechtigung noch nicht erteilt – bitte oben rechts über ↻ neu anmelden und den Kalender-Zugriff bestätigen.</div>'}
+      <div class="field"><label>Art</label><select id="tmType"><option value="Telefonat">Telefonat</option><option value="Besichtigung">Besichtigung</option><option value="Termin">Sonstiger Termin</option></select></div>
+      <div class="field"><label>Titel</label><input id="tmTitle" type="text" value="Telefonat – ${esc(o.titel).replace(/"/g,'&quot;')}"></div>
+      <div class="field"><label>Datum &amp; Uhrzeit</label><div class="tm-row"><div><input id="tmDate" type="date" value="${today}"></div><div><input id="tmTime" type="time" value="10:00"></div><div><select id="tmDur"><option value="30">30 Min</option><option value="60" selected>1 Std</option><option value="90">1,5 Std</option><option value="120">2 Std</option></select></div></div></div>
+      <div id="tmErr"></div>
+      <button class="savebtn" id="tmSave">📅 In Google Kalender eintragen</button>
+    </div>`;
+}
+function wireTerminSection(id,o){
+  const tog=$('tmToggle'); if(tog) tog.onclick=()=>{ const f=$('tmForm'); if(f){ f.style.display=f.style.display==='none'?'':'none'; if(f.style.display!=='none'){ const t=$('tmTitle'); if(t) t.focus(); } } };
+  const ty=$('tmType'); if(ty) ty.onchange=()=>{ const t=$('tmTitle'); if(t) t.value=ty.value+' – '+(o.titel||''); };
+  const sv=$('tmSave'); if(sv) sv.onclick=()=>createTermin(id);
+}
+async function createTermin(id){
+  const o=[...OBJ,...SALE].find(x=>x._id===id); if(!o) return;
+  const errEl=$('tmErr'); if(errEl) errEl.innerHTML='';
+  const title=($('tmTitle').value||'').trim(), date=$('tmDate').value, time=$('tmTime').value, dur=+($('tmDur').value||60);
+  const fail=m=>{ if(errEl) errEl.innerHTML='<div class="erl-err">'+m+'</div>'; };
+  if(!hasCalScope()){ fail('Kalender-Berechtigung fehlt – bitte neu anmelden und Kalender-Zugriff bestätigen.'); return; }
+  if(!title){ fail('Bitte einen Titel eingeben.'); return; }
+  if(!date||!time){ fail('Bitte Datum und Uhrzeit wählen.'); return; }
+  const btn=$('tmSave'); btn.disabled=true; btn.textContent='Trage ein …';
+  try{
+    const start=new Date(date+'T'+time+':00');
+    const end=new Date(start.getTime()+dur*60000);
+    await calPost('calendars/primary/events',{
+      summary:title, location:o.adresse||'', description:'Termin aus dem Tagescockpit'+(o.titel?' · '+o.titel:''),
+      start:{dateTime:start.toISOString(),timeZone:'Europe/Berlin'}, end:{dateTime:end.toISOString(),timeZone:'Europe/Berlin'} });
+    // In der Leadliste vermerken (nur Ankauf-Objekte mit Zeile), damit der Termin auch dort dokumentiert ist.
+    if(o.kind==='ankauf'&&o._row){ try{ const c=await appendCell('Leadliste','W',o._row,`[${fmtDate(new Date())}] 📅 ${title} am ${fmtDate(start)} ${time} Uhr`,o.nextStep||''); o.nextStep=c; o.task=c; }catch(e){} }
+    saveToast('✓ Termin im Google Kalender eingetragen',1);
+    if(hasCalScope()) loadCalendar();   // heutige Kalenderliste ggf. aktualisieren
+    openDetail(id);
+  }catch(e){ fail('⚠ Termin nicht eingetragen: '+esc(e.message)); btn.disabled=false; btn.textContent='📅 In Google Kalender eintragen'; }
+}
+
+/* ===== Wiedervorlage im Detail-Modal setzen/aufheben (dieselbe Pause wie im Erledigt-Popup) ===== */
+function wvSectionHTML(o){
+  const d=snoozeDate(o), aktiv=isSnoozed(o), auto=wvAutoDate(o);
+  const autoZeile=auto?`<div class="mini"><span class="dot" style="background:#93C5FD"></span><span class="mt">Automatisch aus der Leadliste (Spalte U/V): <b>${esc(fmtDate(auto))}</b>${daysUntil(auto)<=0?' – erreicht':' – in '+daysUntil(auto)+' T'}${d?' · wird durch dein Datum überschrieben':''}</span></div>`:'';
+  return `<div class="section-t" style="margin-top:16px">⏳ Wiedervorlage</div>
+    ${autoZeile}
+    ${aktiv?`<div class="mini"><span class="dot" style="background:var(--ink-faint)"></span><span class="mt">Pausiert bis <b>${esc(snoozeTxt(o))}</b> – erscheint bis dahin nicht in „Heute zuerst".</span><button class="iconbtn" style="padding:5px 10px" id="wvClear">Pause aufheben</button></div>`
+      :`<div style="font-size:12px;color:var(--ink-faint);margin:4px 0">Eigenes Datum setzen, wenn der Vorgang erst später wieder dran ist. Es sticht die automatische Wiedervorlage.</div>`}
+    <div class="tm-row" style="margin-top:8px"><div><input id="wvDate" type="date" value="${d?esc(new Date(+d-d.getTimezoneOffset()*60000).toISOString().slice(0,10)):''}"></div>
+      <div><button class="copybtn" type="button" id="wvSave">⏳ Wiedervorlage setzen</button></div></div>
+    <div id="wvErr"></div>`;
+}
+async function saveWiedervorlage(id){
+  const o=OBJ.find(x=>x._id===id); if(!o) return;
+  const v=($('wvDate').value||'').trim(), errEl=$('wvErr'); errEl.innerHTML='';
+  const d=v?parseISO(v):null;
+  if(!d){ errEl.innerHTML='<div class="erl-err">Bitte ein Datum wählen.</div>'; return; }
+  const btn=$('wvSave'); btn.disabled=true; btn.textContent='Speichere …';
+  try{
+    if(o._row){ await sheetsWrite('Leadliste!U'+o._row,[fmtDate(d)]); o.nachfass1=d; o.fael=faellig(o); o.score=scoreOf(o); }
+    META[o._id+'|snooze']=v; await persistState(o._id,'snooze',v);
+    if(o._row){ try{ const c=await appendCell('Leadliste','W',o._row,`[${fmtDate(new Date())}] ⏳ Wiedervorlage gesetzt auf ${fmtDate(d)}`,o.nextStep||''); o.nextStep=c; o.task=c; }catch(e){} }
+    openDetail(id);
+  }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='⏳ Wiedervorlage setzen'; }
+}
+
+/* ============ DETAIL ============ */
+function openDetail(id){
+  const o=[...OBJ,...SALE].find(x=>x._id===id); if(!o) return;
+  const isSale=o.kind==='verkauf', done=isDone(o);
+  const gmailQ=encodeURIComponent(o.adresse||o.titel||o.seller||'');
+  const rows = isSale
+    ? `<div><b>Einheit</b>${esc(o.einheit||'—')}</div><div><b>Status</b>${esc(o.status||'—')}</div><div><b>Zielpreis</b>${esc(o.zielpreis||'—')}</div><div><b>Interessent</b>${esc(o.interessent||'—')}</div>`
+    : `<div><b>Typ</b>${esc(o.typ||'—')}</div><div><b>Status</b>${esc(o.status||'—')}</div><div><b>Phase</b>${esc(phaseLabel(o.phase))}</div><div><b>Kaufpreis</b>${esc(o.kaufpreis||'—')}</div><div><b>Kalk. VK</b>${esc(o.kalkVK||'—')}</div><div><b>Angebot</b>${esc(o.angebot||'—')}</div><div><b>Fällig</b>${esc(o.fael?o.fael.txt:'—')}</div><div><b>Verkäufer</b>${esc(o.seller||'—')}</div>`;
+  const objMails=(!isSale&&GMAIL.state==='ready')?(GMAIL.byObj[o._id]||[]).filter(m=>m.hasDraft||(m.weOwe&&!m.noise)):[];
+  const mailSec=objMails.length?`<div class="section-t" style="margin-top:16px">✉️ Offene Mails zu diesem Objekt</div>`+objMails.map(m=>`<div class="mini"><span class="dot" style="background:${m.hasDraft?'var(--band-yellow)':'var(--band-red)'}"></span><span class="mt" style="white-space:normal">${m.hasDraft?'✏️ Entwurf offen – abschicken':'🔴 unbeantwortet'}: ${esc(m.subj)}</span><a class="link" target="_blank" href="${gmailThreadLink(m.tid)}">${m.hasDraft?'öffnen &amp; senden':'öffnen'}</a></div>`).join(''):'';
+  $('modal').innerHTML=`<button class="modal-close" onclick="closeDetail()">✕ schließen</button>
+    <div class="detail-head"><h2>🏠 ${esc(o.titel)}</h2><div style="margin-top:4px">${isSale?ownerAv('Nele'):urgBadge(o.score)} <span class="owner ${effOwner(o)}">${effOwner(o)}</span></div>
+      <div class="kv">${rows}</div>
+      <div class="deeplinks"><a class="link" target="_blank" href="https://mail.google.com/mail/u/0/#search/${gmailQ}">✉️ In Gmail suchen</a><a class="link" target="_blank" href="https://docs.google.com/spreadsheets/d/${CFG.SHEET_ID}/edit">📊 Leadliste öffnen</a></div>
+    </div>
+    ${mailSec}
+    ${!isSale?listingSectionHTML(o):''}
+    ${!isSale?terminSectionHTML(o):''}
+    ${!isSale?`<div class="section-t" style="margin-top:16px">🎯 Follow-up ${briefingInfo(o)?'<small style="color:var(--gold)">aus dem Morning Briefing</small>':'<small>aus Leadliste / Phase</small>'}</div>
+      <div class="mini"><span class="dot" style="background:${bandColor(o.score)}"></span><span class="mt" style="white-space:normal">${KANAL_ICON[kanalOf(o)]||''} <b>${esc(hzTodo(o))}</b> – ${esc(hzVorschlag(o))}</span></div>`:''}
+    <div class="section-t" style="margin-top:16px">📋 Nächster Schritt (Leadliste Spalte W)</div>
+    <div class="mini"><span class="dot" style="background:${isSale?'#93C5FD':bandColor(o.score)}"></span><span class="mt">${esc(o.task||o.nextStep||'—')}</span></div>
+    ${!isSale?wvSectionHTML(o):''}
+    ${!isSale?`<div class="section-t" style="margin-top:16px">👤 Zuständig</div><div class="phbtns"><button class="phbtn${effOwner(o)==='Nele'?' on':''}" data-ow="Nele">Nele</button><button class="phbtn${effOwner(o)==='Niklas'?' on':''}" data-ow="Niklas">Niklas</button></div>`:''}
+    ${!isSale?`<div class="section-t" style="margin-top:16px">🔀 Phase / Status ändern</div><div class="phbtns">${BOARD_COLS.map(ph=>`<button class="phbtn${o.phase===ph?' on':''}" data-ph="${ph}">${esc(phaseLabelShort(ph))}</button>`).join('')}</div>`:''}
+    ${!isSale?`<div class="section-t" style="margin-top:16px">✏️ Status / Notiz ergänzen</div>
+      ${o.nextStep?`<div class="erl-cur">${esc(o.nextStep)}</div>`:''}
+      <div class="field"><textarea id="dtNote" placeholder="Aktuellen Stand als Text ergänzen … (wird an die Leadliste angehängt, nichts wird überschrieben)"></textarea></div>
+      <button class="savebtn" id="dtNoteSave">In Leadliste ergänzen</button><div id="dtNoteErr"></div>`:''}
+    ${o.notiz?`<div class="section-t" style="margin-top:16px">📝 Notiz</div><div style="font-size:13px;color:var(--ink-soft)">${esc(o.notiz)}</div>`:''}`;
+  $('modal').querySelectorAll('[data-ow]').forEach(b=>b.onclick=()=>{ setOwner(id,b.dataset.ow); openDetail(id); });
+  $('modal').querySelectorAll('.phbtn[data-ph]').forEach(b=>b.onclick=()=>{ if(o.phase!==b.dataset.ph){ o.phase=b.dataset.ph; o.score=scoreOf(o); persistPhase(o); } openDetail(id); });
+  const _dt=$('dtNoteSave'); if(_dt) _dt.onclick=()=>saveDetailNote(id);
+  const _ls=$('lsSave'); if(_ls) _ls.onclick=()=>saveListingUrl(id);   // Punkt 1
+  const _wv=$('wvSave'); if(_wv) _wv.onclick=()=>saveWiedervorlage(id);
+  const _wc=$('wvClear'); if(_wc) _wc.onclick=()=>{ unsnooze(id); openDetail(id); };
+  wireTerminSection(id,o);                                             // Punkt 2
+  $('overlay').classList.add('open');
+}
+function closeDetail(){ $('overlay').classList.remove('open'); renderAll(); }
+$('overlay').onclick=e=>{ if(e.target.id==='overlay') closeDetail(); };
+
+/* ============ ACTIONS ============ */
+function toggleDone(id){ const k=dkey(id), nowDone=!doneSet.has(k); if(nowDone){ doneSet.add(k); burst(); } else doneSet.delete(k); persistState(k,'done',nowDone?'1':'0'); renderAll();
+  ensureSnapshot(); const d=focusSnapshot.filter(f=>doneSet.has(dkey(f.id))).length; if(focusSnapshot.length&&d===focusSnapshot.length) bigBurst(); }
+/* ===== Erledigt-Popup: „Was getan / nächste Schritte" in die Leadliste (Spalte W) ANHÄNGEN (nie überschreiben) ===== */
+function handleErledigtClick(id){
+  const o=OBJ.find(x=>x._id===id);
+  if(o&&o.kind==='ankauf'&&o._row&&!isDone(o)) openErledigt(id);   // echtes Objekt → Popup
+  else toggleDone(id);                                             // Mail-Item / Wieder-Aufmachen → direkt
+}
+function closeErledigt(){ $('erlOverlay').classList.remove('open'); }
+$('erlOverlay').onclick=e=>{ if(e.target.id==='erlOverlay') closeErledigt(); };
+function openErledigt(id){
+  const o=OBJ.find(x=>x._id===id); if(!o) return;
+  const cur=o.nextStep||'';
+  const np=nextPhaseOf(o.phase);
+  const phaseOpts=BOARD_COLS.map(ph=>`<option value="${ph}" ${ph===(np||o.phase)?'selected':''}>${esc(phaseLabel(ph))}${ph===o.phase?' — unverändert':''}${ph===np?' ← Vorschlag':''}</option>`).join('');
+  const altU=wvAutoDate(o)?fmtDate(wvAutoDate(o)):'';
+  const ow=effOwner(o);
+  $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
+    <div class="detail-head"><h2>✓ Erledigt: ${esc(o.titel)}</h2>
+      <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">Wird als neuer Eintrag in der Leadliste ergänzt (Spalte „Notizen aktueller Stand / Next steps") – der vorhandene Text bleibt erhalten.</div></div>
+    <div class="field"><label>Was hast du getan?</label><textarea id="erlDone" placeholder="z. B. Verkäufer angerufen, Exposé angefordert"></textarea></div>
+    <div class="field"><label>Nächste Schritte (optional)</label><textarea id="erlNext" placeholder="z. B. Rückruf am Freitag, Kalkulation aufsetzen"></textarea></div>
+
+    <div class="field"><label>Neue Phase (Leadliste Spalte J) – bestimmt auch, wohin die Karte in der Pipeline rückt</label>
+      <select id="erlPhase">${phaseOpts}</select></div>
+
+    <div class="field"><label>Zuständig ab jetzt</label>
+      <div class="phbtns" id="erlOwner">
+        <button type="button" class="phbtn${ow==='Nele'?' on':''}" data-ow="Nele">Nele</button>
+        <button type="button" class="phbtn${ow==='Niklas'?' on':''}" data-ow="Niklas">Niklas</button>
+      </div>
+      <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">Diese Zuweisung gilt dauerhaft und überschreibt den Namen aus der Leadliste.</div></div>
+
+    <div class="field"><label>Wiedervorlage am (optional)</label>
+      <div class="tm-row"><div><input id="erlWv" type="date"></div>
+      <div style="align-self:center;font-size:12px;color:var(--ink-faint)">Bis dahin verschwindet der Vorgang aus „Heute zuerst" und dem Tagesfokus.</div></div>
+      ${altU?`<div style="font-size:12px;color:var(--ink-faint);margin-top:4px">Automatische Wiedervorlage aus der Leadliste: <b>${esc(altU)}</b> – ein Datum hier sticht sie.</div>`:''}
+    </div>
+    ${cur?`<div class="field"><label>Bisheriger Stand in der Leadliste</label><div class="erl-cur">${esc(cur)}</div></div>`:''}
+    <div id="erlErr"></div>
+    <div class="erl-actions"><button class="savebtn" id="erlSave">✓ Speichern &amp; erledigt</button><button class="btn-ghost" onclick="closeErledigt()">Abbrechen</button></div>`;
+  $('erlOverlay').classList.add('open');
+  // Zuständigkeit im Popup umschalten (wird erst beim Speichern übernommen)
+  $('erlOwner').querySelectorAll('button[data-ow]').forEach(b=>b.onclick=()=>{
+    $('erlOwner').querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
+  setTimeout(()=>{ const t=$('erlDone'); if(t) t.focus(); },40);
+  $('erlSave').onclick=()=>saveErledigt(id);
+}
+async function saveErledigt(id){
+  const o=OBJ.find(x=>x._id===id); if(!o) return;
+  const getan=($('erlDone').value||'').trim(), next=($('erlNext').value||'').trim();
+  const errEl=$('erlErr'); errEl.innerHTML='';
+  if(!getan&&!next){ errEl.innerHTML='<div class="erl-err">Bitte kurz eintragen, was du getan hast.</div>'; return; }
+  const neuePhase=$('erlPhase').value||o.phase;
+  const neuerOwner=(($('erlOwner').querySelector('button.on')||{}).dataset||{}).ow||effOwner(o);
+  const wv=($('erlWv').value||'').trim();               // ISO yyyy-mm-dd oder ''
+  const wvDate=wv?parseISO(wv):null;
+  if(wv&&!wvDate){ errEl.innerHTML='<div class="erl-err">Wiedervorlage-Datum konnte nicht gelesen werden.</div>'; return; }
+  const btn=$('erlSave'); btn.disabled=true; btn.textContent='Speichere …';
+  let add=`[${fmtDate(new Date())}] ✓ ${getan||'erledigt'}`+(next?`  →  nächste Schritte: ${next}`:'');
+  if(neuePhase!==o.phase) add+=`  ·  Phase: ${o.phase} → ${neuePhase}`;
+  if(neuerOwner!==effOwner(o)) add+=`  ·  Zuständig: ${neuerOwner}`;
+  if(wvDate) add+=`  ·  Wiedervorlage: ${fmtDate(wvDate)}`;
+  try{
+    const combined=await appendCell('Leadliste','W',o._row,add,o.nextStep||'');   // frisch lesen + anhängen (nie überschreiben)
+    o.nextStep=combined; o.task=combined;
+    // 0) Zuständigkeit: manuelle Zuweisung gewinnt dauerhaft gegen den Namensmarker in Spalte W
+    if(neuerOwner!==effOwner(o)) setOwner(id,neuerOwner);
+    // 1) Phase weiterschieben (schreibt Leadliste Spalte J) – nur wenn sie sich wirklich ändert
+    if(neuePhase!==o.phase){ o.phase=neuePhase; o.score=scoreOf(o); await persistPhase(o); }
+    // 2) Wiedervorlage: Datum in Spalte U + Pause im Cockpit-State
+    if(wvDate){
+      try{ await sheetsWrite('Leadliste!U'+o._row,[fmtDate(wvDate)]); o.nachfass1=wvDate; o.fael=faellig(o); o.score=scoreOf(o); }catch(e){}
+      META[o._id+'|snooze']=wv; persistStateSilent(o._id,'snooze',wv);
+    } else {
+      // ohne Termin: alte Pause aufheben, damit der Vorgang nicht ungewollt versteckt bleibt
+      if(META[o._id+'|snooze']){ META[o._id+'|snooze']=''; persistStateSilent(o._id,'snooze',''); }
+    }
+    META[o._id+'|touched']=TODAY_STR; persistStateSilent(o._id,'touched',TODAY_STR);   // kurze Pause im Tagesfokus
+    saveToast('✓ In Leadliste ergänzt'+(neuePhase!==o.phase?' · Phase verschoben':'')+(wvDate?' · Wiedervorlage gesetzt':''),1);
+    closeErledigt();
+    toggleDone(id);                               // erst nach erfolgreichem Speichern abhaken
+  }catch(e){
+    errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+' – bitte nochmal versuchen.</div>';
+    btn.disabled=false; btn.textContent='✓ Speichern & erledigt';
+  }
+}
+/* ===== Punkt 6: Absage-Popup (Heute) – vermerken → Objekt auf „Beobachten" + in Leadliste speichern ===== */
+function openAbsage(id){
+  const o=OBJ.find(x=>x._id===id); if(!o) return;
+  $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
+    <div class="detail-head"><h2>📤 Absage: ${esc(o.titel)}</h2>
+      <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">Nach dem Speichern rückt das Objekt automatisch auf <b>Beobachten</b> (Wiedervorlage in 30/60 Tagen) und der Vermerk wird in der Leadliste (Spalte „Notizen aktueller Stand") ergänzt.</div></div>
+    <div class="field"><label>Vermerk (optional)</label><textarea id="absNote" placeholder="z. B. Absage per Mail gesendet – Kaufpreis zu hoch"></textarea></div>
+    ${o.nextStep?`<div class="field"><label>Bisheriger Stand in der Leadliste</label><div class="erl-cur">${esc(o.nextStep)}</div></div>`:''}
+    <div id="absErr"></div>
+    <div class="erl-actions"><button class="savebtn" id="absSave">✓ Abgesagt → Beobachten</button><button class="btn-ghost" onclick="closeErledigt()">Abbrechen</button></div>`;
+  $('erlOverlay').classList.add('open');
+  setTimeout(()=>{ const t=$('absNote'); if(t) t.focus(); },40);
+  $('absSave').onclick=()=>saveAbsage(id);
+}
+async function saveAbsage(id){
+  const o=OBJ.find(x=>x._id===id); if(!o) return;
+  const note=($('absNote').value||'').trim(), errEl=$('absErr'); errEl.innerHTML='';
+  const btn=$('absSave'); btn.disabled=true; btn.textContent='Speichere …';
+  try{
+    if(note){ const combined=await appendCell('Leadliste','W',o._row,`[${fmtDate(new Date())}] Absage: ${note}`,o.nextStep||''); o.nextStep=combined; o.task=combined; }
+    o.phase='Beobachten'; o.score=scoreOf(o);
+    await persistPhase(o);                 // schreibt J=Beobachten + U/V=Wiedervorlage (30/60 T)
+    closeErledigt();
+    toggleDone(id);                        // aus „Absagen offen" entfernen + als erledigt zählen
+    saveToast('✓ Auf Beobachten gesetzt',1);
+  }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='✓ Abgesagt → Beobachten'; }
+}
+/* ===== Gemeinsames Anhängen an eine Zelle (liest den aktuellen Wert frisch, hängt an, überschreibt nie) ===== */
+function colLetter(n){ let s=''; n++; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+async function appendCell(tab,col,row,addText,fallbackCur){
+  let cur=fallbackCur||'';
+  try{ const v=await readTab(tab,col+row+':'+col+row); cur=(v[0]&&v[0][0]!=null)?String(v[0][0]):''; }catch(e){ cur=fallbackCur||''; }
+  const combined=cur?cur+'\n'+addText:addText;
+  await sheetsWrite(tab+'!'+col+row,[combined]);
+  return combined;
+}
+/* ===== Pipeline-Detail: Status/Notiz an die Leadliste (Spalte W) anhängen ===== */
+async function saveDetailNote(id){
+  const o=OBJ.find(x=>x._id===id); if(!o||!o._row) return;
+  const txt=($('dtNote').value||'').trim(), errEl=$('dtNoteErr'); errEl.innerHTML='';
+  if(!txt){ errEl.innerHTML='<div class="erl-err">Bitte einen Text eingeben.</div>'; return; }
+  const btn=$('dtNoteSave'); btn.disabled=true; btn.textContent='Speichere …';
+  try{
+    const combined=await appendCell('Leadliste','W',o._row,`[${fmtDate(new Date())}] ${txt}`,o.nextStep||'');
+    o.nextStep=combined; o.task=combined;
+    saveToast('✓ In Leadliste ergänzt',1);
+    openDetail(id);   // Detail neu aufbauen: zeigt aktualisierten Stand, Feld ist leer
+  }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='In Leadliste ergänzen'; }
+}
+/* ===== Kontakt-Detail: CRM-Infos zeigen + Notiz in die CRM-Notizspalte anhängen ===== */
+function openKontakt(id){
+  const k=KON.find(x=>x._id===id); if(!k) return;
+  const idx=contactMailIndex();
+  const lk=letzterKontakt(k,idx), term=callTermin(k);
+  const nxt=nextContactInfo(k,idx);
+  const info=`<div><b>Firma</b>${esc(k.firma||'—')}</div><div><b>Funktion</b>${esc(k.funktion||'—')}</div><div><b>Telefon</b>${esc(k.tel||'—')}</div><div><b>E-Mail</b>${esc(k.email||'—')}</div><div><b>Letzter Kontakt</b>${esc(letzterKontaktTxt(k,idx))}</div><div><b>Art</b>${esc(k.art||'—')}</div><div><b>Status</b>${esc(k.statusK||'—')}</div>`;
+  const mailBtn=k.email?`<a class="link" target="_blank" href="https://mail.google.com/mail/u/0/#search/${encodeURIComponent(k.email)}">✉️ In Gmail suchen</a>`:'';
+  const telBtn=k.tel?`<a class="link" href="tel:${esc(String(k.tel).replace(/\s/g,''))}">📞 Anrufen</a>`:'';
+  const prioBtns=TIER_ORDER.filter(t=>t).map(t=>`<button type="button" class="phbtn${k.prio===t?' on':''}" data-prio="${t}">${t} <small style="opacity:.7">· ${TIER_TAKT_TXT[t]}</small></button>`).join('');
+  const termIso=term?new Date(+term-term.getTimezoneOffset()*60000).toISOString().slice(0,10):'';
+  const naechste=term?`Gesetzter Termin: <b>${fmtDate(term)}</b>${daysUntil(term)>0?` (in ${daysUntil(term)} T)`:' – erreicht'} · sticht den Takt`
+    :(nxt?`Nach Takt fällig: <b>${fmtDate(nxt.due)}</b>${daysUntil(nxt.due)>0?` (in ${daysUntil(nxt.due)} T)`:' – fällig'}`
+        :'Kein fester Takt – dieser Kontakt wird nicht automatisch fällig.');
+  $('modal').innerHTML=`<button class="modal-close" onclick="closeDetail()">✕ schließen</button>
+    <div class="detail-head"><h2>${esc(k.name)}</h2>
+      <div class="kv" style="margin-top:8px">${info}</div>
+      <div class="deeplinks">${telBtn}${mailBtn}<a class="link" target="_blank" href="https://docs.google.com/spreadsheets/d/${CFG.SHEET_ID}/edit">📊 CRM öffnen</a><button type="button" class="link" id="konEditBtn">✏️ Bearbeiten</button></div>
+    </div>
+
+    <div class="section-t" style="margin-top:16px">⭐ Kategorie <small>– steuert den Kontakt-Takt, wird in CRM Spalte A geschrieben</small></div>
+    <div class="phbtns" id="konPrio">${prioBtns}</div>
+    <div id="konPrioErr"></div>
+
+    <div class="section-t" style="margin-top:16px">📞 Nächstes Telefonat</div>
+    <div class="mini"><span class="dot" style="background:${term?'var(--gold)':'#93C5FD'}"></span><span class="mt" style="white-space:normal">${naechste}</span>${term?`<button class="iconbtn" style="padding:5px 10px" id="konTermClear">Termin löschen</button>`:''}</div>
+    <div class="tm-row" style="margin-top:8px">
+      <div><input id="konTerm" type="date" value="${termIso}"></div>
+      <div><button class="copybtn" type="button" id="konTermSave">📞 Termin setzen</button></div>
+      <div style="align-self:center"><label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--ink-faint);cursor:pointer"><input type="checkbox" id="konTermCal" style="width:auto"> auch in den Google Kalender</label></div>
+    </div>
+    <div id="konTermErr"></div>
+
+    ${k.notiz?`<div class="section-t" style="margin-top:16px">📝 Bisherige Notizen (CRM)</div><div class="erl-cur">${esc(k.notiz)}</div>`:''}
+    <div class="section-t" style="margin-top:16px">✏️ Notiz ergänzen</div>
+    <div class="field"><textarea id="konNote" placeholder="z. B. telefoniert – sucht MFH in Rostock, Rückruf nächste Woche"></textarea></div>
+    <button class="savebtn" id="konNoteSave">In CRM ergänzen</button><div id="konNoteErr"></div>`;
+  $('konNoteSave').onclick=()=>saveKontaktNote(id);
+  $('konPrio').querySelectorAll('button[data-prio]').forEach(b=>b.onclick=()=>saveKontaktPrio(id,b.dataset.prio));
+  $('konTermSave').onclick=()=>saveKontaktTermin(id);
+  const _kc=$('konTermClear'); if(_kc) _kc.onclick=()=>clearKontaktTermin(id);
+  const _ke=$('konEditBtn'); if(_ke) _ke.onclick=()=>openKontaktEdit(id);
+  $('overlay').classList.add('open');
+  setTimeout(()=>{ const t=$('konNote'); if(t) t.focus(); },40);
+}
+/* ===== Kontaktdaten bearbeiten – schreibt Name/Firma/Funktion/Telefon/E-Mail (CRM B–F) und Status (CRM I) zurück ===== */
+function openKontaktEdit(id){
+  const k=KON.find(x=>x._id===id); if(!k) return;
+  const iv=(v)=>esc(v||'').replace(/"/g,'&quot;');
+  $('modal').innerHTML=`<button class="modal-close" onclick="closeDetail()">✕ schließen</button>
+    <div class="detail-head"><h2>Kontakt bearbeiten</h2>
+      <div style="color:var(--ink-faint);font-size:12.5px;margin-top:4px">Änderungen werden direkt in den CRM-Reiter der Leadliste geschrieben.</div>
+    </div>
+    <div class="field"><label>Name</label><input id="keName" type="text" value="${iv(k.name)}"></div>
+    <div class="field"><label>Firma</label><input id="keFirma" type="text" value="${iv(k.firma)}"></div>
+    <div class="field"><label>Funktion</label><input id="keFunk" type="text" value="${iv(k.funktion)}"></div>
+    <div class="field"><label>Telefon</label><input id="keTel" type="text" value="${iv(k.tel)}"></div>
+    <div class="field"><label>E-Mail</label><input id="keMail" type="text" value="${iv(k.email)}"></div>
+    <div class="field"><label>Status</label><input id="keStatus" type="text" value="${iv(k.statusK)}" placeholder="z. B. warm, kalt, aktiv …"></div>
+    <div class="erl-actions">
+      <button class="savebtn" id="keSave">Speichern</button>
+      <button class="btn-ghost" onclick="openKontakt('${id}')">Abbrechen</button>
+    </div>
+    <div id="keErr"></div>`;
+  $('keSave').onclick=()=>saveKontaktInfo(id);
+  $('overlay').classList.add('open');
+  setTimeout(()=>{ const t=$('keName'); if(t){ t.focus(); t.select(); } },40);
+}
+async function saveKontaktInfo(id){
+  const k=KON.find(x=>x._id===id); if(!k||!k._row) return;
+  const errEl=$('keErr'); if(errEl) errEl.innerHTML='';
+  const name=($('keName').value||'').trim();
+  if(!name){ if(errEl) errEl.innerHTML='<div class="erl-err">Der Name darf nicht leer sein.</div>'; return; }
+  const firma=($('keFirma').value||'').trim(), funktion=($('keFunk').value||'').trim();
+  const tel=($('keTel').value||'').trim(), email=($('keMail').value||'').trim(), statusK=($('keStatus').value||'').trim();
+  const btn=$('keSave'); btn.disabled=true; btn.textContent='Speichere …';
+  try{
+    const R=k._row;
+    // B–F zusammenhängend (Name, Firma, Funktion, Telefon, E-Mail); Status separat in Spalte I. G (Letzter Kontakt) und H (Art) bleiben unberührt.
+    await sheetsBatchWrite([
+      {range:CFG.TABS.crm+'!B'+R+':F'+R, values:[[name,firma,funktion,tel,email]]},
+      {range:CFG.TABS.crm+'!I'+R, values:[[statusK]]},
+    ]);
+    Object.assign(k,{name,firma,funktion,tel,email,statusK});
+    saveToast('✓ Kontaktdaten in CRM gespeichert',1);
+    renderKontakte();   // Liste zeigt neuen Namen/Status sofort
+    openKontakt(id);    // zurück zur Detailansicht mit aktualisierten Werten
+  }catch(e){ if(errEl) errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='Speichern'; }
+}
+/* Punkt 5: Kategorie ändern – schreibt CRM Spalte A und wirkt sofort auf den Takt. */
+async function saveKontaktPrio(id,prio){
+  const k=KON.find(x=>x._id===id); if(!k||!k._row) return;
+  const errEl=$('konPrioErr'); if(errEl) errEl.innerHTML='';
+  if(k.prio===prio) return;
+  try{
+    await sheetsWrite(CFG.TABS.crm+'!A'+k._row,[prio]);
+    k.prio=prio;
+    saveToast('✓ Kategorie auf '+prio+' gesetzt',1);
+    openKontakt(id);
+  }catch(e){ if(errEl) errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; }
+}
+/* Punkt 5: Telefontermin setzen – sticht den Prio-Takt. Optional zusätzlich als Kalendereintrag. */
+async function saveKontaktTermin(id){
+  const k=KON.find(x=>x._id===id); if(!k) return;
+  const errEl=$('konTermErr'); errEl.innerHTML='';
+  const v=($('konTerm').value||'').trim(), d=v?parseISO(v):null;
+  if(!d){ errEl.innerHTML='<div class="erl-err">Bitte ein Datum wählen.</div>'; return; }
+  const inCal=$('konTermCal')&&$('konTermCal').checked;
+  const btn=$('konTermSave'); btn.disabled=true; btn.textContent='Speichere …';
+  try{
+    META[k._id+'|calltermin']=v; await persistState(k._id,'calltermin',v);
+    if(k._row){ try{ const c=await appendCell(CFG.TABS.crm,colLetter(CRM_NOTES_IDX),k._row,`[${fmtDate(new Date())}] 📞 Telefonat terminiert für ${fmtDate(d)}`,k.notiz||''); k.notiz=c; }catch(e){} }
+    if(inCal&&hasCalScope()){
+      try{ const start=new Date(+d); start.setHours(10,0,0,0); const end=new Date(+start+30*60000);
+        await calPost('calendars/primary/events',{summary:'Telefonat – '+(k.name||'')+(k.firma?' ('+k.firma+')':''),
+          description:'Kontaktpflege aus dem Tagescockpit'+(k.tel?' · '+k.tel:''),
+          start:{dateTime:start.toISOString(),timeZone:'Europe/Berlin'}, end:{dateTime:end.toISOString(),timeZone:'Europe/Berlin'}});
+      }catch(e){ errEl.innerHTML='<div class="erl-err">Termin gesetzt, aber Kalendereintrag fehlgeschlagen: '+esc(e.message)+'</div>'; }
+    } else if(inCal){ errEl.innerHTML='<div class="erl-err">Termin gesetzt – für den Kalendereintrag fehlt die Berechtigung (oben rechts ↻ und Kalenderzugriff bestätigen).</div>'; }
+    saveToast('✓ Telefontermin gesetzt',1);
+    openKontakt(id);
+  }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='📞 Termin setzen'; }
+}
+function clearKontaktTermin(id){
+  META[id+'|calltermin']=''; persistStateSilent(id,'calltermin','');
+  saveToast('✓ Termin gelöscht – wieder im normalen Takt',1);
+  openKontakt(id);
+}
+async function saveKontaktNote(id){
+  const k=KON.find(x=>x._id===id); if(!k||!k._row) return;
+  const txt=($('konNote').value||'').trim(), errEl=$('konNoteErr'); errEl.innerHTML='';
+  if(!txt){ errEl.innerHTML='<div class="erl-err">Bitte eine Notiz eingeben.</div>'; return; }
+  const btn=$('konNoteSave'); btn.disabled=true; btn.textContent='Speichere …';
+  try{
+    const combined=await appendCell(CFG.TABS.crm,colLetter(CRM_NOTES_IDX),k._row,`[${fmtDate(new Date())}] ${txt}`,k.notiz||'');
+    k.notiz=combined;
+    // Punkt 5: Ein erreichter Telefontermin ist mit der Notiz erledigt – sonst bliebe er dauerhaft „überfällig".
+    const t=callTermin(k); if(t&&daysUntil(t)<=0){ META[k._id+'|calltermin']=''; persistStateSilent(k._id,'calltermin',''); }
+    saveToast('✓ In CRM ergänzt',1);
+    closeDetail();
+  }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='In CRM ergänzen'; }
+}
+function switchTab(t){ currentTab=t; ['heute','pipeline','kontakte','woche'].forEach(x=>$('tab-'+x).style.display=x===t?'':'none'); document.querySelectorAll('.nav-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t)); renderAll(); }
+function renderAll(){
+  const _mt=$('moinTitle'); if(_mt) _mt.textContent='Moin, '+currentUser+' 👋';
+  document.querySelectorAll('#userswitch button').forEach(b=>b.classList.toggle('active',b.dataset.u===currentUser));   // Gold-Knopf folgt immer dem aktiven Nutzer
+  if(currentTab==='heute'){ renderGreet(); renderDayStrip(); renderCalendar(); renderKpis(); renderMaklercall(); renderWochenTodos(); renderFocus(); renderHeuteZuerst(); renderKontaktMini(); renderNeueObjekte(); }
+  if(currentTab==='pipeline') renderBoard();
+  if(currentTab==='kontakte'){ renderPartner(); renderKontakte(); }
+  if(currentTab==='woche'){ renderWeek(); renderTrack(); }
+}
+$('userswitch').onclick=e=>{ if(e.target.dataset.u){ currentUser=e.target.dataset.u; document.querySelectorAll('#userswitch button').forEach(b=>b.classList.toggle('active',b.dataset.u===currentUser)); focusSnapshot=null; renderAll(); } };
+$('weekViewSwitch').onclick=e=>{ if(e.target.dataset.v){ weekView=e.target.dataset.v; document.querySelectorAll('#weekViewSwitch button').forEach(b=>b.classList.toggle('active',b.dataset.v===weekView)); renderWeek(); } };
+{ const lb=$('labelMgrBtn'); if(lb) lb.onclick=()=>openLabelManager(); }
+$('pipeToggle').onclick=e=>{ if(e.target.dataset.p){ pipeView=e.target.dataset.p; document.querySelectorAll('#pipeToggle button').forEach(b=>b.classList.toggle('active',b.dataset.p===pipeView)); renderBoard(); } };
+document.querySelectorAll('.nav-tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+$('refreshBtn').onclick=()=>{ requestToken(false).then(()=>loadData()).catch(e=>saveToast('⚠ '+e.message,0,1)); };
+// Punkt 8: Partner suchen + anlegen
+{ const s=$('ptSearch'); if(s) s.oninput=()=>{ partnerFilter=s.value; renderPartner(); };
+  const n=$('ptNew'); if(n) n.onclick=()=>openPartner(null); }
+
+/* ============ KONFETTI ============ */
+const cv=$('confetti'), ctx=cv.getContext('2d');
+function rs(){ cv.width=innerWidth; cv.height=innerHeight; } rs(); onresize=rs;
+let parts=[], anim=false;
+function burst(n=26){ for(let i=0;i<n;i++) parts.push(mk(innerWidth/2,innerHeight/3)); st(); }
+function bigBurst(){ for(let i=0;i<110;i++) parts.push(mk(Math.random()*innerWidth,-20)); st(); }
+function mk(x,y){ const c=['#C9A227','#1E3A5F','#22C55E','#F87171','#E7C65B','#F1E1AC']; return {x,y,vx:(Math.random()-.5)*6,vy:Math.random()*-6-2,g:.25,c:c[Math.random()*c.length|0],s:Math.random()*6+4,life:60}; }
+function st(){ if(!anim){ anim=true; requestAnimationFrame(tick); } }
+function tick(){ ctx.clearRect(0,0,cv.width,cv.height); parts=parts.filter(p=>p.life>0); parts.forEach(p=>{ p.vy+=p.g; p.x+=p.vx; p.y+=p.vy; p.life--; ctx.fillStyle=p.c; ctx.globalAlpha=Math.max(0,p.life/60); ctx.fillRect(p.x,p.y,p.s,p.s); }); ctx.globalAlpha=1; if(parts.length) requestAnimationFrame(tick); else { anim=false; ctx.clearRect(0,0,cv.width,cv.height); } }
+</script>
+</body>
+</html>
