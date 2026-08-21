@@ -363,6 +363,7 @@ body{background:var(--bg1)}
     <div class="card" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <div class="userswitch small" id="pipeToggle">
         <button data-p="ankauf" class="active">🏠 Ankauf</button>
+        <button data-p="aufwertung">🏗️ Aufwertung</button>
         <button data-p="verkauf">💰 Verkauf</button>
       </div>
       <span style="font-size:12px;color:var(--ink-faint)">Karten per Drag &amp; Drop zwischen Phasen ziehen · Klick öffnet Detail</span>
@@ -625,11 +626,12 @@ const TIER_TAKT_TXT={'A+':'alle 7 Tage','A':'alle 14 Tage','B':'alle 21 Tage','C
 let OBJ=[], KON=[], SALE=[], PARTNER=[], loadErr=null;
 async function loadData(){
   $('banner').textContent='Lade eure Daten …';
+  AUF_SCAN_FERTIG=false;   // nach ↻ wird der Mail-Durchlauf wieder freigegeben
   try{
     const [lead,crm,obj,part]=await Promise.all([
       readTab(CFG.TABS.leadliste,'A1:X400'),
       readTab(CFG.TABS.crm,'A1:Z1000'),
-      readTab(CFG.TABS.objektliste,'A1:L60').catch(()=>[]),
+      readTab(CFG.TABS.objektliste,'A1:V300').catch(()=>[]),
       readTab(CFG.TABS.partner||'Partner','A1:J400').catch(()=>null),   // null = Reiter existiert noch nicht
     ]);
     OBJ=mapLeadliste(lead); KON=mapCRM(crm); SALE=mapObjektliste(obj); loadErr=null;
@@ -650,7 +652,7 @@ async function loadData(){
   focusSnapshot=null; renderAll();
   if(hasGmailScope()&&!loadErr) loadGmail();       // im Hintergrund nachladen, danach neu rendern
   if(hasCalScope()&&!loadErr) loadCalendar();      // Kalender heute laden → Tagesfokus an freie Zeit anpassen
-  if(hasAufwertung()&&!loadErr) loadAufwertung().then(renderAll);   // 21.08.2026: Aufwertungsplan aus der zweiten Tabelle
+  if(hasAufwertung()&&!loadErr) loadAufwertung().then(()=>{ renderAll(); syncAufStand(); scanUndSync(); });   // 21.08.2026: Aufwertungsplaene aus den verlinkten Tabellen
 }
 function mapLeadliste(rows){
   const out=[];
@@ -709,18 +711,73 @@ function mapPartner(rows){
     schwerpunkt:(r[7]||'').trim(), letzter:parseDate(r[8]), notiz:(r[9]||'').trim()
   })).filter(p=>p.institut||p.name);
 }
+/* ===== OBJEKTSTAMMBLATT (21.08.2026, Stufe 1) ==============================
+   Der Reiter „Objektliste" fuehrt jedes gekaufte Objekt von der Aufwertung bis zur
+   Uebergabe. Eine Zeile = eine Einheit (bei WEG-Aufteilung also je WE eine Zeile).
+
+   Grundregel: JEDE Spalte hat genau EINEN Eigentuemer. Sonst ueberschreibt das
+   Cockpit, was Nele getippt hat, oder umgekehrt.
+     Nele      : Nutzung, Kaufdatum, Kaufpreis, Vermarktungsweg, Makler, Zielpreis,
+                 Kaeufer, Reserviert seit, Notartermin, Kaufpreis erzielt,
+                 Geldeingang am, Uebergabe am, Notizen
+     Automatik : Kuerzel, Objekt, Adresse, PLZ/Ort, Einheit, Aufwertungstabelle,
+                 Lead-Schluessel
+     Cockpit   : Aufwertungsstand (nur Anzeige) und Verkaufsphase (Drag & Drop)
+
+   Gesucht wird ueber die KOPFZEILE, nie ueber die Spaltenposition - erst exakt,
+   dann „enthaelt". Sonst traefe die Suche nach „Kaufpreis" auch „Kaufpreis erzielt"
+   und die nach „Status" sowohl den Aufwertungsstand als auch die Verkaufsphase.
+   Die Spaltenreihenfolge ist damit frei; die Buchstaben unten sind nur Orientierung. */
+const OBJ_HEAD=['Kürzel','Objekt','Adresse','PLZ / Ort','Einheit','Nutzung','Kaufdatum','Kaufpreis',
+  'Aufwertungstabelle','Aufwertungsstand','Verkaufsphase','Vermarktungsweg','Makler / Partner',
+  'Zielpreis','Käufer / Interessent','Reserviert seit','Notartermin','Kaufpreis erzielt',
+  'Geldeingang am','Übergabe am','Notizen','Lead-Schlüssel'];
+const ARCHIV_TAGE=30;      // so lange bleibt ein uebergebenes Objekt noch sichtbar
+// Aus einer Zelle die Google-Kennung holen - egal ob dort die nackte Kennung oder
+// die ganze URL steht. Beides kommt in der Praxis vor, wenn man sie aus dem Browser kopiert.
+function sheetIdOf(v){
+  const t=String(v||'').trim(); if(!t) return '';
+  const m=t.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/);
+  if(m) return m[1];
+  return /^[a-zA-Z0-9_-]{20,}$/.test(t)?t:'';
+}
 function mapObjektliste(rows){
   if(!rows.length) return [];
-  const head=rows[0].map(norm);
-  const col=n=>head.findIndex(h=>h.includes(n));
-  const iA=col('objekt'), iAd=col('adresse'), iE=col('einheit'), iSt=col('status'), iZ=col('zielpreis'), iInt=col('interessent'), iN=col('nächster')>=0?col('nächster'):col('schritt'), iF=col('fällig'), iNo=col('notiz');
-  // 21.08.2026: erst abbilden, dann filtern - sonst stimmt die gemerkte Zeilennummer (_row) nicht mehr,
-  // und ohne richtige Zeilennummer koennte das Verschieben im Kanban die falsche Zeile ueberschreiben.
-  return rows.slice(1).map((r,i)=>({ _id:'S'+i, kind:'verkauf', owner:'Nele', _row:i+2, _stCol:iSt,
-    _leer:!r.some(c=>String(c).trim()),
-    titel:(r[iA]||r[iAd]||'').trim()||'Verkaufsobjekt', adresse:(r[iAd]||'').trim(), einheit:(r[iE]||'').trim(),
-    status:(r[iSt]||'').trim(), zielpreis:(r[iZ]||'').trim(), interessent:(r[iInt]||'').trim(),
-    task:(r[iN]||'').trim(), faelligTxt:(r[iF]||'').trim(), notiz:(r[iNo]||'').trim() })).filter(o=>!o._leer);
+  const h=rows[0], c=w=>colIdx(h,w);
+  // Rueckfall auf die alte Kopfzeile „Status", solange der Reiter noch nicht umgestellt ist.
+  const iPh=c('verkaufsphase')>=0?c('verkaufsphase'):c('status');
+  const idx={kuerzel:c('kürzel'),titel:c('objekt'),adresse:c('adresse'),plz:c('plz'),einheit:c('einheit'),
+    nutzung:c('nutzung'),kaufdatum:c('kaufdatum'),kaufpreis:c('kaufpreis'),
+    sheet:c('aufwertungstabelle'),aufstand:c('aufwertungsstand'),phase:iPh,
+    weg:c('vermarktungsweg'),makler:c('makler'),zielpreis:c('zielpreis'),
+    interessent:c('käufer')>=0?c('käufer'):c('interessent'),reserviert:c('reserviert'),
+    notar:c('notartermin'),erzielt:c('kaufpreis erzielt'),geld:c('geldeingang'),
+    uebergabe:c('übergabe'),notiz:c('notiz'),lead:c('lead')};
+  const g=(r,k)=>idx[k]>=0?String(r[idx[k]]||'').trim():'';
+  const d=(r,k)=>idx[k]>=0?parseDate(r[idx[k]]):null;
+  // Erst abbilden, DANN filtern - sonst stimmt die gemerkte Zeilennummer (_row) nicht mehr,
+  // und ohne richtige Zeilennummer ueberschreibt ein verschobenes Kaertchen die falsche Zeile.
+  return rows.slice(1).map((r,i)=>{
+    const o={ _id:'S'+i, kind:'verkauf', owner:'Nele', _row:i+2, _idx:idx,
+      _leer:!r.some(x=>String(x).trim()), _stCol:idx.phase, _standCol:idx.aufstand,
+      kuerzel:g(r,'kuerzel'), adresse:g(r,'adresse'), plz:g(r,'plz'), einheit:g(r,'einheit'),
+      nutzung:g(r,'nutzung'), kaufdatum:d(r,'kaufdatum'), kaufpreis:g(r,'kaufpreis'),
+      aufSheetId:sheetIdOf(g(r,'sheet')), aufStand:g(r,'aufstand'), status:g(r,'phase'),
+      weg:g(r,'weg'), makler:g(r,'makler'), zielpreis:g(r,'zielpreis'),
+      interessent:g(r,'interessent'), reserviert:d(r,'reserviert'), notartermin:d(r,'notar'),
+      erzielt:g(r,'erzielt'), geldeingang:d(r,'geld'), uebergabe:d(r,'uebergabe'),
+      notiz:g(r,'notiz'), leadKey:g(r,'lead'), task:'' };
+    o.titel=g(r,'titel')||o.adresse||'Verkaufsobjekt';
+    // Bestand = gehoert uns, steht aber nicht zum Verkauf (Steige 9, vermietet).
+    // Solche Objekte stehen in der Objektliste, aber NICHT auf dem Verkaufsboard.
+    o.bestand=/bestand|halten|vermietet/.test(norm(o.nutzung));
+    // Archiv: von Hand gesetzt ODER die Uebergabe liegt mehr als 30 Tage zurueck.
+    // Ohne das wachsen die Boards mit jedem verkauften Objekt zu - und das Cockpit
+    // laedt weiter dessen Aufwertungstabelle mit (vier Anfragen je Objekt).
+    const uT=o.uebergabe?daysSince(o.uebergabe):null;
+    o.archiv=/archiv/.test(norm(o.nutzung))||(uT!=null&&uT>ARCHIV_TAGE);
+    return o;
+  }).filter(o=>!o._leer);
 }
 function activeObjs(){ return OBJ.filter(o=>o.active); }
 // 21.08.2026: Alles, was in der Leadliste auf "passt nicht" steht, ist im Cockpit unsichtbar -
@@ -1063,6 +1120,11 @@ function renderHeuteZuerst(){
   });
   const aufAlle=aufItems();
   const aufRot=aufAlle.filter(i=>i.sev==='rot'), aufRest=aufAlle.filter(i=>i.sev!=='rot');
+  // Der rote Block ist laut Entscheidung quellenuebergreifend. Eine Reservierung, die
+  // seit drei Wochen ohne Notartermin laeuft, oder ein Kaufpreis, der acht Wochen nach
+  // der Beurkundung nicht da ist, gehoert genau hierhin - nicht nur aufs Verkaufsboard.
+  const vkAlle=vkItems();
+  const vkRot=vkAlle.filter(i=>!aufDone(i.id)), vkErledigt=vkAlle.filter(i=>aufDone(i.id));
   const byScore=(a,b)=>b.score-a.score;
   const byPhase=(a,b)=>(FUNNEL.indexOf(a.phase)-FUNNEL.indexOf(b.phase))||(b.score-a.score);
   reisst.sort(byScore); deals.sort(byPhase); beob.sort(byScore);
@@ -1070,9 +1132,9 @@ function renderHeuteZuerst(){
   let body='';
 
   // 1 – was heute reißt: Termin überschritten, heute fällig oder seit 14 T ohne Bewegung
-  if(reisst.length||aufRot.length){
-    body+=kopf('var(--band-red)','🔴 Reißt heute',reisst.length+aufRot.length,'Termin überschritten oder heute fällig');
-    body+=reisst.map(hztRow).join('')+aufRot.map(hztAufRow).join('');
+  if(reisst.length||aufRot.length||vkRot.length){
+    body+=kopf('var(--band-red)','🔴 Reißt heute',reisst.length+aufRot.length+vkRot.length,'Termin überschritten oder heute fällig');
+    body+=reisst.map(hztRow).join('')+aufRot.map(hztAufRow).join('')+vkRot.map(hztAufRow).join('');
   }
   // 2 – Deals in Arbeit: Kalkulation bis Kaufvertrag, in Phasenreihenfolge
   if(deals.length){
@@ -1081,7 +1143,10 @@ function renderHeuteZuerst(){
   }
   // 3 – Aufwertung: Aufgaben aus dem Projektzeitplan, Handwerker ohne Rückmeldung, Terminvorschläge
   if(aufRest.length){
-    body+=kopf('#B45309','🏗️ Aufwertung '+esc(aufObjektName()),aufRest.length,aufLage());
+    const aufTitel=AUFS.filter(a=>a.state==='ready').length>1
+      ? '🏗️ Aufwertung <small style="font-weight:600">('+AUFS.filter(a=>a.state==='ready').length+' Objekte)</small>'
+      : '🏗️ Aufwertung '+esc(aufObjektName());
+    body+=kopf('#B45309',aufTitel,aufRest.length,aufLage());
     body+=aufRest.map(hztAufRow).join('');
   } else if(AUF.state==='error'){
     body+=kopf('var(--ink-faint)','🏗️ Aufwertung',0,'Plan nicht lesbar: '+esc(AUF.error||''));
@@ -1114,7 +1179,7 @@ function renderHeuteZuerst(){
     body+=snz.map(hztSnoozeRow).join('');
   }
   // 8 – heute erledigt (Objekte und Aufwertungspunkte)
-  const aufDoneList=aufItemsDone();
+  const aufDoneList=aufItemsDone().concat(vkErledigt);
   if(done.length||aufDoneList.length){
     body+=kopf('var(--green)','✓ Heute erledigt',done.length+aufDoneList.length,'');
     body+=done.map(hztRow).join('')+aufDoneList.map(hztAufRow).join('');
@@ -1140,7 +1205,8 @@ function renderHeuteZuerst(){
     const id=tr.dataset.auf;
     if(id.indexOf('auf|termin|')===0) openAufTermin(id);
     else if(id.indexOf('auf|mail|')===0) window.open(gmailThreadLink(id.slice(9)),'_blank');
-    else window.open(aufSheetUrl(),'_blank');
+    else { const it=aufItemsAll().concat(vkItems()).find(x=>x.id===id);
+           window.open((it&&it.link)||aufSheetUrl(),'_blank'); }
   });
 }
 // (entfernt 31.07.2026) renderAbsagen() – die Absagen stehen jetzt direkt in „Heute zuerst" (hztAbsageRow).
@@ -1343,12 +1409,71 @@ function renderWochenTodos(){
    Umbenennen in der Tabelle das Cockpit nicht lahmlegt.
    Gelesen werden: Projektzeitplan · Handwerker-Status · Kostenübersicht.
    ========================================================================== */
-let AUF={state:'idle',error:null,tasks:[],hw:[],kosten:null,tabs:{},termine:[]};
-function hasAufwertung(){ return !!String(CFG.AUFWERTUNG_SHEET_ID||'').trim(); }
-function aufObjektName(){ return CFG.AUFWERTUNG_OBJEKT||'Aufwertung'; }
-function aufSheetUrl(tab){ return 'https://docs.google.com/spreadsheets/d/'+CFG.AUFWERTUNG_SHEET_ID+'/edit'; }
-async function aufRead(tab,range){
-  return gjson('https://sheets.googleapis.com/v4/spreadsheets/'+CFG.AUFWERTUNG_SHEET_ID+'/values/'+encodeURIComponent(tab)+'!'+range).then(d=>d.values||[]);
+/* ---- MEHRERE OBJEKTE IN AUFWERTUNG (Arbeitspaket D, 21.08.2026) -----------
+   Bis hierher kannte das Cockpit GENAU EINE Aufwertungstabelle (feste Kennung in
+   config.js). Ab dem zweiten Objekt war das nicht nur eine Grenze, sondern ein
+   STILLER FEHLER: Der Paket-Schluessel war "P1" und die Schritt-Kennung "auf|task|3"
+   - beides die Nummer INNERHALB der jeweiligen Tabelle. Zwei Objekte haetten sich
+   dieselben Schluessel geteilt: ein Haken bei Objekt A haette Objekt B mit abgehakt,
+   ohne Fehlermeldung.
+
+   Deshalb traegt jetzt jeder Schluessel das Objektkuerzel:
+     "aufp:S14021|P1|phase"   statt  "aufp:P1|phase"
+     "auf|S14021|task|3"      statt  "auf|task|3"
+   Fuer die Tabelle aus config.js wird beim LESEN zusaetzlich der alte, kuerzellose
+   Schluessel geprueft (aufLegacy), damit die bisherigen Haken aus Kuehlungsborn
+   erhalten bleiben. Geschrieben wird immer nur noch der neue Schluessel.
+
+   AUFS = die Liste, ein Eintrag je Objekt.
+   AUF  = die Zusammenfassung darueber, damit "Heute zuerst", die Budgetzeile und
+          die Zaehler unveraendert weiterarbeiten.                              */
+let AUFS=[];
+let AUF={state:'idle',error:null,tasks:[],hw:[],kosten:null,tabs:{},termine:[],antworten:[]};
+const AUF_FALLBACK_KEY='KB';
+// Welche Objekte haben einen Aufwertungsplan? Quelle ist die Spalte
+// "Aufwertungstabelle" der Objektliste. Archivierte Objekte werden bewusst NICHT
+// geladen - sonst waechst die Ladezeit mit jedem verkauften Objekt weiter.
+function aufObjekte(){
+  const out=[];
+  // Bei einem aufgeteilten MFH zeigen mehrere WE-Zeilen auf DENSELBEN Aufwertungsplan
+  // (renoviert wird das Haus, verkauft werden die Einheiten). Der Plan wird dann nur
+  // einmal geladen und traegt den Namen des Hauses, nicht den der ersten Einheit.
+  (typeof SALE!=='undefined'?SALE:[]).forEach(o=>{
+    if(!o.aufSheetId||o.archiv) return;
+    const da=out.find(x=>x.sheetId===o.aufSheetId);
+    if(da){ da.mehrfach=true; da.name=da.sale.titel; return; }
+    out.push({key:o.kuerzel||o._id, name:[o.titel,o.einheit].filter(Boolean).join(' '),
+              sheetId:o.aufSheetId, sale:o});
+  });
+  // Rueckfall: solange Kuehlungsborn noch nicht in der Objektliste steht, zaehlt config.js.
+  const fb=String(CFG.AUFWERTUNG_SHEET_ID||'').trim();
+  if(fb&&!out.some(x=>x.sheetId===fb)){
+    out.push({key:AUF_FALLBACK_KEY, name:CFG.AUFWERTUNG_OBJEKT||'Aufwertung', sheetId:fb, sale:null});
+  }
+  return out;
+}
+function hasAufwertung(){ return aufObjekte().length>0; }
+function aufEintrag(key){ return AUFS.find(a=>a.key===key)||null; }
+// Ist das die Tabelle aus config.js? Nur dort duerfen die alten Schluessel gelten.
+function aufLegacy(key){
+  const a=aufEintrag(key), fb=String(CFG.AUFWERTUNG_SHEET_ID||'').trim();
+  return !!a&&!!fb&&a.sheetId===fb;
+}
+// "S14021|P1" wieder auseinandernehmen.
+function splitKey(k){ const i=String(k||'').indexOf('|');
+  return i<0?{obj:'',rest:String(k||'')}:{obj:k.slice(0,i),rest:k.slice(i+1)}; }
+function aufObjektName(key){
+  const a=key?aufEintrag(key):null;
+  if(a) return a.name;
+  if(AUFS.length===1) return AUFS[0].name;
+  return CFG.AUFWERTUNG_OBJEKT||'Aufwertung';
+}
+function aufSheetId(key){ const a=key?aufEintrag(key):null;
+  return a?a.sheetId:((AUFS[0]&&AUFS[0].sheetId)||CFG.AUFWERTUNG_SHEET_ID||''); }
+function aufSheetUrl(key){ const id=aufSheetId(key);
+  return id?('https://docs.google.com/spreadsheets/d/'+id+'/edit'):'#'; }
+async function aufRead(sheetId,tab,range){
+  return gjson('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'/values/'+encodeURIComponent(tab)+'!'+range).then(d=>d.values||[]);
 }
 // „32.110,00 €" → 32110    ·  leere/kaputte Zellen → null (nie 0, sonst rechnet das Cockpit mit Luft)
 function euroNum(v){
@@ -1376,7 +1501,7 @@ function colIdx(headRow,word){
 const AUF_DONE_RE=/erledigt|fertig|abgeschlossen|entf[äa]llt|storniert/;
 const AUF_LAUFEND_RE=/l[äa]uft|in arbeit|begonnen/;
 
-function parseAufPlan(rows){
+function parseAufPlan(rows,objKey){
   const hi=findHead(rows,['phase','aufgabe']); if(hi<0) return [];
   const h=rows[hi];
   const c={phase:colIdx(h,'phase'),nr:colIdx(h,'nr'),aufgabe:colIdx(h,'aufgabe'),art:colIdx(h,'art'),
@@ -1386,7 +1511,8 @@ function parseAufPlan(rows){
   rows.slice(hi+1).forEach((r,i)=>{
     const titel=String(r[c.aufgabe]||'').trim(); if(!titel) return;
     const status=String(r[c.status]||'').trim();
-    out.push({ id:'auf|task|'+((r[c.nr]||'').toString().trim()||('z'+i)), _row:hi+2+i,
+    const nrT=(r[c.nr]||'').toString().trim()||('z'+i);
+    out.push({ id:'auf|'+objKey+'|task|'+nrT, lid:'auf|task|'+nrT, _obj:objKey, _row:hi+2+i,
       phase:String(r[c.phase]||'').trim(), nr:String(r[c.nr]||'').trim(), titel,
       art:String(r[c.art]||'').trim(), gewerk:String(r[c.gewerk]||'').trim(),
       verantw:String(r[c.verantw]||'').trim(), start:parseDate(r[c.start]), ende:parseDate(r[c.ende]),
@@ -1395,37 +1521,44 @@ function parseAufPlan(rows){
   });
   return out;
 }
-function parseAufHw(rows){
+function parseAufHw(rows,objKey){
   const hi=findHead(rows,['firma']); if(hi<0) return [];
   const h=rows[hi];
   const c={nr:colIdx(h,'nr'),paket:colIdx(h,'paket'),gewerk:colIdx(h,'gewerk'),firma:colIdx(h,'firma'),
            ort:colIdx(h,'ort'),tel:colIdx(h,'telefon'),mail:colIdx(h,'mail'),kanal:colIdx(h,'kanal'),
            kontaktiert:colIdx(h,'kontaktiert'),rueck:colIdx(h,'rückmeldung')>=0?colIdx(h,'rückmeldung'):colIdx(h,'ruckmeldung'),
-           status:colIdx(h,'status'),angebot:colIdx(h,'angebot'),notiz:colIdx(h,'notiz')};
+           status:colIdx(h,'status'),angebot:colIdx(h,'angebot'),notiz:colIdx(h,'notiz'),
+           antwort:colIdx(h,'antwort')};
   const out=[];
+  // Fuer das Zurueckschreiben: wo steht die Kopfzeile, welche Spalten gibt es, wie breit ist sie.
+  out._headRow=hi+1; out._cols=c; out._breite=(h||[]).length;
   rows.slice(hi+1).forEach((r,i)=>{
     const firma=String(r[c.firma]||'').trim(); if(!firma) return;
     const mailRoh=String(r[c.mail]||'').trim();
-    out.push({ id:'auf|hw|'+((r[c.nr]||'').toString().trim()||('z'+i)), _row:hi+2+i,
+    const nrH=(r[c.nr]||'').toString().trim()||('z'+i);
+    out.push({ id:'auf|'+objKey+'|hw|'+nrH, lid:'auf|hw|'+nrH, _obj:objKey, _row:hi+2+i,
       nr:String(r[c.nr]||'').trim(), paket:String(r[c.paket]||'').trim(), gewerk:String(r[c.gewerk]||'').trim(),
       firma, ort:String(r[c.ort]||'').trim(), tel:String(r[c.tel]||'').trim(),
       mail:/@/.test(mailRoh)?mailRoh:'', kanal:String(r[c.kanal]||'').trim(),
       kontaktiert:parseDate(r[c.kontaktiert]), rueck:parseDate(r[c.rueck]),
       status:String(r[c.status]||'').trim(), angebot:euroNum(r[c.angebot]),
-      notiz:String(r[c.notiz]||'').trim() });
+      notiz:String(r[c.notiz]||'').trim(),
+      antwortTxt:c.antwort>=0?String(r[c.antwort]||'').trim():'' });
   });
   return out;
 }
 function parseAufKosten(rows){
-  const k={budget:null,angebote:null,verfuegbar:null,luecke:null,pakete:[]};
+  const k={budget:null,angebote:null,verfuegbar:null,luecke:null,pakete:[],_statusCol:-1};
   const hi=findHead(rows,['paket','budget']);
   if(hi>=0){
     const h=rows[hi], cB=colIdx(h,'budget'), cA=colIdx(h,'angebot'), cP=colIdx(h,'paket'),
           cG=colIdx(h,'gewerk'), cS=colIdx(h,'status'), cV=colIdx(h,'beauftragt');
-    rows.slice(hi+1).forEach(r=>{
+    k._statusCol=cS;
+    rows.slice(hi+1).forEach((r,i)=>{
       const p=String(r[cP]||'').trim(); if(!p) return;
       if(/summe/.test(norm(p))){ k.budget=euroNum(r[cB]); k.angebote=euroNum(r[cA]); return; }
-      k.pakete.push({paket:p,gewerk:String(r[cG]||'').trim(),budget:euroNum(r[cB]),
+      // _row = echte Zeilennummer in der Tabelle, damit ein verschobenes Paket in DIESE Zeile zurueckgeschrieben wird.
+      k.pakete.push({paket:p,gewerk:String(r[cG]||'').trim(),budget:euroNum(r[cB]),_row:hi+2+i,
                      angebot:euroNum(r[cA]),vergeben:String(r[cV]||'').trim(),status:String(r[cS]||'').trim()});
     });
   }
@@ -1439,22 +1572,59 @@ function parseAufKosten(rows){
   });
   return k;
 }
+// Reiternamen je Tabelle erkennen. Das Ergebnis gilt fuer diese Sitzung - bei mehreren
+// Objekten spart das je eine Anfrage pro Neuladen und pro Detail-Fenster.
+async function aufTabs(sheetId){
+  const ck='auftabs:'+sheetId;
+  try{ const c=sessionStorage.getItem(ck); if(c) return JSON.parse(c); }catch(e){}
+  const meta=await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'?fields=sheets.properties.title');
+  const titles=(meta.sheets||[]).map(x=>x.properties.title);
+  const find=re=>titles.find(t=>re.test(norm(t)))||'';
+  const t={plan:find(/zeitplan|projektplan|ablauf|termin/),hw:find(/handwerk|dienstleist|kontaktstatus/),
+           kosten:find(/kosten|budget/),alle:titles};
+  try{ sessionStorage.setItem(ck,JSON.stringify(t)); }catch(e){}
+  return t;
+}
 async function loadAufwertung(){
-  if(!hasAufwertung()){ AUF.state='off'; return; }
-  AUF={state:'loading',error:null,tasks:[],hw:[],kosten:null,tabs:{},termine:AUF.termine||[]};
-  try{
-    const meta=await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+CFG.AUFWERTUNG_SHEET_ID+'?fields=sheets.properties.title');
-    const titles=(meta.sheets||[]).map(x=>x.properties.title);
-    const find=re=>titles.find(t=>re.test(norm(t)));
-    const tPlan=find(/zeitplan|projektplan|ablauf|termin/), tHw=find(/handwerk|dienstleist|kontaktstatus/), tKost=find(/kosten|budget/);
-    AUF.tabs={plan:tPlan||'',hw:tHw||'',kosten:tKost||''};
-    if(tPlan) AUF.tasks=parseAufPlan(await aufRead(tPlan,'A1:L300'));
-    if(tHw)   AUF.hw=parseAufHw(await aufRead(tHw,'A1:P300'));
-    if(tKost) AUF.kosten=parseAufKosten(await aufRead(tKost,'A1:H80'));
-    AUF.state='ready';
-  }catch(e){
-    AUF.error=e.message; AUF.state='error';
-  }
+  const objs=aufObjekte();
+  if(!objs.length){ AUFS=[]; AUF.state='off'; return; }
+  AUF={state:'loading',error:null,tasks:[],hw:[],kosten:null,tabs:{},
+       termine:AUF.termine||[],antworten:AUF.antworten||[]};
+  AUFS=objs.map(o=>({...o,state:'loading',error:null,tasks:[],hw:[],kosten:null,tabs:{}}));
+  // Alle Objekte parallel. Faellt EINES aus, laufen die anderen trotzdem - ein
+  // kaputter Plan darf nicht das ganze Board dunkel machen.
+  await Promise.all(AUFS.map(async a=>{
+    try{
+      a.tabs=await aufTabs(a.sheetId);
+      const [plan,hw,kost]=await Promise.all([
+        a.tabs.plan  ? aufRead(a.sheetId,a.tabs.plan,'A1:L300') : Promise.resolve(null),
+        a.tabs.hw    ? aufRead(a.sheetId,a.tabs.hw,'A1:P300')   : Promise.resolve(null),
+        a.tabs.kosten? aufRead(a.sheetId,a.tabs.kosten,'A1:H80'): Promise.resolve(null),
+      ]);
+      a.tasks =plan ?parseAufPlan(plan,a.key):[];
+      a.hw    =hw   ?parseAufHw(hw,a.key)    :[];
+      a.kosten=kost ?parseAufKosten(kost)    :null;
+      a.state='ready';
+    }catch(e){ a.error=e.message; a.state='error'; }
+  }));
+  aufAggregat();
+}
+// Zusammenfassung ueber alle Objekte, damit "Heute zuerst", die Budgetzeile und die
+// Zaehler unveraendert mit AUF weiterarbeiten koennen.
+function aufAggregat(){
+  const ok=AUFS.filter(a=>a.state==='ready'), fehler=AUFS.filter(a=>a.state==='error');
+  AUF.tasks=ok.reduce((m,a)=>m.concat(a.tasks),[]);
+  AUF.hw   =ok.reduce((m,a)=>m.concat(a.hw),[]);
+  AUF.tabs =ok.length===1?ok[0].tabs:{};
+  const k={budget:null,angebote:null,verfuegbar:null,luecke:null,lueckeLabel:'Lücke',pakete:[],_statusCol:-1};
+  ok.forEach(a=>{ const x=a.kosten; if(!x) return;
+    ['budget','angebote','verfuegbar','luecke'].forEach(f=>{ if(x[f]!=null) k[f]=(k[f]||0)+x[f]; });
+    if(x.lueckeLabel) k.lueckeLabel=x.lueckeLabel;
+    (x.pakete||[]).forEach(pp=>k.pakete.push({...pp,_obj:a.key}));
+  });
+  AUF.kosten=(k.pakete.length||k.budget!=null)?k:null;
+  AUF.state=ok.length?'ready':(fehler.length?'error':'off');
+  AUF.error=fehler.length?(fehler[0].error+(fehler.length>1?' (und '+(fehler.length-1)+' weitere)':'')):null;
 }
 
 /* ---- Was ist HEUTE an der Aufwertung zu tun? -----------------------------
@@ -1464,9 +1634,13 @@ async function loadAufwertung(){
    bald  = startet in den nächsten 7 Tagen                                    */
 const AUF_STALE=7;              // Tage ohne Rückmeldung → anrufen
 function aufDone(id){ return doneSet.has(dkey(id)); }
+// Der Haken kann unter dem neuen (objektbezogenen) oder - nur bei der Tabelle aus
+// config.js - noch unter dem alten Schluessel liegen. Beides gilt beim LESEN.
+function aufDoneItem(it){ return aufDone(it.id)||(!!it.lid&&aufLegacy(it.obj)&&aufDone(it.lid)); }
 function aufItemsAll(){
   if(AUF.state!=='ready') return [];
   const out=[];
+  const mehrere=AUFS.filter(a=>a.state==='ready').length>1;
   AUF.tasks.forEach(t=>{
     if(t.erledigt) return;
     const dEnde=t.ende?daysUntil(t.ende):null, dStart=t.start?daysUntil(t.start):null;
@@ -1477,37 +1651,55 @@ function aufItemsAll(){
     else if(dStart===0){ sev='heute'; stand='startet heute'; }
     else if(dStart!=null&&dStart>0&&dStart<=7){ sev='bald'; stand='startet in '+dStart+' T ('+fmtDate(t.start)+')'; }
     else return;
-    out.push({ id:t.id, sev, art:'plan', meilenstein:t.meilenstein,
+    out.push({ id:t.id, lid:t.lid, obj:t._obj, objName:aufObjektName(t._obj), sev, art:'plan', meilenstein:t.meilenstein,
       titel:(t.meilenstein?'🚩 ':'')+t.titel,
-      meta:(t.phase||'Aufwertung')+(t.gewerk&&t.gewerk!=='-'?' · '+t.gewerk:''),
+      // Bei mehreren Objekten steht das Objekt vorn - sonst ist die Liste nicht lesbar.
+      meta:(mehrere?aufObjektName(t._obj)+' · ':'')+(t.phase||'Aufwertung')+(t.gewerk&&t.gewerk!=='-'?' · '+t.gewerk:''),
       stand, todo:t.meilenstein?'🚩 Meilenstein prüfen':'🧮 Ausführung sicherstellen',
-      vorschlag:aufPlanVorschlag(t), tel:'', mail:'', link:aufSheetUrl() });
+      vorschlag:aufPlanVorschlag(t), tel:'', mail:'', link:aufSheetUrl(t._obj) });
   });
   AUF.hw.forEach(h=>{
     const offenerAuftrag=!/beauftragt|abgesagt|abgelehnt/.test(norm(h.status));
     if(!offenerAuftrag) return;
-    if(h.kontaktiert&&!h.rueck){
+    // Hat der Betrieb geantwortet? Dann ist DAS der Punkt - nicht „meldet sich nicht".
+    const an=hwAntwort(h);
+    const am=an?(ANT_ART[an.art]||ANT_ART.antwort):null;
+    if(an&&am&&am.sev){
+      out.push({ id:'auf|'+h._obj+'|antwort|'+an.tid, obj:h._obj, objName:aufObjektName(h._obj),
+        sev:am.sev, art:'hw',
+        titel:h.firma+' – '+am.txt,
+        meta:(mehrere?aufObjektName(h._obj)+' · ':'')+(h.paket?h.paket+' · ':'')+h.gewerk+(h.ort?' · '+h.ort:''),
+        stand:'Mail vom '+fmtDate(new Date(an.ts))+(an.terminDate?' · genannter Termin '+fmtDate(an.terminDate)+(an.terminTime?' um '+an.terminTime+' Uhr':''):''),
+        todo:am.todo,
+        vorschlag:an.zitat?('Aus der Mail: „'+an.zitat+'"'):'Die Einstufung stammt aus dem Mailtext – im Zweifel den Thread öffnen.',
+        tel:h.tel, mail:h.mail, hw:h, link:gmailThreadLink(an.tid) });
+      return;
+    }
+    // Eine erkannte Antwort zaehlt sofort als Rueckmeldung - auch wenn das
+    // Zurueckschreiben in die Tabelle gerade nicht geklappt hat.
+    const rueckE=h.rueck||(an?new Date(an.ts):null);
+    if(h.kontaktiert&&!rueckE){
       const d=daysSince(h.kontaktiert);
       if(d!=null&&d>=AUF_STALE){
-        out.push({ id:h.id, sev:'rot', art:'hw', titel:h.firma+' – keine Rückmeldung',
-          meta:(h.paket?h.paket+' · ':'')+h.gewerk+(h.ort?' · '+h.ort:''),
+        out.push({ id:h.id, lid:h.lid, obj:h._obj, objName:aufObjektName(h._obj), sev:'rot', art:'hw', titel:h.firma+' – keine Rückmeldung',
+          meta:(mehrere?aufObjektName(h._obj)+' · ':'')+(h.paket?h.paket+' · ':'')+h.gewerk+(h.ort?' · '+h.ort:''),
           stand:'angeschrieben am '+fmtDate(h.kontaktiert)+' · seit '+d+' T still',
           todo:h.tel?'📞 Anrufen':'✉️ Nachfassen',
           vorschlag:'Kurz anrufen und fragen, ob das Angebot noch kommt. Wenn nicht: Reservebetrieb aus derselben Zeile anfragen.',
-          tel:h.tel, mail:h.mail, hw:h, link:aufSheetUrl() });
+          tel:h.tel, mail:h.mail, hw:h, link:aufSheetUrl(h._obj) });
       } else if(d!=null&&d>=4){
-        out.push({ id:h.id, sev:'bald', art:'hw', titel:h.firma+' – Angebot steht aus',
-          meta:(h.paket?h.paket+' · ':'')+h.gewerk+(h.ort?' · '+h.ort:''),
+        out.push({ id:h.id, lid:h.lid, obj:h._obj, objName:aufObjektName(h._obj), sev:'bald', art:'hw', titel:h.firma+' – Angebot steht aus',
+          meta:(mehrere?aufObjektName(h._obj)+' · ':'')+(h.paket?h.paket+' · ':'')+h.gewerk+(h.ort?' · '+h.ort:''),
           stand:'angeschrieben am '+fmtDate(h.kontaktiert)+' · seit '+d+' T still',
           todo:'👀 Beobachten', vorschlag:'Noch im Rahmen. Ab '+AUF_STALE+' Tagen ohne Antwort anrufen.',
-          tel:h.tel, mail:h.mail, hw:h, link:aufSheetUrl() });
+          tel:h.tel, mail:h.mail, hw:h, link:aufSheetUrl(h._obj) });
       }
     } else if(!h.kontaktiert&&/offen/.test(norm(h.status))&&/telefon/.test(norm(h.kanal))){
-      out.push({ id:h.id, sev:'bald', art:'hw', titel:h.firma+' – noch nicht angefragt',
-        meta:(h.paket?h.paket+' · ':'')+h.gewerk+(h.ort?' · '+h.ort:''),
+      out.push({ id:h.id, lid:h.lid, obj:h._obj, objName:aufObjektName(h._obj), sev:'bald', art:'hw', titel:h.firma+' – noch nicht angefragt',
+        meta:(mehrere?aufObjektName(h._obj)+' · ':'')+(h.paket?h.paket+' · ':'')+h.gewerk+(h.ort?' · '+h.ort:''),
         stand:'keine E-Mail-Adresse auffindbar · nur telefonisch',
         todo:'📞 Anrufen', vorschlag:h.notiz||'Betrieb telefonisch anfragen und Angebot erbitten.',
-        tel:h.tel, mail:'', hw:h, link:aufSheetUrl() });
+        tel:h.tel, mail:'', hw:h, link:aufSheetUrl(h._obj) });
     }
   });
   // Mails aus dem Gmail-Label „Aufwertung", die keinem Leadliste-Objekt zugeordnet sind:
@@ -1535,8 +1727,8 @@ function aufItemsAll(){
   return out.sort((a,b)=>rank[a.sev]-rank[b.sev]);
 }
 // Offene Punkte (Standard) bzw. die heute schon abgehakten - fuer den Block "Heute erledigt".
-function aufItems(){ return aufItemsAll().filter(i=>!aufDone(i.id)); }
-function aufItemsDone(){ return aufItemsAll().filter(i=>aufDone(i.id)); }
+function aufItems(){ return aufItemsAll().filter(i=>!aufDoneItem(i)); }
+function aufItemsDone(){ return aufItemsAll().filter(i=>aufDoneItem(i)); }
 function aufPlanVorschlag(t){
   const g=norm(t.gewerk);
   if(t.meilenstein) return 'Meilenstein: kurz prüfen, ob der Termin hält – sonst den Zeitplan nachziehen.';
@@ -1604,11 +1796,62 @@ function uhrzeitNahe(t,pos,end){
   }
   return '';
 }
-// Nach dem Gmail-Laden aufrufen: Aufwertungs-Threads im Volltext holen und Termine vorschlagen.
-async function scanAufwertungTermine(){
-  AUF.termine=[];
+/* ---- WAS HAT DER BETRIEB GEANTWORTET? (21.08.2026) -------------------------
+   Aus dem Text einer eingehenden Aufwertungs-Mail wird die Art der Antwort gelesen.
+   Bewusst NUR aus eingehenden Mails (weOwe = die Gegenseite hat zuletzt geschrieben).
+
+   Reihenfolge ist Absicht: „passt leider nicht, geht auch der 27.?" enthaelt sowohl
+   eine Zustimmung als auch eine Ablehnung - der Terminwunsch muss zuerst greifen,
+   sonst stuende der Betrieb faelschlich auf „bestaetigt".
+
+   Diese Einstufung ist eine DEUTUNG und kann daneben liegen. Sie wird deshalb in eine
+   eigene Spalte „Antwort" geschrieben, die dem Cockpit gehoert - und NICHT in die
+   Spalte „Status", denn die steuert das Board (beauftragt/abgesagt) und gehoert Nele.
+   Zu jeder Einstufung wird der Satz mitgeliefert, der sie ausgeloest hat.          */
+const ANT_ART={
+  absage:     {icon:'🚫', txt:'Absage',                   sev:'rot',  todo:'🔁 Reservebetrieb anfragen'},
+  termin_neu: {icon:'📅', txt:'anderer Termin gewünscht', sev:'rot',  todo:'📅 Neuen Termin abstimmen'},
+  termin_ok:  {icon:'✅', txt:'Termin bestätigt',         sev:null,   todo:''},
+  angebot:    {icon:'📄', txt:'Angebot geschickt',        sev:null,   todo:''},
+  rueckfrage: {icon:'❓', txt:'Rückfrage offen',           sev:'bald', todo:'✉️ Rückfrage beantworten'},
+  antwort:    {icon:'✉️', txt:'geantwortet',              sev:null,   todo:''},
+};
+// Den Satz zurueckgeben, in dem der Treffer steht - damit Nele die Einstufung nachprüfen kann.
+function satzUm(txt,re){
+  // Nur trennen, wenn nach dem Punkt ein neuer Satz beginnt (Grossbuchstabe) - sonst
+  // zerlegt „ich schlage den 02.09. vor" das Zitat in unbrauchbare Bruchstuecke.
+  const saetze=String(txt||'').split(/(?<=[.!?])\s+(?=[A-ZÄÖÜ])|\n+/);
+  const hit=saetze.find(x=>re.test(normLoose(x)));
+  return hit?hit.trim().replace(/\s+/g,' ').slice(0,180):'';
+}
+function aufAntwortArt(txt,hatTermin){
+  const t=normLoose(String(txt||''));
+  const pruef=[
+    ['absage',     /\babsage\b|absagen muessen|kein interesse|kein angebot abgeben|nicht anbieten|keine kapazitaet|ausgebucht|muessen (wir )?(leider )?ablehnen|koennen (wir )?leider nicht (uebernehmen|anbieten|ausfuehren)|kein bedarf|nehmen (wir|den auftrag) nicht/],
+    ['termin_neu', /anderen? termin|alternativtermin|ausweichtermin|termin[^.!?]{0,25}(verschieb|verschob|verleg)|verschieben (wir|auf)|verschoben werden|passt (uns |mir |bei uns )?(leider )?nicht|(termin|das) (geht|klappt|passt) (bei uns )?(leider )?nicht|leider verhindert|schlage .{0,30}vor|schlagen .{0,30}vor|waere (auch|ihnen) .{0,25}(moeglich|recht)|ginge (auch|es auch)|geht (es )?auch am|einen tag (frueher|spaeter)|stattdessen am|kann ich (leider )?nicht|haetten sie .{0,25}(noch|auch) (einen|zeit)/],
+    ['termin_ok',  /termin (passt|steht|ist bestaetigt|bestaetigt|koennen wir so|halten wir|nehmen wir wahr)|passt (uns|mir|so|gut|prima|bestens|hervorragend)|gerne am|wir kommen am|wir sind dann am|bestaetige(n)? (wir|ihnen|hiermit)|einverstanden|geht (in ordnung|klar)|ist (so )?notiert|machen wir so|dann (bis|sehen wir uns)|wir sind dabei/],
+    ['angebot',    /angebot|kostenvoranschlag|\bkv\b|anbei .{0,25}(preis|angebot|kalkulation)|unser preis|aufmass genommen/],
+    ['rueckfrage', /rueckfrage|noch (eine|ein paar) frage|koennen sie (uns|mir) (noch|bitte)|benoetigen wir noch|brauchen wir noch|welche .{0,30}\?|schicken sie (uns|mir) bitte|fehlen (uns|mir) noch|grundriss|aufmass noetig/],
+  ];
+  for(const [art,re] of pruef){
+    if(re.test(t)) return {art, zitat:satzUm(txt,re)};
+  }
+  // Ein Datum im Text ohne erkennbare Zu- oder Absage: es geht um einen Termin, aber unklar wie.
+  if(hatTermin) return {art:'antwort', zitat:''};
+  return {art:'antwort', zitat:''};
+}
+// Nach dem Gmail-Laden aufrufen: Aufwertungs-Threads im Volltext holen, Termine
+// vorschlagen UND die Antwortart je Betrieb bestimmen - beides aus demselben Abruf,
+// damit die Erkennung keine zusaetzliche Gmail-Anfrage kostet.
+async function scanAufwertungMails(){
+  AUF.termine=[]; AUF.antworten=[];
   if(!(hasGmailScope()&&GMAIL.state==='ready')) return;
-  const threads=GMAIL.threads.filter(t=>t.cat==='aufwertung'&&t.weOwe&&!t.noise).slice(0,12);
+  // Ein Betrieb antwortet oft aus einem eigenen Thread heraus, der nie das Label
+  // „Aufwertung" bekommen hat. Deshalb zaehlt auch die Absenderadresse: steht sie in
+  // einer Handwerkerliste, wird die Mail gelesen - egal unter welchem Label sie liegt.
+  const adr=hwAdressen();
+  const threads=GMAIL.threads.filter(t=>t.weOwe&&!t.noise
+      &&(t.cat==='aufwertung'||adr.has(norm(t.fromEmail)))).slice(0,25);
   for(const th of threads){
     try{
       const full=await gmailGet('threads/'+th.tid+'?format=full');
@@ -1616,13 +1859,37 @@ async function scanAufwertungTermine(){
       let txt='';
       msgs.forEach(ms=>{ txt+=' '+(ms.snippet||'')+' '+extractPlainBody(ms.payload); });
       const found=findTermineInText(txt);
-      if(!found.length) continue;
-      found.sort((a,b)=>(b.time?1:0)-(a.time?1:0)||(+a.date)-(+b.date));
-      const best=found[0];
-      AUF.termine.push({ key:th.tid, tid:th.tid, von:mailSenderName(th)||th.fromEmail,
-        titel:aufTerminTitel(th.subj), date:best.date, time:best.time, zitat:best.zitat, subj:th.subj });
+      let best=null;
+      if(found.length){
+        found.sort((a,b)=>(b.time?1:0)-(a.time?1:0)||(+a.date)-(+b.date));
+        best=found[0];
+        AUF.termine.push({ key:th.tid, tid:th.tid, von:mailSenderName(th)||th.fromEmail,
+          titel:aufTerminTitel(th.subj), date:best.date, time:best.time, zitat:best.zitat, subj:th.subj });
+      }
+      const a=aufAntwortArt(txt+' '+(th.subj||''),!!best);
+      AUF.antworten.push({ tid:th.tid, fromEmail:norm(th.fromEmail), ts:th.ts||Date.now(),
+        art:a.art, zitat:a.zitat||(best?best.zitat:''), subj:th.subj,
+        terminDate:best?best.date:null, terminTime:best?best.time:'' });
     }catch(e){}
   }
+}
+// Alle E-Mail-Adressen aus allen geladenen Handwerkerlisten.
+function hwAdressen(){
+  const set=new Set();
+  AUFS.forEach(a=>(a.hw||[]).forEach(h=>{ if(h.mail) set.add(norm(h.mail)); }));
+  return set;
+}
+// Die juengste Antwort dieses Betriebs - zugeordnet ueber die E-Mail-Adresse aus der Handwerkerliste.
+function hwAntwort(h){
+  if(!h||!h.mail) return null;
+  const e=norm(h.mail);
+  const arr=(AUF.antworten||[]).filter(x=>x.fromEmail===e);
+  if(!arr.length) return null;
+  return arr.sort((a,b)=>(b.ts||0)-(a.ts||0))[0];
+}
+function hwAntwortTxt(an){
+  const m=ANT_ART[an.art]||ANT_ART.antwort;
+  return m.icon+' '+m.txt+' · '+fmtDate(new Date(an.ts));
 }
 function extractPlainBody(payload){
   try{ const txt=findMimePart(payload,'text/plain'); if(txt) return b64urlDecode(txt);
@@ -1648,7 +1915,7 @@ async function gmailCreateDraft(to,subject,body,threadId){
 }
 function hwNachfassText(h){
   return ['Sehr geehrte Damen und Herren,','',
-    'wir hatten Ihnen am '+(h.kontaktiert?fmtDate(h.kontaktiert):'zuletzt')+' eine Anfrage zu unserem Vorhaben in '+aufObjektName()+' geschickt ('+(h.paket?h.paket+', ':'')+h.gewerk+').','',
+    'wir hatten Ihnen am '+(h.kontaktiert?fmtDate(h.kontaktiert):'zuletzt')+' eine Anfrage zu unserem Vorhaben in '+aufObjektName(h._obj)+' geschickt ('+(h.paket?h.paket+', ':'')+h.gewerk+').','',
     'Da wir die Vergabe in den nächsten Tagen abschließen möchten, wollte ich kurz nachfragen, ob Sie uns ein Angebot zusenden können. Falls Sie derzeit keine Kapazitäten haben, geben Sie uns bitte ebenfalls kurz Bescheid – dann planen wir anders.','',
     'Für Rückfragen zum Leistungsumfang stehe ich Ihnen gern zur Verfügung.','',
     'Mit freundlichen Grüßen','','Nele Stein','UpgradeHomes eGbR'].join('\n');
@@ -1660,7 +1927,7 @@ async function aufDraft(id){
   if(!hasComposeScope()){ saveToast('⚠ Entwurf-Berechtigung fehlt – bitte oben rechts über ↻ neu anmelden.',0,1); return; }
   saveToast('Lege Entwurf an …');
   try{
-    await gmailCreateDraft(h.mail,'Nachfrage Angebot – '+aufObjektName()+' ('+(h.paket||h.gewerk)+')',hwNachfassText(h));
+    await gmailCreateDraft(h.mail,'Nachfrage Angebot – '+aufObjektName(h._obj)+' ('+(h.paket||h.gewerk)+')',hwNachfassText(h));
     saveToast('✓ Entwurf in Gmail angelegt – dort prüfen und senden',1);
   }catch(e){ saveToast('⚠ Entwurf nicht angelegt: '+e.message,0,1); }
 }
@@ -1711,6 +1978,7 @@ async function saveAufTermin(id){
 /* ---- Zeile in „Heute zuerst" -------------------------------------------- */
 const AUF_SEV_COLOR={rot:'var(--band-red)',heute:'var(--band-orange)',bald:'var(--band-yellow)'};
 function aufAktion(it){
+  if(it.art==='vk') return `<a class="link" target="_blank" href="${esc(it.link)}" onclick="event.stopPropagation()">📊 Objektliste</a>`;
   if(it.art==='termin') return `<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();openAufTermin('${it.id}')">📅 eintragen</button>`;
   if(it.art==='mail') return `<a class="link" target="_blank" href="${esc(it.link)}" onclick="event.stopPropagation()">${it.hasDraft?'✏️ senden':'✉️ schreiben'}</a>`;
   if(it.art==='hw'&&it.mail) return `<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();aufDraft('${it.id}')">✏️ Entwurf</button>`;
@@ -1719,20 +1987,438 @@ function aufAktion(it){
   return `<a class="link" target="_blank" href="${esc(it.link||aufSheetUrl())}" onclick="event.stopPropagation()">📊 Plan</a>`;
 }
 function hztAufRow(it){
-  const d=aufDone(it.id);
+  const d=aufDoneItem(it);
   return `<tr class="hzt-row${d?' done':''}" data-auf="${esc(it.id)}">`
     +`<td><input type="checkbox" class="hzt-chk"${d?' checked':''} onclick="event.stopPropagation();event.preventDefault();toggleAufDone('${it.id}')"></td>`
-    +`<td><span class="hzt-dot" style="background:${AUF_SEV_COLOR[it.sev]}"></span><span class="hzt-obj">${esc(it.titel)}</span><div class="hzt-meta">🏗️ ${esc(it.meta||'Aufwertung')}</div></td>`
+    +`<td><span class="hzt-dot" style="background:${AUF_SEV_COLOR[it.sev]}"></span><span class="hzt-obj">${esc(it.titel)}</span><div class="hzt-meta">${it.icon||'🏗️'} ${esc(it.meta||'Aufwertung')}</div></td>`
     +`<td class="stand">${esc(it.stand)}</td>`
     +`<td>${esc(it.todo)}</td>`
     +`<td class="vor">${esc(it.vorschlag)}</td>`
     +`<td>${aufAktion(it)}</td></tr>`;
 }
 function toggleAufDone(id){
-  const k=dkey(id), nowDone=!doneSet.has(k);
-  if(nowDone){ doneSet.add(k); if(typeof burst==='function') burst(10); } else doneSet.delete(k);
+  const it=aufItemsAll().concat(typeof vkItems==='function'?vkItems():[]).find(x=>x.id===id);
+  const nowDone=!(it?aufDoneItem(it):doneSet.has(dkey(id)));
+  // Beim Abwaehlen muss auch der alte Schluessel weg, sonst bliebe der Haken stehen.
+  const keys=[id].concat((it&&it.lid&&aufLegacy(it.obj))?[it.lid]:[]);
+  keys.forEach(kk=>{ const k=dkey(kk); if(nowDone) doneSet.add(k); else doneSet.delete(k); });
+  if(nowDone&&typeof burst==='function') burst(10);
   persistState(id,'done',nowDone?'1':'0');
+  if(keys.length>1) persistStateSilent(keys[1],'done',nowDone?'1':'0');
   renderAll();
+}
+
+
+/* ============================================================================
+   AUFWERTUNGS-PIPELINE  (Stand 21.08.2026)
+   Zweites Kanban-Board. Referenz ist die Aufwertungstabelle – so wie die
+   Ankaufs-Pipeline die Leadliste als Referenz hat.
+   Eine Kachel = ein Gewerk-Paket (P1 bis P8). Oben auf der Kachel steht das
+   Objekt, darunter das Gewerk. Klick öffnet alle Details aus der Tabelle.
+   Spalten: Angefragt · Angebot da · Beauftragt · In Ausführung · Fertig
+   21.08.2026 (Entscheidung 4.1): Verkauf, Übergabe und Geldeingang sind HIER RAUS -
+   sie haben eine eigene Ansicht bekommen (VERKAUFS-PIPELINE weiter unten). Grund:
+   Aufwertung und Verkauf laufen PARALLEL, nicht nacheinander. In Kühlungsborn ist
+   „Fotos und Vermarktungsstart" Schritt 21 des Aufwertungsplans - die Vermarktung
+   beginnt vor der Fertigstellung. Ein Objekt steht also gleichzeitig in beiden Boards.
+   ========================================================================== */
+const AUF_COLS=['Angefragt','Angebot da','Beauftragt','In Ausführung','Fertig'];
+
+const AUF_COL_ICON={'Angefragt':'✉️','Angebot da':'📄','Beauftragt':'🤝','In Ausführung':'🔨','Fertig':'✅'};
+
+/* ---- Gewerke zusammenführen ---------------------------------------------
+   Die Tabelle nennt dasselbe Gewerk an drei Stellen unterschiedlich:
+   Kostenübersicht „Sanitär / Heizung", Zeitplan „SHK", Handwerkerliste „Sanitär / Heizung".
+   Diese Funktion bringt die drei Schreibweisen zusammen.                     */
+function gewerkTeile(s){
+  return normLoose(s).split(/[\/,+&]|\bund\b/).map(x=>x.trim()).filter(x=>x.length>2);
+}
+function gewerkVarianten(t){
+  const o=[t];
+  if(/shk/.test(t)) o.push('sanitaer','heizung');
+  if(/sanitaer|heizung/.test(t)) o.push('shk');
+  if(/kueche/.test(t)) o.push('kuechenstudio','kueche');
+  if(/boden/.test(t)) o.push('bodenleger','bodenbelag');
+  if(/galabau|garten|landschaft/.test(t)) o.push('galabau','garten');
+  if(/staging/.test(t)) o.push('staging');
+  return o;
+}
+function gewerkMatch(a,b){
+  if(!a||!b) return false;
+  const ta=gewerkTeile(a), tb=gewerkTeile(b);
+  return ta.some(x=>tb.some(y=>{
+    const ex=gewerkVarianten(x), ey=gewerkVarianten(y);
+    return ex.some(pp=>ey.some(qq=>pp.includes(qq)||qq.includes(pp)));
+  }));
+}
+// "Paket 3" bzw. "P3" → "P3"
+function paketKey(v){
+  const m=String(v||'').match(/(\d+)/);
+  return m?('P'+m[1]):'';
+}
+
+/* ---- Ein Paket = eine Kachel -------------------------------------------- */
+function aufPakete(){
+  const out=[];
+  AUFS.filter(a=>a.state==='ready').forEach(a=>{
+    const k=a.kosten||{pakete:[]};
+    // key = „<Objektkuerzel>|P1". Der Objektteil ist Pflicht: ohne ihn teilen sich zwei
+    // Objekte denselben Zustand (siehe Kommentar oben bei AUFS).
+    let basis=(k.pakete||[]).map(x=>({key:a.key+'|'+paketKey(x.paket),pk:paketKey(x.paket),_obj:a.key,
+      objName:a.name,paket:x.paket,gewerk:x.gewerk,budget:x.budget,angebot:x.angebot,
+      vergebenAn:x.vergeben,statusTxt:x.status,_row:x._row}));
+    // Faellt die Kostenuebersicht aus, bauen wir die Pakete ersatzweise aus der Handwerkerliste.
+    if(!basis.length){
+      const seen={};
+      a.hw.forEach(h=>{ const kk=paketKey(h.paket); if(!kk||seen[kk]) return; seen[kk]=1;
+        basis.push({key:a.key+'|'+kk,pk:kk,_obj:a.key,objName:a.name,paket:'Paket '+kk.slice(1),
+          gewerk:h.gewerk,budget:null,angebot:null,vergebenAn:'',statusTxt:'',_row:null}); });
+    }
+    basis.filter(x=>x.pk).forEach(x=>{
+      const betriebe=a.hw.filter(h=>paketKey(h.paket)===x.pk||(!h.paket&&gewerkMatch(h.gewerk,x.gewerk)));
+      const aufgaben=a.tasks.filter(t=>gewerkMatch(t.gewerk,x.gewerk));
+      const angebote=betriebe.filter(h=>h.angebot!=null&&h.angebot>0);
+      const angeschrieben=betriebe.filter(h=>h.kontaktiert);
+      const still=angeschrieben.filter(h=>!h.rueck&&!hwAntwort(h)&&daysSince(h.kontaktiert)>=AUF_STALE);
+      // Antworten, die einen Handgriff verlangen (anderer Termin / Absage) bzw. bestaetigte Termine.
+      const antOffen=betriebe.filter(h=>{const x=hwAntwort(h);return x&&(x.art==='termin_neu'||x.art==='absage');});
+      const antOk=betriebe.filter(h=>{const x=hwAntwort(h);return x&&x.art==='termin_ok';});
+      const offenAnzufragen=betriebe.filter(h=>!h.kontaktiert&&/offen/.test(norm(h.status)));
+      const mails=aufPaketMails(betriebe);
+      const ueberfaellig=aufgaben.filter(t=>!t.erledigt&&t.ende&&daysUntil(t.ende)<0);
+      const laufend=aufgaben.filter(t=>!t.erledigt&&t.start&&daysUntil(t.start)<=0);
+      const alleFertig=aufgaben.length>0&&aufgaben.every(t=>t.erledigt);
+      const o={...x, betriebe, aufgaben, angebote, angeschrieben, still, offenAnzufragen, mails,
+               ueberfaellig, laufend, alleFertig, antOffen, antOk};
+      o.phase=paketPhase(o);
+      o.sev=paketSev(o);
+      out.push(o);
+    });
+  });
+  return out;
+}
+// Wie viele Gewerke eines Objekts sind fertig? Wird auf der Verkaufskachel und im
+// Aufwertungsstand der Objektliste angezeigt.
+function aufFortschritt(objKey){
+  const pak=aufPakete().filter(x=>x._obj===objKey);
+  if(!pak.length) return null;
+  return {fertig:pak.filter(x=>x.phase==='Fertig').length, gesamt:pak.length,
+          rot:pak.filter(x=>x.sev==='rot').length};
+}
+function aufPaketMails(betriebe){
+  if(!(typeof GMAIL!=='undefined'&&hasGmailScope()&&GMAIL.state==='ready')) return [];
+  const adr=new Set(betriebe.map(h=>norm(h.mail)).filter(x=>x&&x.includes('@')));
+  if(!adr.size) return [];
+  return GMAIL.threads.filter(t=>adr.has(norm(t.fromEmail))).sort((a,b)=>(b.ts||0)-(a.ts||0));
+}
+// Spalte des Pakets. Von Hand verschoben sticht immer; sonst aus dem Stand in der Tabelle abgeleitet.
+function paketPhase(o){
+  // Neuer Schluessel „aufp:S14021|P1|phase"; fuer die Tabelle aus config.js gilt beim
+  // LESEN zusaetzlich der alte „aufp:P1|phase", damit bestehende Staende erhalten bleiben.
+  let manuell=META['aufp:'+o.key+'|phase'];
+  if(!manuell&&aufLegacy(o._obj)) manuell=META['aufp:'+o.pk+'|phase'];
+  if(manuell&&AUF_COLS.includes(manuell)) return manuell;
+  const st=norm(o.statusTxt);
+  if(/fertig|abgeschlossen|abgenommen|erledigt/.test(st)||o.alleFertig) return 'Fertig';
+  if(/beauftragt|vergeben/.test(st)||o.vergebenAn) return o.laufend.length?'In Ausführung':'Beauftragt';
+  if(o.angebote.length) return 'Angebot da';
+  return 'Angefragt';
+}
+function paketSev(o){
+  if(o.ueberfaellig.length||o.still.length||(o.antOffen&&o.antOffen.length)) return 'rot';
+  if(o.phase==='Angefragt'&&o.offenAnzufragen.length) return 'gelb';
+  if(o.phase==='Angebot da'&&o.angebote.length<3) return 'gelb';
+  return 'gruen';
+}
+const AUF_SEV_BAR={rot:'var(--band-red)',gelb:'var(--band-yellow)',gruen:'var(--band-green)'};
+function paketWarnung(o){
+  if(o.antOffen&&o.antOffen.length){
+    const a=hwAntwort(o.antOffen[0]);
+    return (ANT_ART[a.art]||ANT_ART.antwort).icon+' '+o.antOffen[0].firma+': '+(ANT_ART[a.art]||ANT_ART.antwort).txt;
+  }
+  if(o.ueberfaellig.length) return '⏰ '+o.ueberfaellig.length+' '+(o.ueberfaellig.length===1?'Termin':'Termine')+' überschritten';
+  if(o.still.length) return '📞 '+o.still.length+' '+(o.still.length===1?'Betrieb meldet sich nicht':'Betriebe melden sich nicht');
+  if(o.phase==='Angefragt'&&o.offenAnzufragen.length) return '✉️ '+o.offenAnzufragen.length+' noch nicht angefragt';
+  if(o.phase==='Angebot da'&&o.angebote.length<3) return '📄 erst '+o.angebote.length+' von 3 Angeboten';
+  return '';
+}
+function paketCard(o){
+  const diff=(o.budget!=null&&o.angebot!=null&&o.angebot>0)?(o.angebot-o.budget):null;
+  const diffTxt=diff==null?'':(diff<=0?' · <b style="color:var(--green)">'+euroTxt(diff)+'</b>':' · <b style="color:var(--band-red)">+'+euroTxt(diff)+'</b>');
+  const warn=paketWarnung(o);
+  const mailFlag=o.mails.some(m=>m.hasDraft)?'<div class="mail-flag draft">✏️ Entwurf offen – in Gmail abschicken</div>'
+    :(o.mails.some(m=>m.weOwe&&!m.noise)?'<div class="mail-flag open">✉️ Rückmeldung offen</div>':'');
+  return `<div class="kc-card" draggable="true" data-paket="${esc(o.key)}">`
+    +`<div class="kc-bar" style="background:${AUF_SEV_BAR[o.sev]}">🏗️ ${esc(o.objName||aufObjektName(o._obj))}</div>`
+    +`<div class="kc-body">`
+    +`<div class="kc-title">${esc(o.key)} · ${esc(o.gewerk||o.paket)}</div>`
+    +`<div class="kc-sub">Budget ${euroTxt(o.budget)} · Angebot ${o.angebot?euroTxt(o.angebot):'—'}${diffTxt}</div>`
+    +mailFlag
+    +(warn?`<div class="kc-follow"><span class="kc-follow-k">⚠</span><span class="kc-follow-t">${esc(warn)}</span></div>`:'')
+    +(o.antOk&&o.antOk.length?`<div class="kc-follow"><span class="kc-follow-k">✅</span><span class="kc-follow-t">${o.antOk.length===1?esc(o.antOk[0].firma)+' hat den Termin bestätigt':o.antOk.length+' Betriebe haben den Termin bestätigt'}</span></div>`:'')
+    +(o.vergebenAn?`<div class="kc-follow"><span class="kc-follow-k">🤝</span><span class="kc-follow-t">vergeben an ${esc(o.vergebenAn)}</span></div>`:'')
+    +`<div class="kc-foot"><span class="kc-due" style="color:var(--ink-faint)">${o.betriebe.length} ${o.betriebe.length===1?'Betrieb':'Betriebe'} · ${o.angebote.length} ${o.angebote.length===1?'Angebot':'Angebote'}${o.aufgaben.length?' · '+o.aufgaben.filter(t=>t.erledigt).length+'/'+o.aufgaben.length+' Schritte':''}</span><span class="sp"></span>${ownerAv('Niklas')}</div>`
+    +`</div></div>`;
+}
+
+/* (21.08.2026 entfernt) aufObjektKarte() - die Objektkachel fuer Verkauf/Uebergabe/
+   Geldeingang. Sie stand im Aufwertungsboard und ist mit Entscheidung 4.1 in die
+   eigene Verkaufsansicht gewandert, wo sie aus der Objektliste kommt statt aus
+   config.js - und damit fuer beliebig viele Objekte funktioniert.               */
+
+/* ---- Phase speichern ----------------------------------------------------
+   Doppelt: im Cockpit-State (wirkt sofort, auch ohne Neuladen) und – wenn die
+   Kostenübersicht eine Status-Spalte hat – in der Aufwertungstabelle selbst. */
+async function persistPaketPhase(key,neu){
+  META['aufp:'+key+'|phase']=neu;
+  persistStateSilent('aufp:'+key,'phase',neu);
+  saveToast('Speichere Stand …');
+  try{
+    const {obj,rest}=splitKey(key);
+    const a=aufEintrag(obj);
+    const p=(a&&a.kosten&&a.kosten.pakete||[]).find(x=>paketKey(x.paket)===rest);
+    if(a&&p&&p._row&&a.kosten._statusCol>=0&&a.tabs.kosten){
+      const sp=colLetter(a.kosten._statusCol);
+      await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+a.sheetId+'/values/'
+        +encodeURIComponent(a.tabs.kosten+'!'+sp+p._row)+'?valueInputOption=USER_ENTERED',
+        {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({values:[[neu]]})});
+      p.status=neu;
+      saveToast('✓ Gespeichert – auch in der Aufwertungstabelle',1);
+    } else {
+      saveToast('✓ Gespeichert (im Cockpit; die Tabelle hat keine Status-Spalte)',1);
+    }
+  }catch(e){ saveToast('⚠ Nur im Cockpit gespeichert: '+e.message,0,1); }
+}
+
+
+/* ---- Das Aufwertungs- und Verkaufsboard --------------------------------- */
+function renderAufBoard(board){
+  if(!hasAufwertung()){
+    board.innerHTML=`<div class="col" style="width:100%"><div class="empty">Kein Objekt in Aufwertung. Trag im Reiter <b>Objektliste</b> in der Spalte <b>Aufwertungstabelle</b> die Kennung des Aufwertungsplans ein - dann erscheint das Objekt hier.</div></div>`;
+    return;
+  }
+  if(AUF.state==='loading'||AUF.state==='idle'){
+    board.innerHTML=`<div class="col" style="width:100%"><div class="empty">Lade die Aufwertungspläne …</div></div>`;
+    return;
+  }
+  const pak=aufPakete();
+  const fehler=AUFS.filter(a=>a.state==='error');
+  if(!pak.length&&fehler.length){
+    board.innerHTML=`<div class="col" style="width:100%"><div class="empty">Kein Aufwertungsplan lesbar: ${esc(fehler[0].error||'')}<br><a class="link" target="_blank" href="${aufSheetUrl(fehler[0].key)}">Tabelle öffnen</a></div></div>`;
+    return;
+  }
+  board.innerHTML=AUF_COLS.map(ph=>{
+    const arr=pak.filter(x=>x.phase===ph);
+    return `<div class="col" data-aufcol="${esc(ph)}"><div class="col-head"><span>${AUF_COL_ICON[ph]} ${esc(ph)}</span><span class="cnt">${arr.length}</span></div>${arr.map(paketCard).join('')}</div>`;
+  }).join('');
+  // Ein Plan, der nicht laedt, darf nicht stumm fehlen - sonst faellt sein Objekt
+  // einfach vom Board, ohne dass jemand es merkt.
+  if(fehler.length){
+    board.insertAdjacentHTML('afterbegin',`<div class="col" style="width:100%"><div class="empty">⚠ ${fehler.length} ${fehler.length===1?'Plan ist':'Pläne sind'} nicht lesbar: ${fehler.map(a=>`<a class="link" target="_blank" href="${aufSheetUrl(a.key)}">${esc(a.name)}</a>`).join(' · ')}</div></div>`);
+  }
+  if(!pak.length){
+    board.insertAdjacentHTML('afterbegin',`<div class="col" style="width:100%"><div class="empty">Im Reiter „Kostenübersicht" der Aufwertungstabelle wurden keine Pakete gefunden. Es braucht dort eine Kopfzeile mit <b>Paket</b> und <b>Budget netto</b>.</div></div>`);
+  }
+  board.querySelectorAll('.kc-card').forEach(card=>{
+    card.onclick=e=>{ if(e.target.tagName==='A'||e.target.tagName==='BUTTON') return; openPaket(card.dataset.paket); };
+    card.addEventListener('dragstart',ev=>{ ev.dataTransfer.setData('id',card.dataset.paket||''); card.classList.add('dragging'); });
+    card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+  });
+  board.querySelectorAll('.col').forEach(col=>{
+    col.addEventListener('dragover',e=>{ e.preventDefault(); col.classList.add('drop'); });
+    col.addEventListener('dragleave',()=>col.classList.remove('drop'));
+    col.addEventListener('drop',async e=>{
+      e.preventDefault(); col.classList.remove('drop');
+      const ziel=col.dataset.aufcol, id=e.dataTransfer.getData('id');
+      if(!ziel||!id||!AUF_COLS.includes(ziel)) return;
+      await persistPaketPhase(id,ziel); renderAll();
+    });
+  });
+}
+
+let AUF_POS_CACHE={};
+async function ladePositionen(key){
+  if(AUF_POS_CACHE[key]) return AUF_POS_CACHE[key];
+  const {obj,rest}=splitKey(key);
+  const a=aufEintrag(obj);
+  if(!a){ AUF_POS_CACHE[key]=[]; return []; }
+  try{
+    const titles=(await aufTabs(a.sheetId)).alle||[];
+    const nr=rest.slice(1);
+    const tab=titles.find(t=>{ const n=norm(t).replace(/\s/g,''); return n===norm(rest)||n==='paket'+nr||n.startsWith('p'+nr+'–')||n.startsWith('p'+nr+'-'); });
+    if(!tab){ AUF_POS_CACHE[key]=[]; return []; }
+    const rows=await aufRead(a.sheetId,tab,'A1:L120');
+    const hi=findHead(rows,['pos','leistung']); if(hi<0){ AUF_POS_CACHE[key]=[]; return []; }
+    const h=rows[hi], cP=colIdx(h,'pos'), cL=colIdx(h,'leistung'), cM=colIdx(h,'menge'),
+          cE=colIdx(h,'einheit'), cB=colIdx(h,'ep netto (budget)')>=0?colIdx(h,'ep netto (budget)'):colIdx(h,'budget'),
+          cA=colIdx(h,'ep netto (angebot)')>=0?colIdx(h,'ep netto (angebot)'):colIdx(h,'angebot'), cBe=colIdx(h,'betrieb');
+    const out=[];
+    rows.slice(hi+1).forEach(r=>{
+      const l=String(r[cL]||'').trim(); if(!l) return;
+      if(/^summe/.test(norm(r[cP]||r[cL]))) return;
+      out.push({pos:String(r[cP]||'').trim(),leistung:l,menge:String(r[cM]||'').trim(),einheit:String(r[cE]||'').trim(),
+                budget:euroNum(r[cB]),angebot:euroNum(r[cA]),betrieb:String(r[cBe]||'').trim()});
+    });
+    AUF_POS_CACHE[key]=out; return out;
+  }catch(e){ AUF_POS_CACHE[key]=[]; return []; }
+}
+function hwZeile(h,key){
+  const an=hwAntwort(h);
+  const am=an?(ANT_ART[an.art]||ANT_ART.antwort):null;
+  const rueckE=h.rueck||(an?new Date(an.ts):null);
+  const tage=h.kontaktiert&&!rueckE?daysSince(h.kontaktiert):null;
+  const ampel=(am&&am.sev==='rot')?'var(--band-red)'
+             :rueckE?'var(--green)'
+             :(tage!=null&&tage>=AUF_STALE?'var(--band-red)':(h.kontaktiert?'var(--band-yellow)':'var(--ink-faint)'));
+  const stand=rueckE?('geantwortet am '+fmtDate(rueckE)):(h.kontaktiert?('angeschrieben am '+fmtDate(h.kontaktiert)+' · seit '+tage+' T still'):'noch nicht angefragt');
+  // Die Einstufung steht mit dem ausloesenden Satz da - eine Deutung, die man nachpruefen kann.
+  const antZeile=an?`<br><b style="color:${am.sev==='rot'?'var(--band-red)':'var(--green)'}">${esc(hwAntwortTxt(an))}</b>`
+      +(an.zitat?`<span style="color:var(--ink-soft)"> – „${esc(an.zitat)}"</span>`:'')
+      +` <a class="link" target="_blank" href="${gmailThreadLink(an.tid)}" onclick="event.stopPropagation()">✉️ Mail</a>`:'';
+  const tel=h.tel?`<a class="link" href="tel:${String(h.tel).replace(/[^\d+]/g,'')}">📞 ${esc(h.tel)}</a>`:'';
+  const mail=h.mail?`<a class="link" href="mailto:${esc(h.mail)}">✉️ ${esc(h.mail)}</a>`
+                   :`<span style="color:var(--ink-faint);font-size:12px">keine E-Mail – nur telefonisch</span>`;
+  const draft=h.mail?`<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="aufDraftHw('${esc(key)}','${esc(h.id)}')">✏️ Entwurf</button>`:'';
+  return `<div class="mini"><span class="dot" style="background:${ampel}"></span><span class="mt">
+      <b>${esc(h.firma)}</b>${h.ort?' · '+esc(h.ort):''}<br>
+      <span style="color:var(--ink-soft)">${esc(stand)}${h.angebot?' · Angebot '+euroTxt(h.angebot):''}${h.notiz?' · '+esc(h.notiz):''}</span>${antZeile}<br>
+      ${tel} ${mail}</span>${draft}</div>`;
+}
+async function openPaket(key){
+  const o=aufPakete().find(p=>p.key===key); if(!o) return;
+  const diff=(o.budget!=null&&o.angebot!=null&&o.angebot>0)?(o.angebot-o.budget):null;
+  const phasen=AUF_COLS;
+  $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
+    <div class="detail-head">
+      <div style="font-size:12px;color:var(--ink-faint);font-weight:700;letter-spacing:.03em">🏗️ ${esc(o.objName||aufObjektName(o._obj))}</div>
+      <h2>${esc(o.pk)} · ${esc(o.gewerk||o.paket)}</h2>
+      <div class="deeplinks"><a class="link" target="_blank" href="${aufSheetUrl(o._obj)}">📊 Aufwertungstabelle öffnen</a></div>
+    </div>
+    <div class="section-t" style="margin-top:12px">💶 Budget und Angebote</div>
+    <div class="mini"><span class="dot" style="background:#93C5FD"></span><span class="mt">
+      Budget netto <b>${euroTxt(o.budget)}</b> · Angebot netto <b>${o.angebot?euroTxt(o.angebot):'—'}</b>
+      ${diff!=null?(diff<=0?' · <b style="color:var(--green)">'+euroTxt(diff)+' unter Budget</b>':' · <b style="color:var(--band-red)">'+euroTxt(diff)+' über Budget</b>'):''}
+      ${o.vergebenAn?'<br>vergeben an <b>'+esc(o.vergebenAn)+'</b>':''}</span></div>
+    <div class="section-t" style="margin-top:16px">📍 Stand</div>
+    <div class="phbtns" id="paketPhasen">${phasen.map(c=>`<button class="phbtn${c===o.phase?' on':''}" data-ph="${esc(c)}">${AUF_COL_ICON[c]} ${esc(c)}</button>`).join('')}</div>
+    <div class="section-t" style="margin-top:16px">🔧 Betriebe <small>– ${o.betriebe.length} in der Liste · ${o.angebote.length} mit Angebot</small></div>
+    ${o.betriebe.length?o.betriebe.map(h=>hwZeile(h,key)).join(''):'<div class="empty">Für dieses Paket sind noch keine Betriebe erfasst.</div>'}
+    <div class="section-t" style="margin-top:16px">🗓️ Schritte im Zeitplan</div>
+    ${o.aufgaben.length?o.aufgaben.map(t=>{
+        const ampel=t.erledigt?'var(--green)':(t.ende&&daysUntil(t.ende)<0?'var(--band-red)':(t.start&&daysUntil(t.start)<=0?'var(--band-orange)':'var(--ink-faint)'));
+        const zeit=[t.start?fmtDate(t.start):'',t.ende&&(!t.start||+t.ende!==+t.start)?fmtDate(t.ende):''].filter(Boolean).join(' – ');
+        return `<div class="mini"><span class="dot" style="background:${ampel}"></span><span class="mt">${t.meilenstein?'🚩 ':''}<b>${esc(t.titel)}</b><br><span style="color:var(--ink-soft)">${esc(t.phase)}${zeit?' · '+esc(zeit):''}${t.status?' · '+esc(t.status):''}</span></span></div>`;
+      }).join(''):'<div class="empty">Keine Schritte im Zeitplan diesem Gewerk zugeordnet.</div>'}
+    <div class="section-t" style="margin-top:16px">✉️ Mails zu diesem Paket</div>
+    ${o.mails.length?o.mails.slice(0,8).map(m=>`<div class="mini" onclick="window.open('${gmailThreadLink(m.tid)}','_blank')" style="cursor:pointer"><span class="dot" style="background:${m.hasDraft?'var(--band-yellow)':'#93C5FD'}"></span><span class="mt"><b>${esc(m.subj)}</b><br><span style="color:var(--ink-soft)">${esc(m.fromEmail||'')}${m.ts?' · '+fmtDate(new Date(m.ts)):''}${m.hasDraft?' · Entwurf offen':''}</span></span></div>`).join('')
+      :'<div class="empty">Noch keine Mails von diesen Betrieben im Label „Aufwertung" oder im Posteingang.</div>'}
+    <div class="section-t" style="margin-top:16px">📋 Leistungen aus dem Leistungsverzeichnis</div>
+    <div id="paketPos"><div class="empty">Lade …</div></div>`;
+  $('erlOverlay').classList.add('open');
+  $('paketPhasen').querySelectorAll('.phbtn').forEach(b=>b.onclick=async()=>{
+    await persistPaketPhase(key,b.dataset.ph); closeErledigt(); renderAll(); });
+  const pos=await ladePositionen(key);
+  const box=$('paketPos'); if(!box) return;
+  box.innerHTML=pos.length?pos.map(pp=>`<div class="mini"><span class="dot" style="background:var(--ink-faint)"></span><span class="mt">
+      <b>${esc(pp.pos)}</b> ${esc(pp.leistung)}<br>
+      <span style="color:var(--ink-soft)">${esc(pp.menge)} ${esc(pp.einheit)} · Budget ${euroTxt(pp.budget)}${pp.angebot?' · Angebot '+euroTxt(pp.angebot):''}${pp.betrieb?' · '+esc(pp.betrieb):''}</span></span></div>`).join('')
+    :'<div class="empty">Kein Leistungsverzeichnis-Reiter zu '+esc(o.pk)+' gefunden.</div>';
+}
+// Nachfass-Entwurf aus dem Detail-Fenster heraus
+async function aufDraftHw(key,hwId){
+  const o=aufPakete().find(p=>p.key===key); if(!o) return;
+  const h=o.betriebe.find(x=>x.id===hwId); if(!h) return;
+  if(!h.mail){ saveToast('⚠ Für '+h.firma+' ist keine E-Mail hinterlegt – bitte anrufen.',0,1); return; }
+  if(!hasComposeScope()){ saveToast('⚠ Entwurf-Berechtigung fehlt – bitte neu anmelden.',0,1); return; }
+  saveToast('Lege Entwurf an …');
+  try{
+    await gmailCreateDraft(h.mail,'Nachfrage Angebot – '+aufObjektName(h._obj)+' ('+(h.paket||h.gewerk)+')',hwNachfassText(h));
+    saveToast('✓ Entwurf in Gmail angelegt – dort prüfen und senden',1);
+  }catch(e){ saveToast('⚠ Entwurf nicht angelegt: '+e.message,0,1); }
+}
+
+/* ---- ANTWORTSTAND IN DIE HANDWERKERLISTE ZURUECKSCHREIBEN (21.08.2026) ----
+   Damit der Stand auch sichtbar ist, wenn man nur die Aufwertungstabelle offen hat.
+   Geschrieben werden ZWEI Spalten, und beide mit klarer Zustaendigkeit:
+
+     „Rückmeldung"  – nur wenn die Zelle LEER ist. Das ist eine Tatsache (an diesem
+                      Tag kam eine Mail), keine Deutung. Was Nele dort selbst
+                      eingetragen hat, bleibt unangetastet.
+     „Antwort"      – gehoert dem Cockpit und wird immer aktualisiert. Hier steht die
+                      Deutung („✅ Termin bestätigt", „📅 anderer Termin gewünscht").
+                      Fehlt die Spalte, legt das Cockpit sie einmalig rechts an.
+
+   Die Spalte „Status" wird BEWUSST NICHT beschrieben: sie steuert das Board
+   (beauftragt / abgesagt) und ist eine Entscheidung, keine Beobachtung. Eine
+   Fehldeutung wuerde dort ein Gewerk in die falsche Spalte schieben.
+   Geschrieben wird gebuendelt, je Tabelle ein Aufruf, und nur bei Aenderung.      */
+const aufBatchWrite=(sheetId,data)=>apiPost('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'/values:batchUpdate',{valueInputOption:'USER_ENTERED',data});
+/* Der Mail-Durchlauf braucht beides: die Mails aus Gmail UND die Handwerkeradressen
+   aus den Aufwertungstabellen. Beide werden parallel geladen - wer zuletzt fertig
+   wird, startet den Durchlauf. Die Sperre verhindert, dass er doppelt laeuft.       */
+let AUF_SCAN_LAEUFT=false, AUF_SCAN_FERTIG=false;
+async function scanUndSync(){
+  if(AUF_SCAN_LAEUFT||AUF_SCAN_FERTIG) return;
+  if(!(hasGmailScope()&&GMAIL.state==='ready')) return;
+  if(AUF.state==='loading'||AUF.state==='idle') return;   // Aufwertung noch unterwegs – der andere Zweig übernimmt
+  AUF_SCAN_LAEUFT=true;
+  try{
+    await scanAufwertungMails();
+    AUF_SCAN_FERTIG=true;
+    renderAll();
+    await syncHandwerkerStatus();
+  }catch(e){ /* stiller Fehlschlag: das Cockpit bleibt benutzbar */ }
+  finally{ AUF_SCAN_LAEUFT=false; }
+}
+async function syncHandwerkerStatus(){
+  if(AUF.state!=='ready'||!(hasGmailScope()&&GMAIL.state==='ready')) return;
+  for(const a of AUFS.filter(x=>x.state==='ready'&&x.tabs&&x.tabs.hw)){
+    try{ await syncHwEinObjekt(a); }catch(e){ /* eine kaputte Tabelle darf den Rest nicht stoppen */ }
+  }
+}
+async function syncHwEinObjekt(a){
+  const c=a.hw._cols, head=a.hw._headRow, breite=a.hw._breite;
+  if(!c||!head) return;
+  const data=[];
+  let cAnt=c.antwort;
+  if(cAnt==null||cAnt<0){ cAnt=breite; c.antwort=cAnt;
+    data.push({range:a.tabs.hw+'!'+colLetter(cAnt)+head,values:[['Antwort']]}); }
+  a.hw.forEach(h=>{
+    const an=hwAntwort(h); if(!an||!h._row) return;
+    const txt=hwAntwortTxt(an);
+    if(String(h.antwortTxt||'').trim()!==txt){
+      h.antwortTxt=txt;
+      data.push({range:a.tabs.hw+'!'+colLetter(cAnt)+h._row,values:[[txt]]});
+    }
+    if(!h.rueck&&c.rueck>=0){
+      h.rueck=new Date(an.ts);
+      data.push({range:a.tabs.hw+'!'+colLetter(c.rueck)+h._row,values:[[fmtDate(new Date(an.ts))]]});
+    }
+  });
+  if(data.length) await aufBatchWrite(a.sheetId,data);
+}
+
+/* ---- „Aufwertungsstand" in der Objektliste ------------------------------
+   Diese Spalte gehoert dem COCKPIT, nicht Nele: sie steht schon in der
+   Aufwertungstabelle und wird hier nur als lesbare Zusammenfassung gespiegelt,
+   damit man den Baustand auch sieht, wenn man nur die Tabelle offen hat.
+   Geschrieben wird gebuendelt in EINEM Aufruf und nur, wenn sich etwas geaendert
+   hat - sonst schriebe jedes Laden des Cockpits sinnlos in die Tabelle.        */
+async function syncAufStand(){
+  try{
+    const data=[];
+    (SALE||[]).forEach(o=>{
+      if(o._standCol==null||o._standCol<0||!o._row||!o.aufSheetId) return;
+      const a=AUFS.find(x=>x.sheetId===o.aufSheetId);
+      if(!a||a.state!=='ready') return;
+      const f=aufFortschritt(a.key); if(!f) return;
+      const txt=f.fertig+'/'+f.gesamt+' Gewerke fertig'+(f.rot?' · '+f.rot+' kritisch':'');
+      if(String(o.aufStand||'').trim()===txt) return;
+      o.aufStand=txt;
+      data.push({range:CFG.TABS.objektliste+'!'+colLetter(o._standCol)+o._row,values:[[txt]]});
+    });
+    if(data.length) await sheetsBatchWrite(data);
+  }catch(e){ /* Anzeigespalte - ein Fehler hier darf das Cockpit nicht stoeren */ }
 }
 
 /* ============ RENDER: PIPELINE ============ */
@@ -1769,67 +2455,169 @@ function pipeCard(o){
   const snz=isSnoozed(o)?`<div class="kc-snooze">⏳ pausiert bis ${esc(snoozeTxt(o))}</div>`:'';
   return `<div class="kc-card${isSnoozed(o)?' snoozed':''}" draggable="true" data-id="${o._id}"><div class="kc-bar" style="background:${bandColor(o.score)}">${urgency(o.score)[1]}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}</div><div class="kc-sub">${esc(o.typ||'')}${o.kaufpreis?' · '+esc(o.kaufpreis):''}${o.angebot?' → '+esc(o.angebot):''}</div>${mailFlagHTML(o._id)}${followUpHTML(o)}${snz}${lnk?`<div style="margin-top:6px"><a class="link" target="_blank" href="${lnk.href}" onclick="event.stopPropagation()" ondragstart="event.stopPropagation()">${lnk.txt}</a></div>`:''}<div class="kc-foot">${o.fael.state!=='none'&&o.fael.state!=='later'?`<span class="kc-due">🔥 ${esc(o.fael.txt)}</span>`:''}<span class="sp"></span>${ownerAv(effOwner(o))}</div></div></div>`;
 }
-function saleCard(o){
-  const ph=salePhase(o);
-  // Steht das Objekt in der Aufwertung UND ist es das Objekt aus dem Aufwertungsplan,
-  // zeigt die Karte den Projektfortschritt direkt an.
-  const zeigtPlan=ph==='Aufwertung'&&AUF.state==='ready'&&AUF.tasks.length&&normLoose(aufObjektName()).split(/[\s,]+/).some(tk=>tk.length>=5&&normLoose(o.titel+' '+o.adresse).includes(tk));
-  let plan='';
-  if(zeigtPlan){
-    const ges=AUF.tasks.length, fertig=AUF.tasks.filter(t=>t.erledigt).length;
-    const offenRot=aufItems().filter(i=>i.sev==='rot').length;
-    plan=`<div class="kc-follow" title="Aus dem Aufwertungsplan"><span class="kc-follow-k">🏗️</span><span class="kc-follow-t">${fertig}/${ges} Schritte erledigt${offenRot?' · '+offenRot+' überfällig':''}</span><span class="kc-follow-src">Plan</span></div>`;
-  }
-  return `<div class="kc-card" draggable="true" data-id="${o._id}"><div class="kc-bar" style="background:#93C5FD">${SALE_ICON[ph]} ${esc(o.status||ph)}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}</div><div class="kc-sub">${esc(o.einheit||'')}${o.zielpreis?' · '+esc(o.zielpreis):''}</div>${plan}<div class="kc-foot">${o.task?`<span class="kc-due" style="color:var(--ink-faint)">${esc(o.task)}</span>`:''}<span class="sp"></span>${ownerAv('Nele')}</div></div></div>`;
+/* ============================================================================
+   VERKAUFS-PIPELINE  (Arbeitspaket B, 21.08.2026) - dritte Ansicht
+   Referenz ist der Reiter „Objektliste". Eine Kachel = eine Zeile = eine Einheit;
+   bei einem aufgeteilten MFH also je WE eine Kachel mit eigenem Kaeufer, Notartermin
+   und Geldeingang (Entscheidung 4.3).
+
+   Sieben Spalten, und alle sind ZUSTAENDE, keine Ereignisse - deshalb heisst die
+   erste „Vermarktung vorbereiten" und nicht „Makler suchen": ob ueber Makler oder
+   selbst vermarktet wird, ist eine Eigenschaft des Objekts (Spalte „Vermarktungsweg"),
+   keine Phase. Beide Wege durchlaufen dieselben sieben Zustaende.
+
+   NICHT auf dem Board: „Bestand" (gehoert uns, steht nicht zum Verkauf - z. B.
+   Steige 9) und Archiviertes (Uebergabe liegt ueber 30 Tage zurueck).
+   ========================================================================== */
+const VK_COLS=['Vermarktung vorbereiten','Inseriert','Besichtigungen','Reserviert','Notartermin','Geldeingang','Übergabe'];
+const VK_ICON={'Vermarktung vorbereiten':'🧰','Inseriert':'📣','Besichtigungen':'🚪','Reserviert':'🔒',
+               'Notartermin':'⚖️','Geldeingang':'💶','Übergabe':'🔑'};
+// Zwischen Beurkundung und Geldeingang liegen ueblicherweise 4 bis 8 Wochen.
+// Danach ist Nachfragen faellig - beim Notar oder bei der Bank des Kaeufers.
+const VK_GELD_TAGE=56;
+const VK_RESERVIERT_TAGE=21;   // so lange darf eine Reservierung ohne Notartermin laufen
+function vkObjekte(){
+  return (SALE||[]).filter(o=>!o._leer&&!o.bestand&&!o.archiv&&o.titel&&o.titel!=='Verkaufsobjekt');
 }
-/* ===== 21.08.2026: Verkaufs-Pipeline mit vier festen Spalten =================
-   Aufwertung → Verkauf → Übergabe → Geldeingang erfolgt.
-   Die Spalte ergibt sich aus der Status-Spalte des Reiters „Objektliste".
-   Beim Verschieben schreibt das Cockpit den neuen Status in dieselbe Zelle zurück,
-   damit Tabelle und Cockpit denselben Stand zeigen. ========================== */
-const SALE_COLS=['Aufwertung','Verkauf','Übergabe','Geldeingang erfolgt'];
-const SALE_ICON={'Aufwertung':'🏗️','Verkauf':'🏷️','Übergabe':'🔑','Geldeingang erfolgt':'💶'};
+// Aus dem Text der Spalte „Verkaufsphase" die Spalte ableiten. Die alten Schreibweisen
+// der Vier-Spalten-Fassung werden mitgenommen, damit bestehende Zeilen nicht ins Leere laufen.
 function salePhase(o){
-  const s=norm(o.status);
-  if(/geldeingang|kaufpreis (ein|erhalten|geflossen)|bezahlt|zahlung (erfolgt|eingegangen)|abgerechnet/.test(s)) return 'Geldeingang erfolgt';
-  if(/[üu]bergabe|schl[üu]ssel|[üu]bergeben/.test(s)) return 'Übergabe';
-  if(/verkauf|vermarkt|inserat|expos|besichtigung|reserviert|notar|kaufvertrag/.test(s)) return 'Verkauf';
-  if(/aufwert|renov|sanier|umbau|bau|handwerk|staging/.test(s)) return 'Aufwertung';
-  return 'Aufwertung';
+  const t=norm(o.status);
+  const exakt=VK_COLS.find(c=>norm(c)===t); if(exakt) return exakt;
+  if(!t) return 'Vermarktung vorbereiten';
+  if(/[üu]bergabe|schl[üu]ssel|[üu]bergeben/.test(t)) return 'Übergabe';
+  if(/geldeingang|kaufpreis (ein|erhalten|geflossen)|bezahlt|zahlung (erfolgt|eingegangen)|abgerechnet/.test(t)) return 'Geldeingang';
+  if(/notar|beurkund|kaufvertrag/.test(t)) return 'Notartermin';
+  if(/reserv/.test(t)) return 'Reserviert';
+  if(/besichtig/.test(t)) return 'Besichtigungen';
+  if(/inseriert|inserat|expos|online|portal|vermarktet|verkauf/.test(t)) return 'Inseriert';
+  return 'Vermarktung vorbereiten';
 }
-function colLetter(i){ let n=i,out=''; if(n==null||n<0) return ''; do{ out=String.fromCharCode(65+(n%26))+out; n=Math.floor(n/26)-1; }while(n>=0); return out; }
+// Was ist an diesem Objekt gerade dran, und laeuft es aus dem Ruder?
+// Gibt {txt, warn} zurueck; warn=true faerbt die Kachel rot und hebt sie in „Reisst heute".
+function vkStand(o){
+  const ph=salePhase(o);
+  if(ph==='Reserviert'){
+    const d=o.reserviert?daysSince(o.reserviert):null;
+    if(o.notartermin){ const n=daysUntil(o.notartermin);
+      return {txt:'Notartermin am '+fmtDate(o.notartermin)+(n>=0?' (in '+n+' T)':''), warn:false}; }
+    if(d!=null) return {txt:'reserviert seit '+d+' T · Notartermin fehlt',
+                        warn:d>VK_RESERVIERT_TAGE};
+    return {txt:'reserviert · Notartermin fehlt', warn:false};
+  }
+  if(ph==='Notartermin'){
+    if(!o.notartermin) return {txt:'Notartermin steht noch nicht', warn:false};
+    const n=daysUntil(o.notartermin);
+    if(n>=0) return {txt:'Beurkundung am '+fmtDate(o.notartermin)+' (in '+n+' T)', warn:n===0};
+    return {txt:'beurkundet am '+fmtDate(o.notartermin)+' · seit '+(-n)+' T', warn:false};
+  }
+  if(ph==='Geldeingang'){
+    if(o.geldeingang) return {txt:'Geld da am '+fmtDate(o.geldeingang), warn:false};
+    const d=o.notartermin?daysSince(o.notartermin):null;
+    if(d!=null) return {txt:'seit Beurkundung '+d+' T · Kaufpreis offen', warn:d>VK_GELD_TAGE};
+    return {txt:'Kaufpreis offen', warn:false};
+  }
+  if(ph==='Übergabe'){
+    if(o.uebergabe){ const n=daysUntil(o.uebergabe);
+      return {txt:(n>0?'Übergabe am '+fmtDate(o.uebergabe)+' (in '+n+' T)':'übergeben am '+fmtDate(o.uebergabe)), warn:false}; }
+    return {txt:'Übergabetermin fehlt', warn:false};
+  }
+  if(ph==='Vermarktung vorbereiten'){
+    if(!o.weg) return {txt:'Vermarktungsweg noch offen', warn:false};
+    return {txt:/makler/.test(norm(o.weg))?(o.makler?'Makler: '+o.makler:'Makler noch nicht ausgewählt'):'Eigenvermarktung vorbereiten', warn:false};
+  }
+  if(ph==='Inseriert') return {txt:o.interessent?('Interessent: '+o.interessent):'inseriert · noch keine Rückmeldung', warn:false};
+  return {txt:o.interessent?('Interessent: '+o.interessent):'Besichtigungen laufen', warn:false};
+}
+// Die roten Punkte aus dem Verkauf gehoeren in „Reisst heute" - dieser Block ist
+// laut Entscheidung quellenuebergreifend. Der Rest bleibt auf dem Board.
+function vkItems(){
+  const out=[];
+  vkObjekte().forEach(o=>{
+    const st=vkStand(o); if(!st.warn) return;
+    const ph=salePhase(o);
+    out.push({ id:'vk|'+o._id, sev:'rot', art:'vk', icon:'💰', obj:'', objName:o.titel,
+      titel:o.titel+(o.einheit?' · '+o.einheit:''),
+      meta:'Verkauf · '+ph+(o.kuerzel?' · '+o.kuerzel:''),
+      stand:st.txt,
+      todo: ph==='Reserviert' ? '⚖️ Notartermin festmachen'
+          : ph==='Geldeingang' ? '📞 Kaufpreis nachfassen' : '📅 Termin prüfen',
+      vorschlag: ph==='Reserviert' ? 'Reservierung läuft zu lange ohne Beurkundung. Beim Käufer nachfassen, ob die Finanzierung steht - sonst freigeben.'
+          : ph==='Geldeingang' ? 'Zwischen Beurkundung und Geldeingang liegen normal 4 bis 8 Wochen. Beim Notar nachfragen, woran es hängt.'
+          : 'Termin steht heute an.',
+      tel:'', mail:'', link:'https://docs.google.com/spreadsheets/d/'+CFG.SHEET_ID+'/edit' });
+  });
+  return out;
+}
+function vkCard(o){
+  const ph=salePhase(o), st=vkStand(o);
+  const bar=st.warn?'var(--band-red)':'#93C5FD';
+  // Fortschritt aus dem Aufwertungsplan - Aufwertung und Verkauf laufen parallel,
+  // deshalb steht der Baustand auch auf der Verkaufskachel.
+  let plan='';
+  const a=o.aufSheetId?AUFS.find(x=>x.sheetId===o.aufSheetId):null;
+  if(a&&a.state==='ready'){
+    const f=aufFortschritt(a.key);
+    if(f) plan=`<div class="kc-follow" title="Aus dem Aufwertungsplan"><span class="kc-follow-k">🏗️</span><span class="kc-follow-t">${f.fertig}/${f.gesamt} Gewerke fertig${f.rot?' · '+f.rot+' kritisch':''}</span><span class="kc-follow-src">Plan</span></div>`;
+  }
+  const wegTxt=o.weg?(/makler/.test(norm(o.weg))?('🤝 '+(o.makler||'über Makler')):'🏠 Eigenvermarktung'):'';
+  const preis=o.erzielt?('erzielt '+esc(o.erzielt)):(o.zielpreis?('Ziel '+esc(o.zielpreis)):'');
+  return `<div class="kc-card" draggable="true" data-id="${o._id}">`
+    +`<div class="kc-bar" style="background:${bar}">${VK_ICON[ph]} ${esc(ph)}</div>`
+    +`<div class="kc-body">`
+    +`<div class="kc-title">${esc(o.titel)}${o.einheit?' · '+esc(o.einheit):''}</div>`
+    +`<div class="kc-sub">${o.kuerzel?esc(o.kuerzel):''}${o.kuerzel&&preis?' · ':''}${preis}</div>`
+    +plan
+    +(wegTxt?`<div class="kc-follow"><span class="kc-follow-k">📣</span><span class="kc-follow-t">${esc(wegTxt)}</span></div>`:'')
+    +`<div class="kc-follow"><span class="kc-follow-k">${st.warn?'⚠':'•'}</span><span class="kc-follow-t">${esc(st.txt)}</span></div>`
+    +`<div class="kc-foot">${o.interessent&&ph!=='Inseriert'&&ph!=='Besichtigungen'?`<span class="kc-due" style="color:var(--ink-faint)">👤 ${esc(o.interessent)}</span>`:''}<span class="sp"></span>${ownerAv('Nele')}</div>`
+    +`</div></div>`;
+}
 async function persistSalePhase(o,neu){
   const spalte=colLetter(o._stCol);
-  if(!o._row||!spalte){ saveToast('⚠ Status-Spalte im Reiter „Objektliste" nicht gefunden – bitte dort eine Spalte „Status" anlegen.',0,1); return; }
-  saveToast('Speichere Status …');
+  if(!o._row||!spalte){ saveToast('⚠ Spalte „Verkaufsphase" im Reiter „Objektliste" nicht gefunden – bitte dort anlegen.',0,1); return; }
+  saveToast('Speichere Verkaufsphase …');
   try{
     await sheetsWrite(CFG.TABS.objektliste+'!'+spalte+o._row,[neu]);
     o.status=neu; saveToast('✓ Gespeichert',1);
   }catch(e){ saveToast('⚠ Nicht gespeichert: '+e.message,0,1); }
 }
-function renderBoard(){
-  const board=$('board');
-  if(pipeView==='verkauf'){
-    if(!SALE.length){
-      board.innerHTML=`<div class="col" style="width:100%"><div class="empty">Reiter „Objektliste" ist noch leer. Trag dort ein Objekt mit den Spalten <b>Objekt · Adresse · Einheit · Status · Zielpreis · Nächster Schritt · Fällig · Notiz</b> ein – als Status z. B. „Aufwertung". Dann erscheint es hier.</div></div>`;
-      return;
-    }
-    board.innerHTML=SALE_COLS.map(ph=>{ const arr=SALE.filter(o=>salePhase(o)===ph);
-      return `<div class="col" data-sale="${esc(ph)}"><div class="col-head"><span>${SALE_ICON[ph]} ${esc(ph)}</span><span class="cnt">${arr.length}</span></div>${arr.map(saleCard).join('')}</div>`; }).join('');
-    board.querySelectorAll('.kc-card').forEach(card=>{
-      card.onclick=()=>openDetail(card.dataset.id);
-      card.addEventListener('dragstart',e=>{ e.dataTransfer.setData('id',card.dataset.id); card.classList.add('dragging'); });
-      card.addEventListener('dragend',()=>card.classList.remove('dragging'));
-    });
-    board.querySelectorAll('.col').forEach(col=>{
-      col.addEventListener('dragover',e=>{ e.preventDefault(); col.classList.add('drop'); });
-      col.addEventListener('dragleave',()=>col.classList.remove('drop'));
-      col.addEventListener('drop',e=>{ e.preventDefault(); col.classList.remove('drop');
-        const o=SALE.find(x=>x._id===e.dataTransfer.getData('id'));
-        if(o&&salePhase(o)!==col.dataset.sale){ const neu=col.dataset.sale; o.status=neu; renderBoard(); persistSalePhase(o,neu); } });
-    });
+function renderVerkaufBoard(board){
+  const objs=vkObjekte();
+  if(!objs.length){
+    board.innerHTML=`<div class="col" style="width:100%"><div class="empty">Noch kein Objekt in der Vermarktung. Sobald im Reiter <b>Objektliste</b> eine Zeile mit Objektnamen steht (und die Nutzung nicht „Bestand" ist), erscheint sie hier.<br><a class="link" target="_blank" href="https://docs.google.com/spreadsheets/d/${CFG.SHEET_ID}/edit">📊 Objektliste öffnen</a></div></div>`;
     return;
   }
+  board.innerHTML=VK_COLS.map(ph=>{
+    const arr=objs.filter(o=>salePhase(o)===ph);
+    return `<div class="col" data-vkcol="${esc(ph)}"><div class="col-head"><span>${VK_ICON[ph]} ${esc(ph)}</span><span class="cnt">${arr.length}</span></div>${arr.map(vkCard).join('')}</div>`;
+  }).join('');
+  const versteckt=(SALE||[]).filter(o=>!o._leer&&(o.bestand||o.archiv)&&o.titel&&o.titel!=='Verkaufsobjekt');
+  if(versteckt.length){
+    board.insertAdjacentHTML('beforeend',`<div class="col" style="opacity:.6"><div class="col-head"><span>📦 Nicht im Verkauf</span><span class="cnt">${versteckt.length}</span></div>${versteckt.map(o=>`<div class="kc-card"><div class="kc-bar" style="background:var(--ink-faint)">${o.archiv?'🗄️ Archiv':'🏘️ Bestand'}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}${o.einheit?' · '+esc(o.einheit):''}</div><div class="kc-sub">${o.archiv?'übergeben am '+(o.uebergabe?fmtDate(o.uebergabe):'—'):'vermietet – steht nicht zum Verkauf'}</div></div></div>`).join('')}</div>`);
+  }
+  board.querySelectorAll('.col[data-vkcol] .kc-card').forEach(card=>{
+    card.onclick=e=>{ if(e.target.tagName==='A'||e.target.tagName==='BUTTON') return; openDetail(card.dataset.id); };
+    card.addEventListener('dragstart',e=>{ e.dataTransfer.setData('id',card.dataset.id); card.classList.add('dragging'); });
+    card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+  });
+  board.querySelectorAll('.col[data-vkcol]').forEach(col=>{
+    col.addEventListener('dragover',e=>{ e.preventDefault(); col.classList.add('drop'); });
+    col.addEventListener('dragleave',()=>col.classList.remove('drop'));
+    col.addEventListener('drop',e=>{
+      e.preventDefault(); col.classList.remove('drop');
+      const ziel=col.dataset.vkcol, id=e.dataTransfer.getData('id');
+      if(!ziel||!id) return;
+      const o=SALE.find(x=>x._id===id);
+      if(o&&salePhase(o)!==ziel){ o.status=ziel; renderBoard(); persistSalePhase(o,ziel); }
+    });
+  });
+}
+
+function renderBoard(){
+  const board=$('board');
+  if(pipeView==='aufwertung'){ renderAufBoard(board); return; }
+  if(pipeView==='verkauf'){ renderVerkaufBoard(board); return; }
   board.innerHTML=BOARD_COLS.map(ph=>{ const objs=activeObjs().filter(o=>o.phase===ph).sort((a,b)=>b.score-a.score);
     return `<div class="col" data-phase="${ph}"><div class="col-head"><span title="${esc(phaseLabel(ph))}">${esc(phaseLabelShort(ph))}</span><span class="cnt">${objs.length}</span></div>${objs.map(pipeCard).join('')}</div>`; }).join('');
   board.querySelectorAll('.kc-card').forEach(card=>{
@@ -2065,7 +2853,7 @@ async function loadGmail(){
   }catch(e){ GMAIL.error=e.message; GMAIL.state='error'; }
   renderAll();
   // 21.08.2026: Aufwertungs-Mails im Volltext nach Terminen absuchen (Vorschlag, kein Automatik-Eintrag).
-  try{ await scanAufwertungTermine(); renderAll(); }catch(e){}
+  try{ await scanUndSync(); }catch(e){}
 }
 function b64urlDecode(s){ try{ s=String(s||'').replace(/-/g,'+').replace(/_/g,'/'); return decodeURIComponent(escape(atob(s))); }catch(e){ try{ return atob(String(s||'').replace(/-/g,'+').replace(/_/g,'/')); }catch(_){ return ''; } } }
 function findMimePart(payload,mime){ if(!payload) return null; if(payload.mimeType===mime&&payload.body&&payload.body.data) return payload.body.data; if(payload.parts){ for(const p of payload.parts){ const r=findMimePart(p,mime); if(r) return r; } } return null; }
