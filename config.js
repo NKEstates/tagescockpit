@@ -12,6 +12,13 @@ window.COCKPIT_CONFIG = {
   // Eure Leadliste (bereits eingetragen – muss nicht geändert werden)
   SHEET_ID: "1eRjJIFXtiVCywbZ0Tpfa3IMBc_YuaCvATgt37Q_cqWk",
 
+  // Aufwertungsplan Kühlungsborn, Strandstraße 14 WE 21 (eigene Google-Tabelle).
+  // Leer lassen ("") schaltet den Aufwertungs-Block im Cockpit ab.
+  // Die Reiter (Projektzeitplan, Handwerker-Status, Kostenübersicht) erkennt das
+  // Cockpit selbst – die Namen müssen hier NICHT eingetragen werden.
+  AUFWERTUNG_SHEET_ID: "1aDrbPfJg3iW2DTCWcXTaHX1LP5sblUIj5S9xkwg2hwM",
+  AUFWERTUNG_OBJEKT: "Kühlungsborn, Strandstraße 14 WE 21",
+
   // Reiter-Namen in der Tabelle
   TABS: {
     leadliste: "Leadliste",      // Ankauf-Pipeline (Objekte)
@@ -22,14 +29,19 @@ window.COCKPIT_CONFIG = {
 
   // Berechtigungen, die die App anfragt.
   // Für den Verbindungstest reicht Sheets. Gmail/Kalender schalten wir später dazu.
+  // gmail.compose = das Cockpit darf ENTWÜRFE anlegen, aber nichts von allein versenden.
+  // Nach dem Hochladen einmal neu anmelden, sonst bleibt der Entwurf-Knopf grau.
   SCOPES: [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/calendar.events",
   ],
 
-  // Gmail-Pipeline-Labels (für später, Stand 12.07.2026)
+  // Gmail-Pipeline-Labels (Stand 21.08.2026). "INBOX" = der normale Posteingang:
+  // damit sehen Mails, die noch kein Label bekommen haben, trotzdem im Cockpit auf.
   LABELS: {
+    "INBOX":                     "Posteingang",
     "Label_4035370739038923452": "1. to do",
     "Label_7512053688514565456": "2. Follow up",
     "Label_243940710325973319":  "2. Follow up/Vorqualifikation",
