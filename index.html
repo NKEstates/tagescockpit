@@ -1032,14 +1032,15 @@ function hztMailOnlyRow(m){
 function renderHeuteZuerst(){
   const objs=openTasks(), done=doneObjs();   // alle EIGENEN offenen Vorgänge, nach Dringlichkeit sortiert
   const gmailReady=hasGmailScope()&&GMAIL.state==='ready';
-  const mailOnly=gmailReady?userMailItems().filter(m=>!m.objId):[];
+  // Aufwertungs-Mails sind hier ausgenommen – die stehen im Aufwertungsblock.
+  const mailOnly=gmailReady?userMailItems().filter(m=>!m.objId&&m.cat!=='aufwertung'):[];
   let h='';
   // Lage-Zeile (wie im Briefing)
   const red=objs.filter(o=>o.score>=100).length, mailWait=objs.filter(o=>o.mail).length+(currentUser==='Nele'?mailOnly.length:0);
   const aufN=aufItems().length;
   h+=`<div class="hz-lage">Lage: <b>${objs.length}</b> ${objs.length===1?'offener Vorgang':'offene Vorgänge'}${red?`, davon <b style="color:var(--band-red)">${red} dringend</b>`:''}${aufN?` · <b>${aufN}</b> ${aufN===1?'Punkt':'Punkte'} Aufwertung`:''}${mailWait?` · <b>${mailWait}</b> ${mailWait===1?'Mail wartet':'Mails warten'}`:''} · gefiltert für <b>${currentUser}</b>.</div>`;
-  if(currentUser==='Nele'&&gmailReady){ const n=neuThreads().length;
-    if(n) h+=`<div class="mini" style="background:rgba(20,184,166,.14)"><span class="dot" style="background:#14B8A6"></span><span class="mt">🔎 ${n} ${n===1?'neues Objekt':'neue Objekte'} aus Suchaufträgen – sichten &amp; anfragen</span><a class="link" target="_blank" href="${gmailLabelLink(GMAIL.neuLabel||'neu')}">in Gmail öffnen</a></div>`; }
+  // (21.08.2026 entfernt) Der Hinweisstreifen „x neue Objekte aus Suchaufträgen" sagte dasselbe
+  // wie der Block „Neue Objekte anfragen" weiter unten – doppelt gemoppelt.
   if(hasCalScope()&&CAL.state==='ready'){ const c=dayCapacity(); if(c<objs.length) h+=`<div class="wt-hint" style="margin:0 0 8px">🗓️ Nur ~${freeHrsTxt()} Std frei heute – realistisch schaffst du die Top ${c}. Der Rest wartet geordnet.</div>`; }
   /* ===== 21.08.2026: Gliederung nach ARBEITSSTRANG statt nach Punktzahl. =====
      Vorher bestimmte allein die Punktzahl die Reihenfolge. Dadurch stand eine
@@ -1048,20 +1049,23 @@ function renderHeuteZuerst(){
      vor; die Ampelfarbe bleibt als Punkt vor jedem Eintrag und sortiert INNERHALB
      eines Blocks. Reihenfolge von Nele festgelegt:
      Reißt heute · Deals in Arbeit · Aufwertung · Neue Objekte · Beobachten · Absagen. */
-  const reisst=[], deals=[], neue=[], beob=[];
+  // 21.08.2026 (Korrektur Nele): ALLE Vorgänge aus der Leadliste gehören in „Deals in Arbeit" –
+  // auch frisch angelegte und solche in der Vorqualifikation. Der Block „Neue Objekte anfragen"
+  // ist ausschließlich für Nele und enthält nur, was noch NICHT in der Leadliste steht:
+  // die Angebote aus dem Gmail-Label „neu" und Mails ohne Objektzuordnung.
+  const reisst=[], deals=[], beob=[];
   objs.forEach(o=>{
     if(o.phase==='Beobachten'){ beob.push(o); return; }
     const f=o.fael||{state:'none'};
     const gerissen=(f.state==='overdue'||f.state==='today')||(o._eskaliert>=STALE_RED);
     if(gerissen){ reisst.push(o); return; }
-    if(o.phase==='Neu'||o.phase==='Vorqualifikation'){ neue.push(o); return; }
     deals.push(o);
   });
   const aufAlle=aufItems();
   const aufRot=aufAlle.filter(i=>i.sev==='rot'), aufRest=aufAlle.filter(i=>i.sev!=='rot');
   const byScore=(a,b)=>b.score-a.score;
   const byPhase=(a,b)=>(FUNNEL.indexOf(a.phase)-FUNNEL.indexOf(b.phase))||(b.score-a.score);
-  reisst.sort(byScore); deals.sort(byPhase); neue.sort(byPhase); beob.sort(byScore);
+  reisst.sort(byScore); deals.sort(byPhase); beob.sort(byScore);
   const kopf=(farbe,txt,n,hinweis)=>`<tr class="hzt-cat"><td colspan="6"><span class="hz-cat" style="color:${farbe}">${txt} <small style="color:var(--ink-faint);font-weight:600">(${n})${hinweis?' – '+hinweis:''}</small></span></td></tr>`;
   let body='';
 
@@ -1072,7 +1076,7 @@ function renderHeuteZuerst(){
   }
   // 2 – Deals in Arbeit: Kalkulation bis Kaufvertrag, in Phasenreihenfolge
   if(deals.length){
-    body+=kopf('var(--band-orange)','💰 Deals in Arbeit',deals.length,'Kalkulation bis Kaufvertrag');
+    body+=kopf('var(--band-orange)','💰 Deals in Arbeit',deals.length,'alles aus der Leadliste – von der Sichtung bis zum Kaufvertrag');
     body+=deals.map(hztRow).join('');
   }
   // 3 – Aufwertung: Aufgaben aus dem Projektzeitplan, Handwerker ohne Rückmeldung, Terminvorschläge
@@ -1082,12 +1086,15 @@ function renderHeuteZuerst(){
   } else if(AUF.state==='error'){
     body+=kopf('var(--ink-faint)','🏗️ Aufwertung',0,'Plan nicht lesbar: '+esc(AUF.error||''));
   }
-  // 4 – neue Objekte anfragen; bei Nele zusätzlich die Mails ohne Objektzuordnung
-  const mailsHier=(currentUser==='Nele')?mailOnly:[];
-  if(neue.length||mailsHier.length){
-    body+=kopf('#14B8A6','🔎 Neue Objekte anfragen',neue.length+mailsHier.length,
-      mailsHier.length?(mailsHier.length+' davon Mails ohne Objektzuordnung'):'sichten, vorqualifizieren, Daten sammeln');
-    body+=neue.map(hztRow).join('')+mailsHier.map(hztMailOnlyRow).join('');
+  // 4 – neue Objekte anfragen: NUR bei Nele, und nur was noch nicht in der Leadliste steht
+  const istNele=currentUser==='Nele';
+  const neuMails=(istNele&&gmailReady)?neuThreads().slice().sort((a,b)=>(b.ts||0)-(a.ts||0)):[];
+  const mailsHier=istNele?mailOnly:[];
+  if(neuMails.length||mailsHier.length){
+    const hinweis=[neuMails.length?neuMails.length+' aus dem Label „neu"':'',
+                   mailsHier.length?mailsHier.length+(mailsHier.length===1?' Mail ohne Objekt':' Mails ohne Objekt'):''].filter(Boolean).join(' · ');
+    body+=kopf('#14B8A6','🔎 Neue Objekte anfragen',neuMails.length+mailsHier.length,hinweis);
+    body+=neuMails.map(hztNeuRow).join('')+mailsHier.map(hztMailOnlyRow).join('');
   }
   // 5 – Beobachten: wichtig, aber nie dringender als ein laufender Vorgang
   if(beob.length){
@@ -1126,10 +1133,14 @@ function renderHeuteZuerst(){
   $('heuteZuerst').querySelectorAll('tr.hzt-row[data-abs]').forEach(tr=>tr.onclick=()=>openAbsage(tr.dataset.abs));
   $('heuteZuerst').querySelectorAll('tr.hzt-row[data-gmail]').forEach(tr=>tr.onclick=e=>{ if(e.target.tagName!=='A') window.open(gmailThreadLink(tr.dataset.gmail),'_blank'); });
   // Aufwertungszeile: Terminvorschlag öffnet das Bestätigen-Fenster, alles andere die Tabelle.
+  $('heuteZuerst').querySelectorAll('tr.hzt-row[data-neu]').forEach(tr=>tr.onclick=e=>{
+    if(e.target.tagName!=='A'&&e.target.tagName!=='INPUT') openNeuObjekt(tr.dataset.neu); });
   $('heuteZuerst').querySelectorAll('tr.hzt-row[data-auf]').forEach(tr=>tr.onclick=e=>{
     if(e.target.tagName==='A'||e.target.tagName==='BUTTON'||e.target.tagName==='INPUT') return;
     const id=tr.dataset.auf;
-    if(id.indexOf('auf|termin|')===0) openAufTermin(id); else window.open(aufSheetUrl(),'_blank');
+    if(id.indexOf('auf|termin|')===0) openAufTermin(id);
+    else if(id.indexOf('auf|mail|')===0) window.open(gmailThreadLink(id.slice(9)),'_blank');
+    else window.open(aufSheetUrl(),'_blank');
   });
 }
 // (entfernt 31.07.2026) renderAbsagen() – die Absagen stehen jetzt direkt in „Heute zuerst" (hztAbsageRow).
@@ -1206,6 +1217,19 @@ function renderKontaktMini(){
 // Nur für Nele: detaillierte Liste aller anzufragenden neuen Objekte aus dem Gmail-Label „neu" (jedes mit Link zur Mail).
 // Ersetzt bei Nele die Kontaktpflege-Karte (die nur Niklas sieht).
 function mailSenderName(t){ const n=String(t.from||'').replace(/<[^>]*>/,'').replace(/["']/g,'').trim(); return n||t.fromEmail||''; }
+// 21.08.2026: Angebot aus dem Gmail-Label „neu" als Zeile in „Heute zuerst".
+// Klick öffnet dasselbe Fenster wie in der Karte darunter: anfragen → Leadliste, oder aussortieren.
+function hztNeuRow(t){
+  const tage=t.ts?Math.max(0,Math.floor((NOW-t.ts)/MS)):null;
+  const alter=tage==null?'aus dem Label „neu"':(tage===0?'heute eingegangen':'eingegangen vor '+tage+' T');
+  return `<tr class="hzt-row" data-neu="${t.tid}">`
+    +`<td><input type="checkbox" class="hzt-chk" onclick="event.stopPropagation();event.preventDefault();openNeuObjekt('${t.tid}')"></td>`
+    +`<td><span class="hzt-dot" style="background:#14B8A6"></span><span class="hzt-obj">${esc(t.subj)}</span><div class="hzt-meta">🔎 ${esc(mailSenderName(t))}${t.objId?' · schon in der Pipeline':''}</div></td>`
+    +`<td class="stand">${esc(alter)}</td>`
+    +`<td>🔎 Sichten &amp; anfragen</td>`
+    +`<td class="vor">Passt das Objekt ins Ankaufsprofil? Dann Makler anfragen und als Vorqualifikation in die Leadliste aufnehmen.</td>`
+    +`<td><a class="link" target="_blank" href="${gmailThreadLink(t.tid)}" onclick="event.stopPropagation()">✉️ Mail</a></td></tr>`;
+}
 function neuRow(t,i){
   const sender=mailSenderName(t);
   const tage=t.ts?Math.max(0,Math.floor((NOW-t.ts)/MS)):null;
@@ -1219,10 +1243,13 @@ function neuRow(t,i){
     +`<a class="link" target="_blank" href="${gmailThreadLink(t.tid)}" onclick="event.stopPropagation()">✉️ öffnen</a></div>`;
 }
 function renderNeueObjekte(){
+  // 21.08.2026: Die neuen Objekt-Angebote stehen jetzt direkt in „Heute zuerst" (Block
+  // „Neue Objekte anfragen"). Die eigene Karte darunter zeigte dieselben Mails ein zweites Mal
+  // und ist deshalb aus. Stattdessen sieht auch Nele die Kontaktpflege.
   const isNele=currentUser==='Nele';
-  $('kontaktCard').style.display=isNele?'none':'';
-  $('neueObjekteCard').style.display=isNele?'':'none';
-  if(!isNele) return;
+  $('kontaktCard').style.display='';
+  $('neueObjekteCard').style.display='none';
+  return;
   const box=$('neueObjekteList');
   if(!hasGmailScope()||GMAIL.state!=='ready'){
     box.innerHTML='<div class="empty">Gmail noch nicht verbunden – oben rechts verbinden, dann erscheinen hier die neuen Objekte aus dem Label „neu".</div>';
@@ -1483,6 +1510,18 @@ function aufItemsAll(){
         tel:h.tel, mail:'', hw:h, link:aufSheetUrl() });
     }
   });
+  // Mails aus dem Gmail-Label „Aufwertung", die keinem Leadliste-Objekt zugeordnet sind:
+  // typischerweise Angebote, Rückfragen und Terminabsprachen der Betriebe.
+  if(typeof GMAIL!=='undefined'&&hasGmailScope()&&GMAIL.state==='ready'){
+    GMAIL.threads.filter(t=>t.cat==='aufwertung'&&!t.objId&&(t.hasDraft||(t.weOwe&&!t.noise))).forEach(t=>{
+      out.push({ id:'auf|mail|'+t.tid, sev:t.hasDraft?'heute':'bald', art:'mail', tid:t.tid,
+        titel:t.subj, meta:'Mail · '+(t.fromEmail||''),
+        stand:t.hasDraft?'Entwurf liegt in Gmail':'Antwort offen',
+        todo:t.hasDraft?'✉️ Entwurf prüfen & senden':'✉️ Antworten',
+        vorschlag:'Gehört zur Aufwertung – Angebot, Rückfrage oder Terminabsprache eines Betriebs.',
+        hasDraft:t.hasDraft, link:gmailThreadLink(t.tid) });
+    });
+  }
   (AUF.termine||[]).forEach(t=>{
     if(META['auftermin:'+t.key+'|status']) return;
     out.push({ id:'auf|termin|'+t.key, sev:'heute', art:'termin',
@@ -1673,6 +1712,7 @@ async function saveAufTermin(id){
 const AUF_SEV_COLOR={rot:'var(--band-red)',heute:'var(--band-orange)',bald:'var(--band-yellow)'};
 function aufAktion(it){
   if(it.art==='termin') return `<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();openAufTermin('${it.id}')">📅 eintragen</button>`;
+  if(it.art==='mail') return `<a class="link" target="_blank" href="${esc(it.link)}" onclick="event.stopPropagation()">${it.hasDraft?'✏️ senden':'✉️ schreiben'}</a>`;
   if(it.art==='hw'&&it.mail) return `<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();aufDraft('${it.id}')">✏️ Entwurf</button>`;
   if(it.tel){ const href='tel:'+String(it.tel).replace(/[^\d+]/g,'');
     return `<a class="link" href="${href}" onclick="event.stopPropagation()">📞 anrufen</a>`; }
