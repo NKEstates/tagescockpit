@@ -741,9 +741,21 @@ function sheetIdOf(v){
   if(m) return m[1];
   return /^[a-zA-Z0-9_-]{20,}$/.test(t)?t:'';
 }
+let OBJ_HEADROW=0;   // in welcher Zeile der Tabelle die Kopfzeile tatsaechlich steht
 function mapObjektliste(rows){
   if(!rows.length) return [];
-  const h=rows[0], c=w=>colIdx(h,w);
+  // 21.08.2026: Die Kopfzeile steht NICHT zwangslaeufig in Zeile 1. Im echten Reiter
+  // liegt darueber noch ein Briefkopf aus der alten Vorlage, die Kopfzeile beginnt
+  // erst in Zeile 3. Vorher las das Cockpit stur Zeile 1, fand keine einzige Spalte
+  // und sortierte damit ALLE Objekte aus - ohne Fehlermeldung, das Board war nur leer.
+  // Ueberall sonst sucht das Cockpit seine Kopfzeile laengst selbst (findHead); hier
+  // wurde es vergessen. Jetzt ist es auch hier so, und der Briefkopf darf stehen bleiben.
+  let hi=findHead(rows,['objekt','adresse']);
+  if(hi<0) hi=findHead(rows,['objekt','einheit']);
+  if(hi<0) hi=findHead(rows,['objekt']);
+  if(hi<0) hi=0;
+  OBJ_HEADROW=hi;
+  const h=rows[hi], c=w=>colIdx(h,w);
   // Rueckfall auf die alte Kopfzeile „Status", solange der Reiter noch nicht umgestellt ist.
   const iPh=c('verkaufsphase')>=0?c('verkaufsphase'):c('status');
   const idx={kuerzel:c('kürzel'),titel:c('objekt'),adresse:c('adresse'),plz:c('plz'),einheit:c('einheit'),
@@ -757,8 +769,9 @@ function mapObjektliste(rows){
   const d=(r,k)=>idx[k]>=0?parseDate(r[idx[k]]):null;
   // Erst abbilden, DANN filtern - sonst stimmt die gemerkte Zeilennummer (_row) nicht mehr,
   // und ohne richtige Zeilennummer ueberschreibt ein verschobenes Kaertchen die falsche Zeile.
-  return rows.slice(1).map((r,i)=>{
-    const o={ _id:'S'+i, kind:'verkauf', owner:'Nele', _row:i+2, _idx:idx,
+  // _row zaehlt ab der ECHTEN Kopfzeile, nicht ab Zeile 1.
+  return rows.slice(hi+1).map((r,i)=>{
+    const o={ _id:'S'+i, kind:'verkauf', owner:'Nele', _row:hi+2+i, _idx:idx,
       _leer:!r.some(x=>String(x).trim()), _stCol:idx.phase, _standCol:idx.aufstand,
       kuerzel:g(r,'kuerzel'), adresse:g(r,'adresse'), plz:g(r,'plz'), einheit:g(r,'einheit'),
       nutzung:g(r,'nutzung'), kaufdatum:d(r,'kaufdatum'), kaufpreis:g(r,'kaufpreis'),
@@ -2584,15 +2597,31 @@ async function persistSalePhase(o,neu){
 }
 function renderVerkaufBoard(board){
   const objs=vkObjekte();
+  const versteckt=(SALE||[]).filter(o=>!o._leer&&(o.bestand||o.archiv)&&o.titel&&o.titel!=='Verkaufsobjekt');
   if(!objs.length){
-    board.innerHTML=`<div class="col" style="width:100%"><div class="empty">Noch kein Objekt in der Vermarktung. Sobald im Reiter <b>Objektliste</b> eine Zeile mit Objektnamen steht (und die Nutzung nicht „Bestand" ist), erscheint sie hier.<br><a class="link" target="_blank" href="https://docs.google.com/spreadsheets/d/${CFG.SHEET_ID}/edit">📊 Objektliste öffnen</a></div></div>`;
+    // Eine Leermeldung, die nur „nichts da" sagt, ist wertlos - man weiss dann nicht,
+    // ob die Tabelle leer ist oder ob das Cockpit sie nur nicht lesen konnte.
+    // Deshalb steht hier, was tatsaechlich ankam.
+    const ohneNamen=(SALE||[]).filter(o=>o.titel==='Verkaufsobjekt').length;
+    let grund;
+    if(!SALE||!SALE.length){
+      grund='Im Reiter <b>Objektliste</b> wurde keine einzige Zeile gefunden.';
+    } else if(ohneNamen){
+      grund='Es wurden <b>'+SALE.length+' Zeilen</b> gelesen, aber in <b>'+ohneNamen+'</b> davon keine Spalte <b>Objekt</b> erkannt. '
+           +'Das passiert, wenn die Kopfzeile fehlt oder anders heißt – das Cockpit sucht sie über die Überschriften '
+           +'<i>Objekt</i> und <i>Adresse</i>.';
+    } else if(versteckt.length){
+      grund='Alle <b>'+versteckt.length+'</b> gefundenen Objekte stehen auf <b>Bestand</b> oder <b>Archiv</b> und gehören damit nicht ins Verkaufsboard.';
+    } else {
+      grund='Es wurden <b>'+SALE.length+'</b> Zeilen gelesen, aber keine gehört in die Vermarktung.';
+    }
+    board.innerHTML=`<div class="col" style="width:100%"><div class="empty">${grund}<br><br><a class="link" target="_blank" href="https://docs.google.com/spreadsheets/d/${CFG.SHEET_ID}/edit">📊 Objektliste öffnen</a></div></div>`;
     return;
   }
   board.innerHTML=VK_COLS.map(ph=>{
     const arr=objs.filter(o=>salePhase(o)===ph);
     return `<div class="col" data-vkcol="${esc(ph)}"><div class="col-head"><span>${VK_ICON[ph]} ${esc(ph)}</span><span class="cnt">${arr.length}</span></div>${arr.map(vkCard).join('')}</div>`;
   }).join('');
-  const versteckt=(SALE||[]).filter(o=>!o._leer&&(o.bestand||o.archiv)&&o.titel&&o.titel!=='Verkaufsobjekt');
   if(versteckt.length){
     board.insertAdjacentHTML('beforeend',`<div class="col" style="opacity:.6"><div class="col-head"><span>📦 Nicht im Verkauf</span><span class="cnt">${versteckt.length}</span></div>${versteckt.map(o=>`<div class="kc-card"><div class="kc-bar" style="background:var(--ink-faint)">${o.archiv?'🗄️ Archiv':'🏘️ Bestand'}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}${o.einheit?' · '+esc(o.einheit):''}</div><div class="kc-sub">${o.archiv?'übergeben am '+(o.uebergabe?fmtDate(o.uebergabe):'—'):'vermietet – steht nicht zum Verkauf'}</div></div></div>`).join('')}</div>`);
   }
