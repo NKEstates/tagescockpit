@@ -366,6 +366,7 @@ body{background:var(--bg1)}
         <button data-p="aufwertung">🏗️ Aufwertung</button>
         <button data-p="verkauf">💰 Verkauf</button>
       </div>
+      <button class="iconbtn" id="objSetupBtn" style="display:none" title="Legt im Reiter „Objektliste" Auswahllisten an und räumt die Formatierung auf. Ändert keine Inhalte.">🧰 Objektliste einrichten</button>
       <span style="font-size:12px;color:var(--ink-faint)">Karten per Drag &amp; Drop zwischen Phasen ziehen · Klick öffnet Detail</span>
     </div>
     <div class="card"><div class="board-wrap"><div class="board" id="board"></div></div></div>
@@ -666,7 +667,15 @@ function mapLeadliste(rows){
       nextStep:(r[22]||'').trim(), prio:prioLetter(r[23]), owner:'Niklas', kind:'ankauf' };
     if(!o.seller && !o.adresse && !o.typ) return;
     o.rejected=isRejected(o.status)&&norm(o.status)!=='absage senden'&&norm(o.status)!=='absagen';
-    o.active=!o.rejected && (!!o.status||!!o.angebot||!!o.nextStep||!!o.nachfass1||!!o.nachfass2);
+    /* 22.08.2026 — die zweite Haelfte der Uebergabe.
+       Setzt Nele in der Leadliste den Status auf „Verkaufsphase", legt das Skript im
+       Sheet eine Zeile in der Objektliste an. Ab da fuehrt die Objektliste, und das
+       Objekt muss aus dem Ankauf-Board VERSCHWINDEN - sonst steht es in beiden Boards
+       und wird doppelt gepflegt. Genau das sollte die Regel „eine fuehrende Tabelle je
+       Lebensphase" verhindern.
+       Es ist ausdruecklich KEINE Absage: das Objekt ist weiter da, nur woanders.      */
+    o.uebergeben=/verkaufsphase|übergeben|uebergeben|in die objektliste|aufwertung/.test(norm(o.status));
+    o.active=!o.rejected && !o.uebergeben && (!!o.status||!!o.angebot||!!o.nextStep||!!o.nachfass1||!!o.nachfass2);
     o.phase=phaseOf(o); o.owner=markerOwner(o)||phaseOwner(o.phase); o.fael=faellig(o); o.score=scoreOf(o);
     o.titel=o.adresse||o.typ||'(ohne Adresse)';
     o.task=o.nextStep||({'Absage senden':'Absage an Verkäufer/Makler senden','Angebot vorbereiten':'Angebot vorbereiten','Angebot raus':'Angebot nachfassen','Vorqualifikation':'Vorqualifizieren & Daten sammeln','Kalkulieren':'Kalkulieren & bewerten'}[o.phase])||'Nächsten Schritt festlegen';
@@ -742,6 +751,7 @@ function sheetIdOf(v){
   return /^[a-zA-Z0-9_-]{20,}$/.test(t)?t:'';
 }
 let OBJ_HEADROW=0;   // in welcher Zeile der Tabelle die Kopfzeile tatsaechlich steht
+let OBJ_IDX={};      // welche Spalte welchen Inhalt hat - fuer das Einrichten der Tabelle
 function mapObjektliste(rows){
   if(!rows.length) return [];
   // 21.08.2026: Die Kopfzeile steht NICHT zwangslaeufig in Zeile 1. Im echten Reiter
@@ -765,6 +775,7 @@ function mapObjektliste(rows){
     interessent:c('käufer')>=0?c('käufer'):c('interessent'),reserviert:c('reserviert'),
     notar:c('notartermin'),erzielt:c('kaufpreis erzielt'),geld:c('geldeingang'),
     uebergabe:c('übergabe'),notiz:c('notiz'),lead:c('lead')};
+  OBJ_IDX=idx;
   const g=(r,k)=>idx[k]>=0?String(r[idx[k]]||'').trim():'';
   const d=(r,k)=>idx[k]>=0?parseDate(r[idx[k]]):null;
   // Erst abbilden, DANN filtern - sonst stimmt die gemerkte Zeilennummer (_row) nicht mehr,
@@ -781,14 +792,23 @@ function mapObjektliste(rows){
       erzielt:g(r,'erzielt'), geldeingang:d(r,'geld'), uebergabe:d(r,'uebergabe'),
       notiz:g(r,'notiz'), leadKey:g(r,'lead'), task:'' };
     o.titel=g(r,'titel')||o.adresse||'Verkaufsobjekt';
-    // Bestand = gehoert uns, steht aber nicht zum Verkauf (Steige 9, vermietet).
-    // Solche Objekte stehen in der Objektliste, aber NICHT auf dem Verkaufsboard.
-    o.bestand=/bestand|halten|vermietet/.test(norm(o.nutzung));
-    // Archiv: von Hand gesetzt ODER die Uebergabe liegt mehr als 30 Tage zurueck.
-    // Ohne das wachsen die Boards mit jedem verkauften Objekt zu - und das Cockpit
-    // laedt weiter dessen Aufwertungstabelle mit (vier Anfragen je Objekt).
+    /* Die Spalte „Nutzung" beantwortet EINE Frage: wo steht das Objekt in seinem Leben?
+       Drei Zustaende, und sie schliessen einander aus - deshalb steht „verkauft" hier
+       und nicht in einer eigenen Spalte. Eine eigene Spalte koennte einem Objekt
+       gleichzeitig „Bestand" und „verkauft" zuschreiben, und dann gilt keins von beidem.
+         Aufwertung & Verkauf  = auf dem Weg zum Verkauf, steht auf dem Board
+         Bestand               = gehoert uns, vermietet, nicht zum Verkauf
+         Verkauft              = durch. Steht in der letzten Spalte des Verkaufsboards. */
+    const nz=norm(o.nutzung);
+    o.verkauft=/verkauft|verkauf abgeschlossen|abgewickelt/.test(nz);
+    o.bestand=!o.verkauft&&/bestand|halten|vermietet/.test(nz);
+    // Aelter als 30 Tage nach der Uebergabe: bleibt „verkauft", wird aber
+    // eingeklappt, damit die Spalte nicht mit den Jahren zuwaechst.
     const uT=o.uebergabe?daysSince(o.uebergabe):null;
-    o.archiv=/archiv/.test(norm(o.nutzung))||(uT!=null&&uT>ARCHIV_TAGE);
+    o.alt=(uT!=null&&uT>ARCHIV_TAGE);
+    // „Archiv" heisst weiterhin: ueberall raus. Bleibt als Wort erhalten, ist aber
+    // im Alltag nicht mehr noetig - dafuer gibt es jetzt „Verkauft".
+    o.archiv=/archiv/.test(nz);
     return o;
   }).filter(o=>!o._leer);
 }
@@ -1452,7 +1472,7 @@ function aufObjekte(){
   // (renoviert wird das Haus, verkauft werden die Einheiten). Der Plan wird dann nur
   // einmal geladen und traegt den Namen des Hauses, nicht den der ersten Einheit.
   (typeof SALE!=='undefined'?SALE:[]).forEach(o=>{
-    if(!o.aufSheetId||o.archiv) return;
+    if(!o.aufSheetId||o.archiv||o.verkauft) return;
     const da=out.find(x=>x.sheetId===o.aufSheetId);
     if(da){ da.mehrfach=true; da.name=da.sale.titel; return; }
     out.push({key:o.kuerzel||o._id, name:[o.titel,o.einheit].filter(Boolean).join(' '),
@@ -2207,7 +2227,13 @@ async function persistPaketPhase(key,neu){
 /* ---- Das Aufwertungs- und Verkaufsboard --------------------------------- */
 function renderAufBoard(board){
   if(!hasAufwertung()){
-    board.innerHTML=`<div class="col" style="width:100%"><div class="empty">Kein Objekt in Aufwertung. Trag im Reiter <b>Objektliste</b> in der Spalte <b>Aufwertungstabelle</b> die Kennung des Aufwertungsplans ein - dann erscheint das Objekt hier.</div></div>`;
+    const ohne=objekteOhnePlan();
+    board.innerHTML=`<div class="col" style="width:100%"><div class="empty">`
+      +(ohne.length
+        ? `Noch kein Objekt hat einen Aufwertungsplan. Für diese ${ohne.length===1?'Zeile':'Zeilen'} der Objektliste lässt sich einer anlegen:<br><br>`
+          +ohne.map(o=>`<button class="iconbtn" style="margin:4px 6px 4px 0" onclick="openPlanAnlegen('${o._id}')">🏗️ ${esc(o.titel)}${o.einheit?' · '+esc(o.einheit):''}</button>`).join('')
+        : `Kein Objekt in Aufwertung. Trag im Reiter <b>Objektliste</b> in der Spalte <b>Aufwertungstabelle</b> die Kennung des Aufwertungsplans ein - dann erscheint das Objekt hier.`)
+      +`</div></div>`;
     return;
   }
   if(AUF.state==='loading'||AUF.state==='idle'){
@@ -2216,6 +2242,7 @@ function renderAufBoard(board){
   }
   const pak=aufPakete();
   const fehler=AUFS.filter(a=>a.state==='error');
+  const ohnePlan=objekteOhnePlan();
   if(!pak.length&&fehler.length){
     board.innerHTML=`<div class="col" style="width:100%"><div class="empty">Kein Aufwertungsplan lesbar: ${esc(fehler[0].error||'')}<br><a class="link" target="_blank" href="${aufSheetUrl(fehler[0].key)}">Tabelle öffnen</a></div></div>`;
     return;
@@ -2232,7 +2259,19 @@ function renderAufBoard(board){
   if(!pak.length){
     board.insertAdjacentHTML('afterbegin',`<div class="col" style="width:100%"><div class="empty">Im Reiter „Kostenübersicht" der Aufwertungstabelle wurden keine Pakete gefunden. Es braucht dort eine Kopfzeile mit <b>Paket</b> und <b>Budget netto</b>.</div></div>`);
   }
+  // Objekte, die in Aufwertung sind, aber noch keinen Plan haben. Sie stehen ganz
+  // links, weil genau hier der nächste Handgriff liegt - nicht in einer Spalte
+  // weiter hinten, wo man sie erst suchen müsste.
+  if(ohnePlan.length){
+    board.insertAdjacentHTML('afterbegin',`<div class="col" style="border:1px dashed var(--gold)"><div class="col-head"><span>🏗️ Kein Plan</span><span class="cnt">${ohnePlan.length}</span></div>`
+      +ohnePlan.map(o=>`<div class="kc-card"><div class="kc-bar" style="background:var(--band-yellow)">📋 Aufwertungsplan fehlt</div><div class="kc-body">`
+        +`<div class="kc-title">${esc(o.titel)}${o.einheit?' · '+esc(o.einheit):''}</div>`
+        +`<div class="kc-sub">${esc(o.kuerzel||'')}${o.plz?' · '+esc(o.plz):''}</div>`
+        +`<div style="margin-top:8px"><button class="iconbtn" style="width:100%;padding:7px" onclick="openPlanAnlegen('${o._id}')">🏗️ Aufwertungsplan anlegen</button></div>`
+        +`</div></div>`).join('')+`</div>`);
+  }
   board.querySelectorAll('.kc-card').forEach(card=>{
+    if(!card.dataset.paket) return;
     card.onclick=e=>{ if(e.target.tagName==='A'||e.target.tagName==='BUTTON') return; openPaket(card.dataset.paket); };
     card.addEventListener('dragstart',ev=>{ ev.dataTransfer.setData('id',card.dataset.paket||''); card.classList.add('dragging'); });
     card.addEventListener('dragend',()=>card.classList.remove('dragging'));
@@ -2258,7 +2297,16 @@ async function ladePositionen(key){
   try{
     const titles=(await aufTabs(a.sheetId)).alle||[];
     const nr=rest.slice(1);
-    const tab=titles.find(t=>{ const n=norm(t).replace(/\s/g,''); return n===norm(rest)||n==='paket'+nr||n.startsWith('p'+nr+'–')||n.startsWith('p'+nr+'-'); });
+    /* 22.08.2026 — Fehler behoben. Die Reiter heissen „P1 Sanitär-Heizung", nach dem
+       Normalisieren also „p1sanitär-heizung". Die alte Suche verlangte entweder genau
+       „p1", oder „paket1", oder einen Binde- bzw. Gedankenstrich direkt hinter der
+       Nummer — nichts davon trifft zu. Das Leistungsverzeichnis im Detailfenster
+       wurde deshalb NIE gefunden; es stand immer „kein Reiter gefunden".
+       Jetzt: der Reitername muss mit p<Nummer> beginnen, gefolgt von etwas, das
+       KEINE Ziffer ist. Das „keine Ziffer" ist der Grund, warum P1 nicht auf P10
+       und P11 mitanspringt — mit den neuen Paketen ab P9 wäre das sonst passiert. */
+    const nrRe=new RegExp('^p'+nr+'(?![0-9])');
+    const tab=titles.find(t=>{ const n=norm(t).replace(/\s/g,''); return nrRe.test(n)||n==='paket'+nr; });
     if(!tab){ AUF_POS_CACHE[key]=[]; return []; }
     const rows=await aufRead(a.sheetId,tab,'A1:L120');
     const hi=findHead(rows,['pos','leistung']); if(hi<0){ AUF_POS_CACHE[key]=[]; return []; }
@@ -2411,6 +2459,216 @@ async function syncHwEinObjekt(a){
   if(data.length) await aufBatchWrite(a.sheetId,data);
 }
 
+/* ============================================================================
+   AUFWERTUNGSPLAN ANLEGEN  (Arbeitspaket F, 22.08.2026)
+
+   WARUM NICHT MIT EINEM KLICK KOPIERT WIRD
+   Die Uebergabe sah vor, die Berechtigung „drive.file" zu ergaenzen und die
+   Vorlage per drive.files.copy zu kopieren. Das geht nicht: „drive.file" gibt
+   einer App nur Zugriff auf Dateien, die SIE SELBST angelegt hat. Die Vorlage
+   gehoert nicht dazu, der Aufruf wuerde abgewiesen. Eine fremde Datei zu kopieren
+   verlangt vollen Drive-Zugriff auf das Geschaeftskonto - eine Entscheidung, die
+   nicht nebenbei getroffen werden sollte.
+
+   Deshalb der geteilte Weg: Das Kopieren macht Google selbst ueber seinen eigenen
+   Dialog (ein Rechtsklick fuer Nele), alles Weitere macht das Cockpit - und zwar
+   mit der Berechtigung, die es ohnehin schon hat. Keine Neuanmeldung noetig.
+
+   WAS DAS COCKPIT DANN TUT
+   - die Kopie umbenennen auf „Aufwertung_<Ort>_<Kuerzel>"
+   - alle Platzhalter «Ort» «Straße Hausnummer» «WE» «Kürzel» «Objekt» «Datum»
+     «Start» «Ende» «Betrag» in ALLEN Reitern durch die echten Werte ersetzen
+   - die Kennung in die Spalte „Aufwertungstabelle" der Objektliste schreiben
+   - das Board neu laden
+
+   Die Platzhalter sind der Vertrag zwischen Vorlage und Cockpit. Wer die Vorlage
+   aendert, muss sie stehen lassen - sonst bleiben Kopfzeilen leer.
+   ========================================================================== */
+function objekteOhnePlan(){
+  return (SALE||[]).filter(o=>!o._leer&&!o.bestand&&!o.archiv&&!o.verkauft
+    &&o.titel&&o.titel!=='Verkaufsobjekt'&&!o.aufSheetId);
+}
+function vorlageId(){ return String(CFG.VORLAGE_SHEET_ID||'').trim(); }
+
+function openPlanAnlegen(saleId){
+  const o=(SALE||[]).find(x=>x._id===saleId); if(!o) return;
+  if(!vorlageId()){ saveToast('⚠ In config.js fehlt VORLAGE_SHEET_ID.',0,1); return; }
+  const name='Aufwertung_'+(ortKurz(o.plz)||o.titel).replace(/[^\wäöüÄÖÜß -]/g,'')+'_'+(o.kuerzel||'');
+  $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
+    <div class="detail-head">
+      <div style="font-size:12px;color:var(--ink-faint);font-weight:700;letter-spacing:.03em">🏗️ AUFWERTUNGSPLAN ANLEGEN</div>
+      <h2>${esc(o.titel)}${o.einheit?' · '+esc(o.einheit):''}</h2>
+      <div style="color:var(--ink-soft);font-size:13px">${esc(o.kuerzel||'ohne Kürzel')}${o.plz?' · '+esc(o.plz):''}</div>
+    </div>
+
+    <div class="section-t" style="margin-top:14px">Schritt 1 — Vorlage kopieren</div>
+    <div class="mini"><span class="dot" style="background:var(--band-yellow)"></span><span class="mt">
+      Der Knopf öffnet Googles eigenen Kopier-Dialog in einem neuen Tab. Dort auf
+      <b>Kopie erstellen</b> klicken. Die Kopie öffnet sich danach von allein.<br>
+      <span style="color:var(--ink-soft)">Das Kopieren macht Google, nicht das Cockpit — so braucht es keinen Zugriff auf euer ganzes Drive.</span><br>
+      <a class="link" target="_blank" href="https://docs.google.com/spreadsheets/d/${vorlageId()}/copy">📄 Vorlage kopieren</a>
+    </span></div>
+
+    <div class="section-t" style="margin-top:16px">Schritt 2 — Adresse der Kopie einsetzen</div>
+    <div class="field"><label>Aus der Browserzeile der Kopie — ganze Adresse genügt</label>
+      <input id="apKennung" type="text" placeholder="https://docs.google.com/spreadsheets/d/…/edit"></div>
+
+    <div class="section-t" style="margin-top:16px">Schritt 3 — Kopfdaten</div>
+    <div class="field"><label>Name der neuen Tabelle</label><input id="apName" type="text" value="${esc(name)}"></div>
+    <div class="field"><label>Angebotsfrist für die Handwerker</label><input id="apFrist" type="text" placeholder="TT.MM.JJJJ"></div>
+    <div class="field"><label>Projektzeitraum von</label><input id="apStart" type="text" placeholder="TT.MM."></div>
+    <div class="field"><label>Projektzeitraum bis</label><input id="apEnde" type="text" placeholder="TT.MM.JJJJ"></div>
+    <div class="field"><label>Mitfinanzierter Betrag (brutto, nur Zahl)</label><input id="apBetrag" type="text" placeholder="30000"></div>
+    <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">Leer gelassene Felder bleiben als Platzhalter stehen und lassen sich später in der Tabelle ausfüllen.</div>
+
+    <div id="apFehler"></div>
+    <button class="btn" style="margin-top:16px" id="apBtn">🏗️ Plan fertigstellen</button>`;
+  $('erlOverlay').classList.add('open');
+  $('apBtn').onclick=()=>planFertigstellen(saleId);
+}
+// „18225 Kühlungsborn" → „Kühlungsborn"
+function ortKurz(plz){ return String(plz||'').replace(/^\s*\d{4,5}\s*/,'').trim(); }
+
+async function planFertigstellen(saleId){
+  const o=(SALE||[]).find(x=>x._id===saleId); if(!o) return;
+  const btn=$('apBtn'), err=$('apFehler');
+  const neueId=sheetIdOf($('apKennung').value);
+  if(!neueId){ err.innerHTML='<div class="erl-err">⚠ Das sieht nicht nach einer Google-Tabelle aus. Bitte die ganze Adresse der Kopie einfügen.</div>'; return; }
+  if(neueId===vorlageId()){ err.innerHTML='<div class="erl-err">⚠ Das ist die Vorlage selbst. Bitte die Adresse der <b>Kopie</b> einfügen — sonst würde die Vorlage überschrieben.</div>'; return; }
+  err.innerHTML=''; btn.disabled=true; btn.textContent='… wird eingerichtet';
+  try{
+    // ── a) Umbenennen ──
+    const titel=$('apName').value.trim();
+    if(titel) await apiPost('https://sheets.googleapis.com/v4/spreadsheets/'+neueId+':batchUpdate',
+      {requests:[{updateSpreadsheetProperties:{properties:{title:titel},fields:'title'}}]});
+
+    // ── b) Platzhalter ersetzen ──
+    const werte={
+      '«Objekt»': [o.titel,o.einheit].filter(Boolean).join(' '),
+      '«Straße Hausnummer»': o.adresse||o.titel,
+      '«Ort»': ortKurz(o.plz)||'',
+      '«WE»': o.einheit||'',
+      '«Kürzel»': o.kuerzel||'',
+      '«Datum»': $('apFrist').value.trim(),
+      '«Start»': $('apStart').value.trim(),
+      '«Ende»': $('apEnde').value.trim(),
+      '«Betrag»': $('apBetrag').value.trim()?($('apBetrag').value.trim()+' €'):''
+    };
+    const ersetzt=await platzhalterFuellen(neueId,werte);
+
+    // ── c) Kennung in die Objektliste ──
+    const sp=colLetter(o._idx?o._idx.sheet:-1);
+    if(!sp||!o._row) throw new Error('Spalte „Aufwertungstabelle" in der Objektliste nicht gefunden.');
+    await sheetsWrite(CFG.TABS.objektliste+'!'+sp+o._row,[neueId]);
+    o.aufSheetId=neueId;
+
+    closeErledigt();
+    saveToast('✓ Plan angelegt · '+ersetzt+' Kopffelder gefüllt — lade neu …',1);
+    AUF_SCAN_FERTIG=false;
+    await loadAufwertung(); renderAll(); syncAufStand();
+  }catch(e){
+    err.innerHTML='<div class="erl-err">⚠ '+esc(e.message)+'</div>';
+    btn.disabled=false; btn.textContent='🏗️ Plan fertigstellen';
+  }
+}
+
+/* Ersetzt die Platzhalter in ALLEN Reitern der neuen Tabelle.
+   Geschrieben werden ausschliesslich Zellen, in denen ein « vorkommt - Formeln
+   enthalten so etwas nie, sie koennen also nicht getroffen werden.
+   Ein Platzhalter, fuer den kein Wert eingegeben wurde, bleibt absichtlich stehen:
+   ein leeres Feld waere schwerer zu finden als ein sichtbares «Datum».            */
+async function platzhalterFuellen(sheetId,werte){
+  const meta=await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'?fields=sheets.properties.title');
+  const titel=(meta.sheets||[]).map(x=>x.properties.title);
+  const daten=[];
+  for(const t of titel){
+    let rows=[];
+    try{ rows=(await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'/values/'+encodeURIComponent(t))).values||[]; }catch(e){ continue; }
+    rows.forEach((r,zi)=>(r||[]).forEach((zelle,ci)=>{
+      const alt=String(zelle==null?'':zelle);
+      if(alt.indexOf('«')<0) return;
+      let neu=alt;
+      for(const k in werte){ if(werte[k]) neu=neu.split(k).join(werte[k]); }
+      if(neu!==alt) daten.push({range:t+'!'+colLetter(ci)+(zi+1),values:[[neu]]});
+    }));
+  }
+  if(daten.length) await apiPost('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'/values:batchUpdate',
+    {valueInputOption:'USER_ENTERED',data:daten});
+  return daten.length;
+}
+
+/* ---- OBJEKTLISTE EINRICHTEN (21.08.2026) ----------------------------------
+   Ein Knopf, der im Reiter „Objektliste" die Auswahllisten anlegt und die
+   Formatierung aufraeumt. Er ruehrt KEINE Inhalte an - nur Aussehen und die
+   erlaubten Werte. Zweimal druecken schadet nicht, das Ergebnis ist dasselbe.
+
+   Warum ueberhaupt im Cockpit und nicht von Hand? Weil dieselbe Einrichtung bei
+   jedem neuen Objektlisten-Reiter wieder faellig waere - und weil Auswahllisten
+   von Hand rund fuenfzig Klicks kosten. Das Cockpit hat die Berechtigung ohnehin.
+
+   Die Auswahllisten sind bewusst NICHT streng („strict:false"): wer etwas anderes
+   eintippt, bekommt eine Warnecke, aber die Eingabe wird nicht abgewiesen. Eine
+   Tabelle, die Eingaben verschluckt, ist schlimmer als eine mit Tippfehlern.     */
+const NUTZUNG_WERTE=['Aufwertung & Verkauf','Bestand','Verkauft'];
+const WEG_WERTE=['Makler','selbst'];
+async function setupObjektliste(){
+  const btn=$('objSetupBtn'), alt=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='… wird eingerichtet'; }
+  try{
+    if(!OBJ_IDX||OBJ_IDX.nutzung==null||OBJ_IDX.nutzung<0)
+      throw new Error('Die Kopfzeile im Reiter „'+CFG.TABS.objektliste+'" wurde nicht gefunden. Steht dort eine Zeile mit „Objekt", „Adresse" und „Nutzung"?');
+    const meta=await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+CFG.SHEET_ID+'?fields=sheets.properties(sheetId,title)');
+    const tab=(meta.sheets||[]).find(x=>x.properties.title===CFG.TABS.objektliste);
+    if(!tab) throw new Error('Reiter „'+CFG.TABS.objektliste+'" nicht gefunden.');
+    const gid=tab.properties.sheetId, hr=OBJ_HEADROW, i=OBJ_IDX, LETZTE=hr+201;
+    const spalte=(c,von,bis)=>({sheetId:gid,startRowIndex:von,endRowIndex:bis,startColumnIndex:c,endColumnIndex:c+1});
+    const req=[];
+    // Kopfzeile einfrieren, damit sie beim Scrollen stehen bleibt
+    req.push({updateSheetProperties:{properties:{sheetId:gid,gridProperties:{frozenRowCount:hr+1}},fields:'gridProperties.frozenRowCount'}});
+    // Kopfzeile: dunkles Gold, weiss, fett
+    req.push({repeatCell:{range:{sheetId:gid,startRowIndex:hr,endRowIndex:hr+1},
+      cell:{userEnteredFormat:{backgroundColor:{red:0.42,green:0.33,blue:0.12},
+        textFormat:{bold:true,fontSize:10,foregroundColor:{red:1,green:1,blue:1}},
+        verticalAlignment:'MIDDLE',wrapStrategy:'CLIP',horizontalAlignment:'LEFT'}},
+      fields:'userEnteredFormat(backgroundColor,textFormat,verticalAlignment,wrapStrategy,horizontalAlignment)'}});
+    // Datenzeilen: alles Geerbte raus - kein Gold, kein Gruen, kein ungleiches Fett
+    req.push({repeatCell:{range:{sheetId:gid,startRowIndex:hr+1,endRowIndex:LETZTE},
+      cell:{userEnteredFormat:{backgroundColor:{red:1,green:1,blue:1},
+        textFormat:{bold:false,italic:false,fontSize:10,foregroundColor:{red:0.14,green:0.12,blue:0.09}},
+        wrapStrategy:'CLIP',horizontalAlignment:'LEFT',verticalAlignment:'MIDDLE'}},
+      fields:'userEnteredFormat(backgroundColor,textFormat,wrapStrategy,horizontalAlignment,verticalAlignment)'}});
+    // Auswahllisten
+    const liste=(c,werte)=>{ if(c==null||c<0) return;
+      req.push({setDataValidation:{range:spalte(c,hr+1,LETZTE),
+        rule:{condition:{type:'ONE_OF_LIST',values:werte.map(v=>({userEnteredValue:v}))},
+              showCustomUi:true,strict:false}}}); };
+    liste(i.nutzung,NUTZUNG_WERTE);
+    liste(i.phase,VK_PHASEN);
+    liste(i.weg,WEG_WERTE);
+    // Betraege rechtsbuendig mit Euro, Daten im deutschen Format
+    const format=(c,fmt,rechts)=>{ if(c==null||c<0) return;
+      req.push({repeatCell:{range:spalte(c,hr+1,LETZTE),
+        cell:{userEnteredFormat:{numberFormat:fmt,horizontalAlignment:rechts?'RIGHT':'LEFT'}},
+        fields:'userEnteredFormat(numberFormat,horizontalAlignment)'}}); };
+    const EURO={type:'NUMBER',pattern:'#,##0 \u20AC'}, DATUM={type:'DATE',pattern:'dd.mm.yyyy'};
+    [i.kaufpreis,i.zielpreis,i.erzielt].forEach(c=>format(c,EURO,true));
+    [i.kaufdatum,i.reserviert,i.notar,i.geld,i.uebergabe].forEach(c=>format(c,DATUM,false));
+    // Spaltenbreiten - Notizen breit, der Rest schmal
+    const breite=(c,px)=>{ if(c==null||c<0) return;
+      req.push({updateDimensionProperties:{range:{sheetId:gid,dimension:'COLUMNS',startIndex:c,endIndex:c+1},
+        properties:{pixelSize:px},fields:'pixelSize'}}); };
+    breite(i.kuerzel,80); breite(i.titel,150); breite(i.adresse,160); breite(i.plz,150);
+    breite(i.einheit,70); breite(i.nutzung,155); breite(i.sheet,120); breite(i.aufstand,140);
+    breite(i.phase,165); breite(i.weg,130); breite(i.makler,140); breite(i.interessent,150);
+    breite(i.notiz,340); breite(i.lead,120);
+    await apiPost('https://sheets.googleapis.com/v4/spreadsheets/'+CFG.SHEET_ID+':batchUpdate',{requests:req});
+    saveToast('✓ Objektliste eingerichtet – Auswahllisten stehen, Formatierung ist aufgeräumt',1);
+  }catch(e){
+    saveToast('⚠ Nicht eingerichtet: '+e.message,0,1);
+  }
+  if(btn){ btn.disabled=false; btn.textContent=alt||'🧰 Objektliste einrichten'; }
+}
+
 /* ---- „Aufwertungsstand" in der Objektliste ------------------------------
    Diese Spalte gehoert dem COCKPIT, nicht Nele: sie steht schon in der
    Aufwertungstabelle und wird hier nur als lesbare Zusammenfassung gespiegelt,
@@ -2482,9 +2740,14 @@ function pipeCard(o){
    NICHT auf dem Board: „Bestand" (gehoert uns, steht nicht zum Verkauf - z. B.
    Steige 9) und Archiviertes (Uebergabe liegt ueber 30 Tage zurueck).
    ========================================================================== */
-const VK_COLS=['Vermarktung vorbereiten','Inseriert','Besichtigungen','Reserviert','Notartermin','Geldeingang','Übergabe'];
+const VK_PHASEN=['Vermarktung vorbereiten','Inseriert','Besichtigungen','Reserviert','Notartermin','Geldeingang','Übergabe'];
+const VK_VERKAUFT='Verkauft';
+// Die achte Spalte ist keine Phase der Vermarktung, sondern ihr Ende. Sie steht
+// trotzdem auf demselben Board, weil dort sichtbar wird, ob die Zielpreise halten -
+// die einzige Rueckmeldung, die ein Aufwertungsgeschaeft ueber sich selbst bekommt.
+const VK_COLS=[...VK_PHASEN,VK_VERKAUFT];
 const VK_ICON={'Vermarktung vorbereiten':'🧰','Inseriert':'📣','Besichtigungen':'🚪','Reserviert':'🔒',
-               'Notartermin':'⚖️','Geldeingang':'💶','Übergabe':'🔑'};
+               'Notartermin':'⚖️','Geldeingang':'💶','Übergabe':'🔑','Verkauft':'✅'};
 // Zwischen Beurkundung und Geldeingang liegen ueblicherweise 4 bis 8 Wochen.
 // Danach ist Nachfragen faellig - beim Notar oder bei der Bank des Kaeufers.
 const VK_GELD_TAGE=56;
@@ -2495,8 +2758,10 @@ function vkObjekte(){
 // Aus dem Text der Spalte „Verkaufsphase" die Spalte ableiten. Die alten Schreibweisen
 // der Vier-Spalten-Fassung werden mitgenommen, damit bestehende Zeilen nicht ins Leere laufen.
 function salePhase(o){
+  if(o.verkauft) return VK_VERKAUFT;          // Nutzung sticht die Phase
   const t=norm(o.status);
-  const exakt=VK_COLS.find(c=>norm(c)===t); if(exakt) return exakt;
+  if(/^verkauft/.test(t)) return VK_VERKAUFT;
+  const exakt=VK_PHASEN.find(c=>norm(c)===t); if(exakt) return exakt;
   if(!t) return 'Vermarktung vorbereiten';
   if(/[üu]bergabe|schl[üu]ssel|[üu]bergeben/.test(t)) return 'Übergabe';
   if(/geldeingang|kaufpreis (ein|erhalten|geflossen)|bezahlt|zahlung (erfolgt|eingegangen)|abgerechnet/.test(t)) return 'Geldeingang';
@@ -2510,6 +2775,14 @@ function salePhase(o){
 // Gibt {txt, warn} zurueck; warn=true faerbt die Kachel rot und hebt sie in „Reisst heute".
 function vkStand(o){
   const ph=salePhase(o);
+  if(ph===VK_VERKAUFT){
+    const teile=[];
+    if(o.erzielt) teile.push('erzielt '+o.erzielt);
+    else if(o.zielpreis) teile.push('Zielpreis war '+o.zielpreis);
+    if(o.uebergabe) teile.push('übergeben am '+fmtDate(o.uebergabe));
+    else if(o.geldeingang) teile.push('Geld am '+fmtDate(o.geldeingang));
+    return {txt:teile.join(' · ')||'abgeschlossen', warn:false};
+  }
   if(ph==='Reserviert'){
     const d=o.reserviert?daysSince(o.reserviert):null;
     if(o.notartermin){ const n=daysUntil(o.notartermin);
@@ -2595,9 +2868,25 @@ async function persistSalePhase(o,neu){
     o.status=neu; saveToast('✓ Gespeichert',1);
   }catch(e){ saveToast('⚠ Nicht gespeichert: '+e.message,0,1); }
 }
+/* In die Spalte „Verkauft" ziehen heisst: das Objekt ist durch. Das ist eine Aussage
+   ueber sein Leben, nicht ueber den Stand der Vermarktung - deshalb wird die NUTZUNG
+   geschrieben, nicht die Verkaufsphase. Zieht man es wieder heraus, geht beides
+   zurueck: Nutzung auf „Aufwertung & Verkauf" und die Phase auf die Zielspalte.     */
+async function persistNutzung(o,neu){
+  const spalte=colLetter(o._idx?o._idx.nutzung:-1);
+  if(!o._row||!spalte){ saveToast('⚠ Spalte „Nutzung" im Reiter „Objektliste" nicht gefunden – bitte dort anlegen.',0,1); return false; }
+  saveToast('Speichere …');
+  try{
+    await sheetsWrite(CFG.TABS.objektliste+'!'+spalte+o._row,[neu]);
+    o.nutzung=neu;
+    const nz=norm(neu);
+    o.verkauft=/verkauft/.test(nz); o.bestand=!o.verkauft&&/bestand|halten|vermietet/.test(nz); o.archiv=/archiv/.test(nz);
+    saveToast('✓ Gespeichert',1); return true;
+  }catch(e){ saveToast('⚠ Nicht gespeichert: '+e.message,0,1); return false; }
+}
 function renderVerkaufBoard(board){
   const objs=vkObjekte();
-  const versteckt=(SALE||[]).filter(o=>!o._leer&&(o.bestand||o.archiv)&&o.titel&&o.titel!=='Verkaufsobjekt');
+  const versteckt=(SALE||[]).filter(o=>!o._leer&&(o.bestand||o.archiv)&&o.titel&&o.titel!=='Verkaufsobjekt');   // Bestand und Archiv
   if(!objs.length){
     // Eine Leermeldung, die nur „nichts da" sagt, ist wertlos - man weiss dann nicht,
     // ob die Tabelle leer ist oder ob das Cockpit sie nur nicht lesen konnte.
@@ -2619,11 +2908,18 @@ function renderVerkaufBoard(board){
     return;
   }
   board.innerHTML=VK_COLS.map(ph=>{
-    const arr=objs.filter(o=>salePhase(o)===ph);
-    return `<div class="col" data-vkcol="${esc(ph)}"><div class="col-head"><span>${VK_ICON[ph]} ${esc(ph)}</span><span class="cnt">${arr.length}</span></div>${arr.map(vkCard).join('')}</div>`;
+    let arr=objs.filter(o=>salePhase(o)===ph), hinweis='';
+    if(ph===VK_VERKAUFT){
+      // Neueste zuerst - und was laenger als 30 Tage her ist, nur noch als Zeile.
+      arr=arr.slice().sort((a,b)=>(+(b.uebergabe||b.geldeingang||0))-(+(a.uebergabe||a.geldeingang||0)));
+      const alt=arr.filter(o=>o.alt);
+      arr=arr.filter(o=>!o.alt);
+      if(alt.length) hinweis=`<div class="empty" style="padding:8px;font-size:12px">🗄️ ${alt.length} ${alt.length===1?'älterer Verkauf':'ältere Verkäufe'} ausgeblendet (Übergabe über ${ARCHIV_TAGE} Tage her): ${alt.map(o=>esc(o.kuerzel||o.titel)).join(' · ')}</div>`;
+    }
+    return `<div class="col" data-vkcol="${esc(ph)}"><div class="col-head"><span>${VK_ICON[ph]} ${esc(ph)}</span><span class="cnt">${arr.length}</span></div>${arr.map(vkCard).join('')}${hinweis}</div>`;
   }).join('');
   if(versteckt.length){
-    board.insertAdjacentHTML('beforeend',`<div class="col" style="opacity:.6"><div class="col-head"><span>📦 Nicht im Verkauf</span><span class="cnt">${versteckt.length}</span></div>${versteckt.map(o=>`<div class="kc-card"><div class="kc-bar" style="background:var(--ink-faint)">${o.archiv?'🗄️ Archiv':'🏘️ Bestand'}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}${o.einheit?' · '+esc(o.einheit):''}</div><div class="kc-sub">${o.archiv?'übergeben am '+(o.uebergabe?fmtDate(o.uebergabe):'—'):'vermietet – steht nicht zum Verkauf'}</div></div></div>`).join('')}</div>`);
+    board.insertAdjacentHTML('beforeend',`<div class="col" style="opacity:.6"><div class="col-head"><span>📦 Nicht im Verkauf</span><span class="cnt">${versteckt.length}</span></div>${versteckt.map(o=>`<div class="kc-card"><div class="kc-bar" style="background:var(--ink-faint)">${o.archiv?'🗄️ Archiv':'🏘️ Bestand'}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}${o.einheit?' · '+esc(o.einheit):''}</div><div class="kc-sub">${o.archiv?'archiviert':'vermietet – steht nicht zum Verkauf'}</div></div></div>`).join('')}</div>`);
   }
   board.querySelectorAll('.col[data-vkcol] .kc-card').forEach(card=>{
     card.onclick=e=>{ if(e.target.tagName==='A'||e.target.tagName==='BUTTON') return; openDetail(card.dataset.id); };
@@ -2638,17 +2934,35 @@ function renderVerkaufBoard(board){
       const ziel=col.dataset.vkcol, id=e.dataTransfer.getData('id');
       if(!ziel||!id) return;
       const o=SALE.find(x=>x._id===id);
-      if(o&&salePhase(o)!==ziel){ o.status=ziel; renderBoard(); persistSalePhase(o,ziel); }
+      if(!o||salePhase(o)===ziel) return;
+      if(ziel===VK_VERKAUFT){
+        o.verkauft=true; renderBoard();
+        persistNutzung(o,'Verkauft').then(ok=>{ if(!ok){ o.verkauft=false; renderBoard(); } });
+        return;
+      }
+      if(o.verkauft){
+        // aus „Verkauft" zurueckgeholt: erst die Nutzung, dann die Phase
+        o.verkauft=false; o.status=ziel; renderBoard();
+        persistNutzung(o,'Aufwertung & Verkauf').then(ok=>{ if(ok) persistSalePhase(o,ziel); else { o.verkauft=true; renderBoard(); } });
+        return;
+      }
+      o.status=ziel; renderBoard(); persistSalePhase(o,ziel);
     });
   });
 }
 
 function renderBoard(){
   const board=$('board');
+  { const b=$('objSetupBtn'); if(b) b.style.display=(pipeView==='verkauf')?'':'none'; }
   if(pipeView==='aufwertung'){ renderAufBoard(board); return; }
   if(pipeView==='verkauf'){ renderVerkaufBoard(board); return; }
   board.innerHTML=BOARD_COLS.map(ph=>{ const objs=activeObjs().filter(o=>o.phase===ph).sort((a,b)=>b.score-a.score);
     return `<div class="col" data-phase="${ph}"><div class="col-head"><span title="${esc(phaseLabel(ph))}">${esc(phaseLabelShort(ph))}</span><span class="cnt">${objs.length}</span></div>${objs.map(pipeCard).join('')}</div>`; }).join('');
+  // Uebergebene Objekte sind hier weg - aber nicht spurlos. Sonst wirkt es wie ein Verlust.
+  const ueb=OBJ.filter(o=>o.uebergeben);
+  if(ueb.length){
+    board.insertAdjacentHTML('beforeend',`<div class="col" style="opacity:.6"><div class="col-head"><span>➡️ In die Objektliste</span><span class="cnt">${ueb.length}</span></div><div class="empty" style="font-size:12px">${ueb.map(o=>esc(o.titel)).join('<br>')}<br><br>Diese Objekte werden jetzt im Board <b>💰 Verkauf</b> geführt.</div></div>`);
+  }
   board.querySelectorAll('.kc-card').forEach(card=>{
     card.onclick=()=>openDetail(card.dataset.id);
     card.addEventListener('dragstart',e=>{ e.dataTransfer.setData('id',card.dataset.id); card.classList.add('dragging'); });
@@ -3585,6 +3899,7 @@ $('userswitch').onclick=e=>{ if(e.target.dataset.u){ currentUser=e.target.datase
 $('weekViewSwitch').onclick=e=>{ if(e.target.dataset.v){ weekView=e.target.dataset.v; document.querySelectorAll('#weekViewSwitch button').forEach(b=>b.classList.toggle('active',b.dataset.v===weekView)); renderWeek(); } };
 { const lb=$('labelMgrBtn'); if(lb) lb.onclick=()=>openLabelManager(); }
 $('pipeToggle').onclick=e=>{ if(e.target.dataset.p){ pipeView=e.target.dataset.p; document.querySelectorAll('#pipeToggle button').forEach(b=>b.classList.toggle('active',b.dataset.p===pipeView)); renderBoard(); } };
+{ const b=$('objSetupBtn'); if(b) b.onclick=()=>setupObjektliste(); }
 document.querySelectorAll('.nav-tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 $('refreshBtn').onclick=()=>{ requestToken(false).then(()=>loadData()).catch(e=>saveToast('⚠ '+e.message,0,1)); };
 // Punkt 8: Partner suchen + anlegen

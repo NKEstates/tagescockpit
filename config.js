@@ -19,6 +19,10 @@ window.COCKPIT_CONFIG = {
   AUFWERTUNG_SHEET_ID: "1aDrbPfJg3iW2DTCWcXTaHX1LP5sblUIj5S9xkwg2hwM",
   AUFWERTUNG_OBJEKT: "Kühlungsborn, Strandstraße 14 WE 21",
 
+  // Vorlage für neue Aufwertungspläne (entkernte Kopie des Kühlungsborn-Plans).
+  // Das Cockpit legt daraus mit einem Klick den Plan für ein neues Objekt an.
+  VORLAGE_SHEET_ID: "1iCHjUAv34vWBAzdYqT-xjwAQ2QP-yFHpUxvj7cXC3ng",
+
   // Reiter-Namen in der Tabelle
   TABS: {
     leadliste: "Leadliste",      // Ankauf-Pipeline (Objekte)
