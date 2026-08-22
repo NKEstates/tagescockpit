@@ -678,6 +678,11 @@ function mapLeadliste(rows){
     o.active=!o.rejected && !o.uebergeben && (!!o.status||!!o.angebot||!!o.nextStep||!!o.nachfass1||!!o.nachfass2);
     o.phase=phaseOf(o); o.owner=markerOwner(o)||phaseOwner(o.phase); o.fael=faellig(o); o.score=scoreOf(o);
     o.titel=o.adresse||o.typ||'(ohne Adresse)';
+    /* Stabiler Schlüssel für gespeicherte Zuordnungen. Die laufende Kennung (_id)
+       und die Zeilennummer verschieben sich, sobald jemand die Leadliste sortiert
+       oder eine Zeile einfügt — eine darauf gespeicherte Zuordnung zeigte danach
+       auf das falsche Objekt. Adresse und Verkäufer verschieben sich nicht.       */
+    o.key=normLoose(o.adresse)+'|'+normLoose(o.seller);
     o.task=o.nextStep||({'Absage senden':'Absage an Verkäufer/Makler senden','Angebot vorbereiten':'Angebot vorbereiten','Angebot raus':'Angebot nachfassen','Vorqualifikation':'Vorqualifizieren & Daten sammeln','Kalkulieren':'Kalkulieren & bewerten'}[o.phase])||'Nächsten Schritt festlegen';
     out.push(o);
   });
@@ -1114,10 +1119,11 @@ function hztMailOnlyRow(m){
   return `<tr class="hzt-row" data-gmail="${m.tid}">`
     +`<td></td>`
     +`<td><span class="hzt-dot" style="background:${m.hasDraft?'var(--band-yellow)':'var(--band-red)'}"></span><span class="hzt-obj">${esc(m.subj)}</span><div class="hzt-meta">${esc(m.fromEmail||'')}</div></td>`
-    +`<td class="stand">Mail ${m.hasDraft?'– Entwurf offen':'– Antwort offen'}</td>`
+    +`<td class="stand">Mail ${m.hasDraft?'– Entwurf offen':'– Antwort offen'}${m.unsicher?'<br><span style="color:var(--band-orange)">Zuordnung unsicher</span>':''}</td>`
     +`<td>${m.hasDraft?'Entwurf prüfen & senden':'Antworten'}</td>`
     +`<td class="vor">—</td>`
-    +`<td><a class="link" target="_blank" href="${gmailThreadLink(m.tid)}" onclick="event.stopPropagation()">${m.hasDraft?'✏️ senden':'✉️ schreiben'}</a></td></tr>`;
+    +`<td><a class="link" target="_blank" href="${gmailThreadLink(m.tid)}" onclick="event.stopPropagation()">${m.hasDraft?'✏️ senden':'✉️ schreiben'}</a>`
+    +`<br><button class="iconbtn" style="padding:3px 8px;font-size:11px;margin-top:4px" onclick="event.stopPropagation();openMailZuordnung('${esc(m.tid)}')">🔗 zuordnen</button></td></tr>`;
 }
 function renderHeuteZuerst(){
   const objs=openTasks(), done=doneObjs();   // alle EIGENEN offenen Vorgänge, nach Dringlichkeit sortiert
@@ -3134,20 +3140,90 @@ function normLoose(s){ return String(s||'').toLowerCase()
 function wordHit(hay,tk){ try{ return new RegExp('\\b'+tk+'\\b').test(hay); }catch(e){ return hay.includes(tk); } }
 const MAP_STOP=new Set(['haus','wohnung','objekt','immobilie','mehrfamilienhaus','etage','zimmer','allee','platz','ring','weg']);  // zu generische Wörter
 // Ordnet eine Mail dem besten Leadliste-Objekt zu (Punkte: exakte Kontakt-Mail > Straßen-Token > Verkäufer-/Absendername). Schwelle gegen Fehltreffer.
+/* Ordnet eine Mail einem Objekt aus der Leadliste zu.
+   22.08.2026: Vorher gewann schlicht die höchste Punktzahl. Bei zwei Wohnungen
+   im selben Haus oder zwei Objekten in derselben Straße liegen die Punktzahlen
+   aber fast gleichauf — dann war die Zuordnung ein Münzwurf, sah aber genauso
+   sicher aus wie ein Treffer über die E-Mail-Adresse. Jetzt gilt: Liegen die
+   beiden besten Kandidaten dicht beieinander, wird NICHT zugeordnet. Lieber eine
+   Mail, die auf Zuordnung wartet, als eine, die beim falschen Objekt liegt.
+   Rückgabe: {o, score, unsicher, kandidaten}.                                   */
+const MAP_ABSTAND=15;   // so weit müssen erster und zweiter auseinanderliegen
 function mapMailToObject(fromEmail,subject,fromName){
   const fe=norm(fromEmail), hay=normLoose((subject||'')+' '+(fromName||''));
-  let best=null, bestScore=0;
+  const treffer=[];
   for(const o of OBJ){
     if(!o.active) continue;      // 21.08.2026: aussortierte Objekte ziehen keine Mails mehr an sich
-    let score=0;
-    if(fe&&fe.includes('@')&&o.tel){ const emails=(norm(o.tel).match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/g)||[]); if(emails.includes(fe)) score+=100; }
+    let score=0, ueberMail=false;
+    if(fe&&fe.includes('@')&&o.tel){ const emails=(norm(o.tel).match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/g)||[]); if(emails.includes(fe)){ score+=100; ueberMail=true; } }
     const adr=normLoose(o.adresse);
     if(adr) adr.split(/[\s,.\/]+/).filter(w=>w.length>=4&&!/^\d+$/.test(w)&&!MAP_STOP.has(w)).forEach(tk=>{ if(wordHit(hay,tk)) score+=(tk.length>=5?40:25); });
     const seller=normLoose(o.seller);
     if(seller) seller.split(/[\s,]+/).filter(w=>w.length>=4&&!MAP_STOP.has(w)).forEach(tk=>{ if(wordHit(hay,tk)) score+=30; });
-    if(score>bestScore){ bestScore=score; best=o; }
+    if(score>0) treffer.push({o,score,ueberMail});
   }
-  return bestScore>=30?best:null;
+  treffer.sort((a,b)=>b.score-a.score);
+  const erster=treffer[0], zweiter=treffer[1];
+  if(!erster||erster.score<30) return {o:null,score:erster?erster.score:0,unsicher:false,kandidaten:[]};
+  // Ein Treffer über die E-Mail-Adresse ist eindeutig und sticht jede Nähe.
+  if(!erster.ueberMail&&zweiter&&(erster.score-zweiter.score)<MAP_ABSTAND){
+    return {o:null,score:erster.score,unsicher:true,kandidaten:treffer.slice(0,3).map(t=>t.o)};
+  }
+  return {o:erster.o,score:erster.score,unsicher:false,kandidaten:treffer.slice(0,3).map(t=>t.o)};
+}
+/* Eine von Hand gesetzte Zuordnung sticht immer. Sie liegt im Reiter Cockpit-State
+   unter „mailobj:<Thread>" und überlebt damit jedes Neuladen — und sie ist zugleich
+   die Aufzeichnung, welche Zuordnungen danebenlagen. Genau die brauchen wir, um die
+   Erkennung später nachzuschärfen, statt sie nach Gefühl zu ändern.               */
+function mailZuordnungManuell(tid){ return META['mailobj:'+tid+'|obj']||''; }
+/* Fenster: „Zu welchem Objekt gehört diese Mail?"
+   Oben die Vorschläge der Erkennung, darunter alle offenen Objekte zum Suchen,
+   und die Möglichkeit, ausdrücklich KEIN Objekt zu wählen. Das Letzte ist wichtig:
+   Eine Mail, die zu keinem Objekt gehört, soll nicht bei jedem Laden neu geraten
+   werden — sonst korrigiert man dieselbe Fehlzuordnung jede Woche wieder.        */
+function openMailZuordnung(tid){
+  const t=(GMAIL.threads||[]).find(x=>x.tid===tid); if(!t) return;
+  const jetzt=t.objId?(OBJ.find(x=>x._id===t.objId)||null):null;
+  const vorschlag=(t.kandidaten||[]).filter(k=>!jetzt||k.key!==jetzt.key);
+  const zeile=(key,titel,extra)=>`<div class="mini" style="cursor:pointer" onclick="setMailObj('${esc(tid)}','${esc(key)}')">`
+    +`<span class="dot" style="background:${extra==='aktuell'?'var(--green)':'#93C5FD'}"></span>`
+    +`<span class="mt"><b>${esc(titel)}</b>${extra&&extra!=='aktuell'?'<br><span style="color:var(--ink-soft)">'+esc(extra)+'</span>':''}</span>`
+    +`${extra==='aktuell'?'<span style="color:var(--green);font-size:12px">aktuell zugeordnet</span>':''}</div>`;
+  $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
+    <div class="detail-head">
+      <div style="font-size:12px;color:var(--ink-faint);font-weight:700;letter-spacing:.03em">🔗 MAIL ZUORDNEN</div>
+      <h2 style="font-size:17px">${esc(t.subj)}</h2>
+      <div style="color:var(--ink-soft);font-size:13px">${esc(t.fromEmail||'')}</div>
+      <div class="deeplinks"><a class="link" target="_blank" href="${gmailThreadLink(tid)}">✉️ Mail öffnen</a></div>
+    </div>
+    ${t.unsicher?`<div class="wt-hint" style="margin:12px 0">Die Erkennung war sich nicht sicher — mehrere Objekte passen fast gleich gut. Deshalb ist die Mail bisher keinem zugeordnet.</div>`:''}
+    ${jetzt?`<div class="section-t" style="margin-top:12px">Aktuell</div>`+zeile(jetzt.key,jetzt.titel,'aktuell'):''}
+    ${vorschlag.length?`<div class="section-t" style="margin-top:14px">Vorschläge der Erkennung</div>`+vorschlag.map(k=>zeile(k.key,k.titel,'')).join(''):''}
+    <div class="section-t" style="margin-top:14px">Alle offenen Objekte</div>
+    <input id="mzSuche" type="text" placeholder="Suchen: Adresse oder Verkäufer …" style="width:100%;margin-bottom:8px">
+    <div id="mzListe" style="max-height:260px;overflow:auto"></div>
+    <div class="section-t" style="margin-top:14px">Oder</div>
+    <div class="mini" style="cursor:pointer" onclick="setMailObj('${esc(tid)}','-')">
+      <span class="dot" style="background:var(--ink-faint)"></span>
+      <span class="mt"><b>Gehört zu keinem Objekt</b><br><span style="color:var(--ink-soft)">Wird künftig nicht mehr geraten und bleibt in „Neue Objekte anfragen".</span></span></div>`;
+  $('erlOverlay').classList.add('open');
+  const mal=()=>{
+    const q=normLoose($('mzSuche').value);
+    const liste=activeObjs().filter(o=>!q||normLoose(o.titel+' '+o.seller).includes(q)).slice(0,60);
+    $('mzListe').innerHTML=liste.length
+      ? liste.map(o=>zeile(o.key,o.titel,o.seller||'')).join('')
+      : '<div class="empty">Kein Objekt gefunden.</div>';
+  };
+  $('mzSuche').oninput=mal; mal();
+}
+function objVonKey(key){ return OBJ.find(x=>x.key===key)||null; }
+async function setMailObj(tid,key){
+  META['mailobj:'+tid+'|obj']=key;
+  await persistState('mailobj:'+tid,'obj',key);
+  const t=(GMAIL.threads||[]).find(x=>x.tid===tid);
+  if(t){ const o=key&&key!=='-'?objVonKey(key):null; t.objId=o?o._id:null; t.objTitel=o?o.titel:null; t.unsicher=false; }
+  GMAIL.byObj={}; (GMAIL.threads||[]).forEach(x=>{ if(x.objId) (GMAIL.byObj[x.objId]=GMAIL.byObj[x.objId]||[]).push(x); });
+  closeErledigt(); renderAll();
 }
 async function loadGmail(){
   if(!hasGmailScope()){ GMAIL.state='noscope'; return; }
@@ -3175,10 +3251,16 @@ async function loadGmail(){
       const fromName=from.replace(/<[^>]*>/,'').replace(/["']/g,'').trim();
       const ts=h.date?(new Date(h.date)).getTime():null;
       const weOwe=!fe.includes('value.estate.group');
-      const obj=mapMailToObject(fe,subj,fromName);
+      const zuo=mapMailToObject(fe,subj,fromName);
+      let obj=zuo.o, unsicher=zuo.unsicher;
+      const manuell=mailZuordnungManuell(tid);
+      if(manuell==='-'){ obj=null; unsicher=false; }
+      else if(manuell){ const m=objVonKey(manuell); if(m){ obj=m; unsicher=false; } }
       // „neu"-Suchauftrags-Objekte sind nie Rauschen; sonst no-reply/Newsletter filtern
       const noise=meta.cat==='neu'?false:isMailNoise(fe,subj);
-      out.push({tid,subj,from,fromEmail:fe,ts,weOwe,hasDraft:draftThreads.has(tid),cat:meta.cat,label:meta.labelName,objTitel:obj?obj.titel:null,objId:obj?obj._id:null,noise});
+      out.push({tid,subj,from,fromEmail:fe,ts,weOwe,hasDraft:draftThreads.has(tid),cat:meta.cat,label:meta.labelName,
+                objTitel:obj?obj.titel:null,objId:obj?obj._id:null,noise,
+                unsicher,kandidaten:(zuo.kandidaten||[]).map(x=>({key:x.key,titel:x.titel})),manuell:!!manuell});
     }
     const byObj={}; out.forEach(t=>{ if(t.objId) (byObj[t.objId]=byObj[t.objId]||[]).push(t); });
     GMAIL.threads=out; GMAIL.byObj=byObj; GMAIL.state='ready';
@@ -3574,7 +3656,7 @@ function openDetail(id){
     ? `<div><b>Einheit</b>${esc(o.einheit||'—')}</div><div><b>Status</b>${esc(o.status||'—')}</div><div><b>Zielpreis</b>${esc(o.zielpreis||'—')}</div><div><b>Interessent</b>${esc(o.interessent||'—')}</div>`
     : `<div><b>Typ</b>${esc(o.typ||'—')}</div><div><b>Status</b>${esc(o.status||'—')}</div><div><b>Phase</b>${esc(phaseLabel(o.phase))}</div><div><b>Kaufpreis</b>${esc(o.kaufpreis||'—')}</div><div><b>Kalk. VK</b>${esc(o.kalkVK||'—')}</div><div><b>Angebot</b>${esc(o.angebot||'—')}</div><div><b>Fällig</b>${esc(o.fael?o.fael.txt:'—')}</div><div><b>Verkäufer</b>${esc(o.seller||'—')}</div>`;
   const objMails=(!isSale&&GMAIL.state==='ready')?(GMAIL.byObj[o._id]||[]).filter(m=>m.hasDraft||(m.weOwe&&!m.noise)):[];
-  const mailSec=objMails.length?`<div class="section-t" style="margin-top:16px">✉️ Offene Mails zu diesem Objekt</div>`+objMails.map(m=>`<div class="mini"><span class="dot" style="background:${m.hasDraft?'var(--band-yellow)':'var(--band-red)'}"></span><span class="mt" style="white-space:normal">${m.hasDraft?'✏️ Entwurf offen – abschicken':'🔴 unbeantwortet'}: ${esc(m.subj)}</span><a class="link" target="_blank" href="${gmailThreadLink(m.tid)}">${m.hasDraft?'öffnen &amp; senden':'öffnen'}</a></div>`).join(''):'';
+  const mailSec=objMails.length?`<div class="section-t" style="margin-top:16px">✉️ Offene Mails zu diesem Objekt</div>`+objMails.map(m=>`<div class="mini"><span class="dot" style="background:${m.hasDraft?'var(--band-yellow)':'var(--band-red)'}"></span><span class="mt" style="white-space:normal">${m.hasDraft?'✏️ Entwurf offen – abschicken':'🔴 unbeantwortet'}: ${esc(m.subj)}</span><a class="link" target="_blank" href="${gmailThreadLink(m.tid)}">${m.hasDraft?'öffnen &amp; senden':'öffnen'}</a><button class="iconbtn" style="padding:3px 8px;font-size:11px;margin-left:6px" onclick="event.stopPropagation();openMailZuordnung('${esc(m.tid)}')" title="Gehört diese Mail zu einem anderen Objekt?">🔗</button></div>`).join(''):'';
   $('modal').innerHTML=`<button class="modal-close" onclick="closeDetail()">✕ schließen</button>
     <div class="detail-head"><h2>🏠 ${esc(o.titel)}</h2><div style="margin-top:4px">${isSale?ownerAv('Nele'):urgBadge(o.score)} <span class="owner ${effOwner(o)}">${effOwner(o)}</span></div>
       <div class="kv">${rows}</div>
