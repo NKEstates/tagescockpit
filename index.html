@@ -683,6 +683,119 @@ function lastActivity(o){
   mails.forEach(m=>{ if(m.ts) ds.push(m.ts); });
   return ds.length?new Date(Math.max(...ds)):null;
 }
+/* ---- Angefragte Exposés (12.09.2026, Regel Nele) --------------------------
+   Ein Vorgang gilt als „Exposé angefragt", wenn in Spalte W eine datierte
+   „angefragt"-Notiz steht (so schreibt sie das Fenster „Neues Objekt" hinein).
+   Zwei Zustände zählen:
+   - Antwort/Exposé ist da (zugeordnete Mail nach der Anfrage, Gegenseite hat
+     zuletzt geschrieben) → PRÜFEN und innerhalb einer WOCHE zurückmelden.
+   - Keine Antwort → nach 7 Tagen beim Makler NACHFASSEN.
+   Beides steht in „Reißt heute". Die Regel erlischt von selbst: Sobald eine
+   jüngere datierte Notiz in Spalte W steht (z. B. über das Erledigt-Fenster)
+   oder die Phase über die Vorqualifikation hinaus ist, greift sie nicht mehr. */
+const EXPOSE_FRIST=7;
+// Gemeinsamer Fristen-Baustein für beide Quellen (Leadliste-Vermerk UND reine Mail-Anfrage).
+function exposeZustand(anf,antwort){
+  if(antwort){
+    const frist=new Date(+antwort+EXPOSE_FRIST*MS), rest=daysUntil(frist);
+    return {typ:'pruefen',anf,antwort,frist,rest,ueberfaellig:rest<0,
+      stand:'📨 Exposé/Antwort da seit '+fmtDate(antwort)+' · Rückmeldung bis '+fmtDate(frist)+(rest<0?' (seit '+(-rest)+' T überfällig!)':rest===0?' (heute!)':' (noch '+rest+' T)'),
+      todo:'🧐 Exposé prüfen & antworten',
+      vorschlag:'Unterlagen gegen das Ankaufsprofil prüfen und dem Makler innerhalb der Wochenfrist antworten – Interesse, Rückfragen oder Absage.'};
+  }
+  const seit=daysSince(anf);
+  if(seit!=null&&seit>=EXPOSE_FRIST) return {typ:'nachfassen',anf,seit,
+    stand:'🔎 angefragt am '+fmtDate(anf)+' · seit '+seit+' T ohne Antwort',
+    todo:'📞 Beim Makler nachfassen',
+    vorschlag:'Kurz nachfassen, ob das Exposé noch kommt – sonst das Objekt auf „Beobachten" setzen.'};
+  return {typ:'warten',anf,seit:seit||0,
+    stand:'🔎 angefragt am '+fmtDate(anf)+' · Antwort steht aus',
+    todo:'⏳ Antwort abwarten',vorschlag:null};
+}
+// Rangfolge für die Sortierung im Block: Nachfassen/überfällig → prüfen → warten.
+function exposeRang(z){ return (z.typ==='nachfassen'||z.ueberfaellig)?0:(z.typ==='pruefen'?1:2); }
+function angefragtInfo(o){
+  if(o.phase!=='Neu'&&o.phase!=='Vorqualifikation') return null;
+  let anf=null, letzteNotiz=null;
+  String(o.nextStep||'').split('\n').forEach(z=>{
+    const stamp=parseDate(z); if(!stamp||daysUntil(stamp)>0) return;   // Zukunftsdaten (Wiedervorlagen) zählen nicht
+    if(/angefragt/i.test(z)){
+      // Das FRÜHESTE Datum der Zeile ist die echte Anfrage – der [Stempel] kann jünger
+      // sein, wenn der Eintrag nachträglich aus einer Mail übernommen wurde
+      // („[12.09.] angefragt: Exposé angefragt am 01.09. (per Mail)").
+      const ds=parseAllDates(z).filter(d=>daysUntil(d)<=0);
+      const early=ds.length?new Date(Math.min(...ds.map(d=>+d))):stamp;
+      if(!anf||+early>+anf) anf=early;
+    } else if(!letzteNotiz||+stamp>+letzteNotiz) letzteNotiz=stamp;    // die Anfrage-Notiz selbst ist keine „Bewegung"
+  });
+  // 12.09.2026: Auch OHNE „angefragt"-Vermerk gilt die Regel, sobald dem Objekt eine
+  // unbeantwortete Makler-Mail zugeordnet ist – so greifen von Hand angelegte Zeilen
+  // (Anfrage lief übers Portal, Adresse stand nicht in der Mail) trotzdem.
+  const mails=((typeof GMAIL!=='undefined'&&GMAIL.byObj&&GMAIL.byObj[o._id])||[]).filter(m=>m.weOwe&&!m.noise&&m.ts&&(!anf||m.ts>=+anf));
+  const antwort=mails.length?new Date(Math.max(...mails.map(m=>m.ts))):null;
+  if(!anf&&!antwort) return null;                                // weder Vermerk noch Makler-Mail
+  if(antwort&&letzteNotiz&&+letzteNotiz>+antwort) return null;   // seit der Antwort wurde gehandelt → normale Logik
+  if(!antwort&&letzteNotiz&&+letzteNotiz>+anf) return null;      // nach der Anfrage passierte schon etwas
+  return exposeZustand(anf||antwort,antwort);
+}
+/* Anfragen, die NUR als Mail existieren (noch keine Leadliste-Zeile).
+   WICHTIG (Korrektur Nele, 12.09.2026): Angefragt wird immer ÜBER DIE PORTALE, nie
+   per Mail. Es gibt also keine gesendete Anfrage – erkennbar ist eine Anfrage nur an
+   den eingehenden Mails im Posteingang:
+   - Portal-Bestätigung (no-reply, „Ihre Anfrage …")            → warten / nachhaken
+   - Makler-Antwort bzw. „Neue Nachricht"-Benachrichtigung      → Exposé da, prüfen
+   Haben WIR im Thread danach geantwortet (sentTs), ist die Rückmeldung erfolgt und
+   der Punkt verschwindet. Ein Klick auf ➕ übernimmt die Anfrage über das
+   „Neues Objekt"-Fenster in die Leadliste – ab dann führt die Objekt-Regel. */
+const ANF_MAIL_CATS=new Set(['inbox','neu','followup','other']);
+// Bewusst eng: „Unterlagen" o. Ä. würde auch Steuerberater-Post treffen.
+const ANF_SUBJ_RE=/anfrage|expos|mietaufstellung|besichtigung/;
+const ANF_PORTAL_RE=/immobilienscout|immoscout|is24|immowelt|immonet|ohne-makler|kleinanzeigen|wohnungsboerse|immobilien\.de/;
+const ANF_ANTWORT_RE=/neue nachricht|nachricht von|hat.{0,12}geantwortet|expos/;
+const ANF_NOREPLY_RE=/no-?_?reply|donotreply|notifications?@|mailer-daemon|postmaster|automail/;
+// 12.09.2026 (nach Test an den echten Fällen): Der Betreff allein reicht nicht –
+// „AW: neue Immobilie" (Tasler, Exposé im Anhang) oder „Informationen zu Petridamm"
+// (PlanetHome) tragen keins der Schlüsselwörter. Deshalb zählt zusätzlich der ABSENDER:
+// eine Makler-Domain oder ein bekannter CRM-Kontakt (Steuerberater/Notare stehen im
+// Partner-Reiter, nicht im CRM – die schlagen hier also nicht an).
+const ANF_MAKLER_DOM_RE=/immobilien|immo\b|makler|planethome|von-?poll|engel.?voelkers/;
+function istMaklerAbsender(fe){
+  const e=norm(fe); if(!e.includes('@')) return false;
+  if(ANF_MAKLER_DOM_RE.test(e.split('@')[1]||'')) return true;
+  return (typeof KON!=='undefined'?KON:[]).some(k=>k.email&&norm(k.email)===e);
+}
+function angefragtMailItems(){
+  if(!(typeof GMAIL!=='undefined'&&hasGmailScope()&&GMAIL.state==='ready')) return [];
+  return GMAIL.threads
+    .filter(t=>{
+      if(t.objId||t.privat||t.manuell||neuHandled(t.tid)) return false;
+      if(!ANF_MAIL_CATS.has(t.cat)||!t.ts) return false;
+      const s=norm(t.subj), fe=norm(t.fromEmail);
+      // Im Label „neu" liegen die ANGEBOTE der Portale (oft mit „Exposé" im Betreff) –
+      // dort zählt nur ein echter „Anfrage"-Betreff, sonst wandert jedes Angebot hierher.
+      const bezug=t.cat==='neu'?/anfrage/.test(s):(ANF_SUBJ_RE.test(s)||ANF_PORTAL_RE.test(fe)||istMaklerAbsender(fe));
+      if(!bezug) return false;
+      if(t.noise&&!(ANF_SUBJ_RE.test(s)||ANF_ANTWORT_RE.test(s))) return false;   // no-reply nur mit klarem Anfrage-/Antwort-Betreff
+      if(t.sentTs&&(!t.replyTs||t.sentTs>t.replyTs)) return false;       // wir haben geantwortet → erledigt
+      return true;
+    })
+    .map(t=>{
+      const s=norm(t.subj), fe=norm(t.fromEmail);
+      // Echter Absender oder „Neue Nachricht"-Benachrichtigung = der Makler hat sich gemeldet.
+      const antwortDa=!ANF_NOREPLY_RE.test(fe)||ANF_ANTWORT_RE.test(s);
+      const basis=new Date(t.replyTs||t.ts);
+      t._anfTs=+basis;
+      const info=exposeZustand(basis,antwortDa?basis:null);
+      if(!antwortDa&&info.typ==='nachfassen'){
+        info.todo='🔁 Im Portal nachhaken';
+        info.vorschlag='Portal-Anfrage seit '+info.seit+' T unbeantwortet – im Portal nachhaken oder das Objekt abhaken.';
+      }
+      if(t.hasDraft) info.stand+=' · ✏️ Entwurf liegt bereit';
+      return {t,info};
+    })
+    .sort((a,b)=>(exposeRang(a.info)-exposeRang(b.info))||(b.t._anfTs-a.t._anfTs));
+}
+function angefragtTids(){ return new Set(angefragtMailItems().map(x=>x.t.tid)); }
 const STALE_YELLOW=7, STALE_RED=14;   // Punkt 2: ≥7 T ohne Aktivität → 🟡 Bald, ≥14 T → 🔴 dringend
 function scoreOf(o){
   const f=o.fael, last=[o.anruf,o.besichtigung,o.nachfass1,o.nachfass2].filter(Boolean).map(daysSince).filter(x=>x!=null&&x>=0);
@@ -699,6 +812,11 @@ function scoreOf(o){
     // Engpass Kalkulation: liegt sie länger als KALK_STALE_DAYS, geht sie sofort auf 🟠 „Diese Woche“.
     if(o.phase==='Kalkulieren' && st!=null && st>=KALK_STALE_DAYS){ base=Math.max(base,60); o._eskaliert=st; }
   }
+  // 12.09.2026: Wochenfrist für angefragte Exposés (Regel Nele). Antwort da → prüfen
+  // (ab 2 Resttagen rot), Makler seit 7 T still → nachfassen (rot).
+  const ex=angefragtInfo(o);
+  if(ex){ if(ex.typ==='nachfassen'||ex.ueberfaellig) base=Math.max(base,100);
+          else if(ex.typ==='pruefen') base=Math.max(base,ex.rest<=2?100:60); }
   return base;
 }
 function urgency(s){ return s>=100?['var(--band-red)','🔴 Sofort']:s>=60?['var(--band-orange)','🟠 Diese Woche']:s>=30?['var(--band-yellow)','🟡 Bald']:['var(--band-green)','🟢 Im Plan']; }
@@ -810,7 +928,7 @@ async function loadData(){
   focusSnapshot=null; renderAll();
   if(hasGmailScope()&&!loadErr) loadGmail().catch(e=>problem('Gmail',e));       // im Hintergrund nachladen, danach neu rendern
   if(hasCalScope()&&!loadErr) loadCalendar().catch(e=>problem('Kalender',e));   // Kalender heute laden → Tagesfokus an freie Zeit anpassen
-  if(hasAufwertung()&&!loadErr) loadAufwertung().then(()=>{ renderAll(); syncAufStand(); scanUndSync(); });   // 21.08.2026: Aufwertungsplaene aus den verlinkten Tabellen
+  if(hasAufwertung()&&!loadErr) loadAufwertung().then(()=>{ focusSnapshot=null; renderAll(); syncAufStand(); scanUndSync(); });   // 21.08.2026: Aufwertungsplaene aus den verlinkten Tabellen · 12.09.2026: Fokus-Top-3 neu bilden, sobald Aufwertungspunkte da sind
 }
 function mapLeadliste(rows){
   const out=[];
@@ -1109,8 +1227,25 @@ function renderMaklercall(){
   } else slot.innerHTML=`<div class="card maklercall done"><div class="mc-h">${MC[NOW.getDate()%MC.length]}</div></div>`;
 }
 function ensureSnapshot(){ if(focusSnapshot) return;
-  const snap=activeObjs().filter(o=>inTagesliste(o)&&mine(o)&&!focusSuppressed(o)).sort((a,b)=>b.score-a.score).slice(0,3).map(o=>({id:o._id,label:phaseLabelShort(o.phase)+' · '+actionKeyword(o)+' – '+o.titel}));
-  if(snap.length<3&&hasGmailScope()&&GMAIL.state==='ready'){   // Bisherige Priorisierung; nur auffüllen mit dem dringendsten Mail-Entwurf
+  /* 12.09.2026 (Regel Nele): Der Tagesfokus zeigt die drei wichtigsten Themen
+     QUELLENÜBERGREIFEND – Leadliste, angefragte Exposés, Aufwertung und Verkauf.
+     Den Block „Reißt heute" gibt es nicht mehr; was früher dort stand, muss hier
+     um die drei Plätze konkurrieren. Punktzahlen: Leadliste = Score, Aufwertung/
+     Verkauf rot 100 · heute 65 · bald 35, Mail-Anfrage nachfassen/überfällig 100 ·
+     prüfen 60 · warten 20. */
+  const kand=activeObjs().filter(o=>inTagesliste(o)&&mine(o)&&!focusSuppressed(o))
+    .map(o=>({id:o._id,score:o.score,label:phaseLabelShort(o.phase)+' · '+actionKeyword(o)+' – '+o.titel}));
+  const SEV_PTS={rot:100,heute:65,bald:35};
+  try{
+    aufItems().forEach(it=>kand.push({id:it.id,score:SEV_PTS[it.sev]||35,label:'🏗️ '+it.titel}));
+    vkItems().filter(it=>!aufDone(it.id)).forEach(it=>kand.push({id:it.id,score:SEV_PTS[it.sev]||100,label:'💰 '+it.titel}));
+    if(hasGmailScope()&&GMAIL.state==='ready') angefragtMailItems().forEach(x=>{
+      const r=exposeRang(x.info);
+      kand.push({id:'anf|'+x.t.tid,score:r===0?100:r===1?60:20,label:x.info.todo+' – '+x.t.subj,gmail:x.t.tid});
+    });
+  }catch(e){}
+  const snap=kand.filter(k=>!doneSet.has(dkey(k.id))).sort((a,b)=>b.score-a.score).slice(0,3);
+  if(snap.length<3&&hasGmailScope()&&GMAIL.state==='ready'){   // auffüllen mit dem dringendsten Mail-Entwurf
     for(const m of userMailItems()){ if(snap.length>=3)break; if(m.objId&&snap.some(s=>s.id===m.objId))continue; const id='mail|'+m.tid; if(snap.some(s=>s.id===id))continue; snap.push({id,label:'✉️ '+(m.hasDraft?'Entwurf senden':'Antwort schreiben')+' – '+m.subj,gmail:m.tid}); }
   }
   focusSnapshot=snap;
@@ -1128,8 +1263,11 @@ function renderFocus(){
 // „Stand" = aktueller Zustand (Leadliste-Status J), plus Mail-Hinweis. To-do = die eine nächste Handlung.
 function hzStand(o){
   const bits=[o.status||phaseLabelShort(o.phase)];
+  // 12.09.2026: Exposé-Lage (angefragt / Antwort da / Rückmeldefrist) ersetzt den generischen Mail-Hinweis.
+  const ex=angefragtInfo(o);
+  if(ex) bits.push(ex.stand);
   if(o.mail&&o.mail.state==='draft') bits.push('✉️ Entwurf offen');
-  else if(o.mail&&o.mail.state==='open') bits.push('✉️ Antwort offen'+(o.mail.ageDays?' ('+o.mail.ageDays+' T)':''));
+  else if(!ex&&o.mail&&o.mail.state==='open') bits.push('✉️ Antwort offen'+(o.mail.ageDays?' ('+o.mail.ageDays+' T)':''));
   // Punkt 4: Telefon-Stand sichtbar machen – ein geführtes Telefonat ist genauso ein Stand wie eine Mail.
   // Punkt 3: bei Wiedervorlage aus „Beobachten" den Termin und seine Herkunft zeigen
   if(o.phase==='Beobachten'){ const d=wvDateOf(o); if(d){ const du=daysUntil(d);
@@ -1143,9 +1281,11 @@ function hzStand(o){
 }
 const HZ_TODO={Neu:'Sichten',Vorqualifikation:'Vorqualifizieren & Daten sammeln',Kalkulieren:'Kalkulieren & bewerten','Angebot vorbereiten':'Angebot vorbereiten','Angebot raus':'Nachfassen',Verhandlung:'Verhandeln',Kaufvertrag:'Kaufvertrag/Notar anstoßen',Beobachten:'Wiedervorlage – reaktivieren oder vertagen'};
 function hzTodo(o){
-  const bi=briefingInfo(o); if(bi&&bi.todo&&bi.todo.length>2) return bi.todo;   // Briefing-To-do hat Vorrang
   const k=kanalOf(o);
   if(k==='mail'&&o.mail&&o.mail.state==='draft') return '✉️ Entwurf prüfen & senden';
+  // 12.09.2026: Die Exposé-Regel ist eine feste Ansage von Nele – sie schlägt das (heuristische) Briefing.
+  const ex=angefragtInfo(o); if(ex&&ex.typ!=='warten') return ex.todo;
+  const bi=briefingInfo(o); if(bi&&bi.todo&&bi.todo.length>2) return bi.todo;   // Briefing-To-do hat Vorrang
   if(k==='mail'&&o.mail&&o.mail.state==='open') return '✉️ Antworten';
   if(k==='tel') return '📞 Anrufen';
   return (KANAL_ICON[k]||'')+' '+(HZ_TODO[o.phase]||'Nächsten Schritt festlegen');
@@ -1153,9 +1293,10 @@ function hzTodo(o){
 const HZ_VOR={Neu:'Objekt kurz gegen das Ankaufsprofil prüfen.',Vorqualifikation:'Verkäufer/Makler anrufen: Baujahr, Miete, Zustand erfragen.',Kalkulieren:'Kalkulation aufsetzen (Kaufpreis, Sanierung, Verkaufserlös).','Angebot vorbereiten':'Angebot final machen und rausschicken.','Angebot raus':'Freundlich nachfassen, ggf. Frist setzen.',Verhandlung:'Konditionen abstimmen – Preis und Übergabe klären.',Kaufvertrag:'Notartermin vereinbaren, Unterlagen zusammenstellen.',Beobachten:'Wiedervorlage erreicht: kurz prüfen, ob das Objekt noch am Markt ist – dann reaktivieren oder neu vertagen.'};
 // „Vorschlag" = kombiniert: bevorzugt der Text aus dem Morning-Briefing-Entwurf (echte Einschätzung), sonst interne Notiz (Spalte W), sonst Phasen-Standard.
 function hzVorschlag(o){
-  const b=briefingVorschlag(o); if(b) return b;
   const k=kanalOf(o);
   if(k==='mail'&&o.mail&&o.mail.state==='draft') return 'Entwurf in Gmail kurz prüfen und abschicken.';
+  const ex=angefragtInfo(o); if(ex&&ex.vorschlag) return ex.vorschlag;   // 12.09.2026: Exposé-Regel vor Briefing
+  const b=briefingVorschlag(o); if(b) return b;
   if(k==='mail'&&o.mail&&o.mail.state==='open') return 'Freundlich beantworten und offene Punkte klären.';
   if(k==='tel'){
     const t=o.anruf?daysSince(o.anruf):null;
@@ -1285,7 +1426,9 @@ function renderHeuteZuerst(){
   const objs=openTasks(), done=doneObjs();   // alle EIGENEN offenen Vorgänge, nach Dringlichkeit sortiert
   const gmailReady=hasGmailScope()&&GMAIL.state==='ready';
   // Aufwertungs-Mails sind hier ausgenommen – die stehen im Aufwertungsblock.
-  const mailOnly=gmailReady?userMailItems().filter(m=>!m.objId&&m.cat!=='aufwertung'):[];
+  // 12.09.2026: Ebenso die erkannten Portal-Anfragen – die stehen in „Angefragt – zu prüfen".
+  const anfTids=gmailReady?angefragtTids():new Set();
+  const mailOnly=gmailReady?userMailItems().filter(m=>!m.objId&&m.cat!=='aufwertung'&&!anfTids.has(m.tid)):[];
   let h='';
   // Lage-Zeile (wie im Briefing)
   const red=objs.filter(o=>o.score>=100).length, mailWait=objs.filter(o=>o.mail).length+(currentUser==='Nele'?mailOnly.length:0);
@@ -1305,46 +1448,57 @@ function renderHeuteZuerst(){
   // auch frisch angelegte und solche in der Vorqualifikation. Der Block „Neue Objekte anfragen"
   // ist ausschließlich für Nele und enthält nur, was noch NICHT in der Leadliste steht:
   // die Angebote aus dem Gmail-Label „neu" und Mails ohne Objektzuordnung.
-  const reisst=[], deals=[], beob=[];
+  /* 12.09.2026 (Regel Nele): Den Block „Reißt heute" gibt es nicht mehr. Die drei
+     wichtigsten Themen stehen oben im TAGESFOKUS (quellenübergreifend), alles andere
+     steht nur in seiner Kategorie – Dringlichkeit zeigt die Ampelfarbe vor der Zeile.
+     Neu ist der Block „Angefragt – zu prüfen": angefragte Exposés aus der Leadliste
+     UND aus reinen Mail-Anfragen, mit der Wochenfrist für die Rückmeldung. */
+  const angefragt=[], deals=[], beob=[];
   objs.forEach(o=>{
     if(o.phase==='Beobachten'){ beob.push(o); return; }
-    const f=o.fael||{state:'none'};
-    const gerissen=(f.state==='overdue'||f.state==='today')||(o._eskaliert>=STALE_RED);
-    if(gerissen){ reisst.push(o); return; }
+    const ex=angefragtInfo(o);
+    if(ex){ angefragt.push({o,ex}); return; }
     deals.push(o);
   });
+  const anfMails=gmailReady?angefragtMailItems():[];
   const aufAlle=aufItems();
-  const aufRot=aufAlle.filter(i=>i.sev==='rot'), aufRest=aufAlle.filter(i=>i.sev!=='rot');
-  // Der rote Block ist laut Entscheidung quellenuebergreifend. Eine Reservierung, die
-  // seit drei Wochen ohne Notartermin laeuft, oder ein Kaufpreis, der acht Wochen nach
-  // der Beurkundung nicht da ist, gehoert genau hierhin - nicht nur aufs Verkaufsboard.
   const vkAlle=vkItems();
-  const vkRot=vkAlle.filter(i=>!aufDone(i.id)), vkErledigt=vkAlle.filter(i=>aufDone(i.id));
+  const vkOffen=vkAlle.filter(i=>!aufDone(i.id)), vkErledigt=vkAlle.filter(i=>aufDone(i.id));
   const byScore=(a,b)=>b.score-a.score;
+  // Deals: Rotes (Ampel) zuerst, darunter die gewohnte Phasenreihenfolge.
   const byPhase=(a,b)=>(FUNNEL.indexOf(a.phase)-FUNNEL.indexOf(b.phase))||(b.score-a.score);
-  reisst.sort(byScore); deals.sort(byPhase); beob.sort(byScore);
+  deals.sort((a,b)=>((b.score>=100)-(a.score>=100))||byPhase(a,b)); beob.sort(byScore);
+  angefragt.sort((a,b)=>(exposeRang(a.ex)-exposeRang(b.ex))||(b.o.score-a.o.score));
   const kopf=(farbe,txt,n,hinweis)=>`<tr class="hzt-cat"><td colspan="5"><span class="hz-cat" style="color:${farbe}">${txt} <small style="color:var(--ink-faint);font-weight:600">(${n})${hinweis?' – '+hinweis:''}</small></span></td></tr>`;
   let body='';
 
-  // 1 – was heute reißt: Termin überschritten, heute fällig oder seit 14 T ohne Bewegung
-  if(reisst.length||aufRot.length||vkRot.length){
-    body+=kopf('var(--band-red)','🔴 Reißt heute',reisst.length+aufRot.length+vkRot.length,'Termin überschritten oder heute fällig');
-    body+=reisst.map(hztRow).join('')+aufRot.map(hztAufRow).join('')+vkRot.map(hztAufRow).join('');
+  // 1 – Angefragt – zu prüfen: angefragte Exposés (Leadliste-Vermerk + reine Mail-Anfragen).
+  // Rot = Rückmeldefrist gerissen oder Makler 7 T still · Orange = Exposé da, prüfen · Teal = wartet.
+  if(angefragt.length||anfMails.length){
+    body+=kopf('#0D9488','🧐 Angefragt – zu prüfen',angefragt.length+anfMails.length,'Exposé da → prüfen & binnen '+EXPOSE_FRIST+' T antworten · '+EXPOSE_FRIST+' T still → nachfassen · ➕ trägt in die Leadliste ein');
+    body+=angefragt.map(x=>hztRow(x.o)).join('')+anfMails.map(hztAngefragtRow).join('');
   }
-  // 2 – Deals in Arbeit: Kalkulation bis Kaufvertrag, in Phasenreihenfolge
+  // 2 – Deals in Arbeit: Kalkulation bis Kaufvertrag; Rotes steht oben, die Ampel zeigt die Dringlichkeit
   if(deals.length){
-    body+=kopf('var(--band-orange)','💰 Deals in Arbeit',deals.length,'alles aus der Leadliste – von der Sichtung bis zum Kaufvertrag');
+    body+=kopf('var(--band-orange)','💰 Deals in Arbeit',deals.length,'alles aus der Leadliste – Ampel vorn zeigt, was dringend ist');
     body+=deals.map(hztRow).join('');
   }
-  // 3 – Aufwertung: Aufgaben aus dem Projektzeitplan, Handwerker ohne Rückmeldung, Terminvorschläge
-  if(aufRest.length){
+  // 3 – Aufwertung: ALLE Aufgaben aus Projektzeitplan, Handwerkern und Terminvorschlägen –
+  // seit 12.09.2026 auch die überfälligen (rot zuerst), die vorher oben im roten Block standen.
+  if(aufAlle.length){
     const aufTitel=AUFS.filter(a=>a.state==='ready').length>1
       ? '🏗️ Aufwertung <small style="font-weight:600">('+AUFS.filter(a=>a.state==='ready').length+' Objekte)</small>'
       : '🏗️ Aufwertung '+esc(aufObjektName());
-    body+=kopf('#B45309',aufTitel,aufRest.length,aufLage());
-    body+=aufRest.map(hztAufRow).join('');
+    body+=kopf('#B45309',aufTitel,aufAlle.length,aufLage());
+    body+=aufAlle.map(hztAufRow).join('');
   } else if(AUF.state==='error'){
     body+=kopf('var(--ink-faint)','🏗️ Aufwertung',0,'Plan nicht lesbar: '+esc(AUF.error||''));
+  }
+  // 3b – Verkaufs-Wächter (Reservierung ohne Notartermin, Kaufpreis nicht eingegangen):
+  // standen früher im roten Block, jetzt eigene Kategorie – die Ampel zeigt den Ernst.
+  if(vkOffen.length){
+    body+=kopf('var(--band-red)','💰 Verkauf',vkOffen.length,'Notartermin, Geldeingang & Co. – nichts davon darf liegen bleiben');
+    body+=vkOffen.map(hztAufRow).join('');
   }
   // 4 – neue Objekte anfragen: NUR bei Nele, und nur was noch nicht in der Leadliste steht
   const istNele=currentUser==='Nele';
@@ -1400,6 +1554,9 @@ function renderHeuteZuerst(){
   // Aufwertungszeile: Terminvorschlag öffnet das Bestätigen-Fenster, alles andere die Tabelle.
   $('heuteZuerst').querySelectorAll('tr.hzt-row[data-neu]').forEach(tr=>tr.onclick=e=>{
     if(e.target.tagName!=='A'&&e.target.tagName!=='INPUT') openNeuObjekt(tr.dataset.neu); });
+  // 12.09.2026: Mail-Anfragen im Block „Angefragt – zu prüfen" → gleiches Fenster wie „Neues Objekt"
+  $('heuteZuerst').querySelectorAll('tr.hzt-row[data-anf]').forEach(tr=>tr.onclick=e=>{
+    if(e.target.tagName!=='A'&&e.target.tagName!=='INPUT'&&e.target.tagName!=='BUTTON') openNeuObjekt(tr.dataset.anf); });
   $('heuteZuerst').querySelectorAll('tr.hzt-row[data-auf]').forEach(tr=>tr.onclick=e=>{
     if(e.target.tagName==='A'||e.target.tagName==='BUTTON'||e.target.tagName==='INPUT') return;
     const id=tr.dataset.auf;
@@ -1485,6 +1642,20 @@ function renderKontaktMini(){
 function mailSenderName(t){ const n=String(t.from||'').replace(/<[^>]*>/,'').replace(/["']/g,'').trim(); return n||t.fromEmail||''; }
 // 21.08.2026: Angebot aus dem Gmail-Label „neu" als Zeile in „Heute zuerst".
 // Klick öffnet dasselbe Fenster wie in der Karte darunter: anfragen → Leadliste, oder aussortieren.
+// 12.09.2026: Zeile für eine Exposé-Anfrage, die nur als Mail existiert. Die Ampel folgt
+// dem Fristen-Zustand; ➕ öffnet das „Neues Objekt"-Fenster und trägt in die Leadliste ein.
+const ANF_FARBE={0:'var(--band-red)',1:'var(--band-orange)',2:'#14B8A6'};
+function hztAngefragtRow(x){
+  const t=x.t, info=x.info;
+  return `<tr class="hzt-row" data-anf="${escA(t.tid)}">`
+    +`<td><input type="checkbox" class="hzt-chk" onclick="event.stopPropagation();event.preventDefault();openNeuObjekt('${escA(t.tid)}')"></td>`
+    +`<td><span class="hzt-dot" style="background:${ANF_FARBE[exposeRang(info)]}"></span><span class="hzt-obj">${esc(t.subj)}</span><div class="hzt-meta">🧐 ${esc(mailSenderName(t))} · noch nicht in der Leadliste</div></td>`
+    +`<td class="stand">${esc(info.stand)}</td>`
+    +`<td class="vor">${esc(info.vorschlag||(info.todo+' – mit ➕ in die Leadliste übernehmen, dann läuft die Frist im Objekt weiter.'))}</td>`
+    +`<td><button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();openNeuObjekt('${escA(t.tid)}')">➕ eintragen</button><br>`
+    +`<button class="iconbtn" style="padding:3px 8px;font-size:11px;margin-top:4px" onclick="event.stopPropagation();openMailZuordnung('${escA(t.tid)}')" title="Wenn das Objekt schon in der Leadliste steht: Mail der Zeile zuordnen statt doppelt anzulegen">🔗 zuordnen</button><br>`
+    +`<a class="link" target="_blank" style="font-size:11px" href="${gmailThreadLink(t.tid)}" onclick="event.stopPropagation()">✉️ Mail</a></td></tr>`;
+}
 function hztNeuRow(t){
   const tage=t.ts?Math.max(0,Math.floor((NOW-t.ts)/MS)):null;
   const alter=tage==null?'aus dem Label „neu"':(tage===0?'heute eingegangen':'eingegangen vor '+tage+' T');
@@ -1539,7 +1710,7 @@ function openNeuObjekt(tid){
     <div class="section-t" style="margin-top:14px">✅ Angefragt → in die Leadliste</div>
     <div class="field"><label>Adresse / Objekt</label><textarea id="noAdr" style="min-height:38px">${esc(t.subj)}</textarea></div>
     <div class="field"><label>Makler / Verkäufer</label><textarea id="noSeller" style="min-height:38px">${esc(sender)}</textarea></div>
-    <div class="field"><label>Notiz (was hast du angefragt?)</label><textarea id="noNote" placeholder="z. B. Exposé & Mietaufstellung angefragt am ${fmtDate(new Date())}"></textarea></div>
+    <div class="field"><label>Notiz (was hast du angefragt?)</label><textarea id="noNote" placeholder="z. B. Exposé & Mietaufstellung angefragt am ${fmtDate(new Date())}">${t._anfTs?'Exposé angefragt am '+fmtDate(new Date(t._anfTs))+' (über Portal)':''}</textarea></div>
     <div id="noErr"></div>
     <div class="erl-actions"><button class="savebtn" id="noAdd">➕ In Leadliste (Vorqualifikation)</button></div>
     <div class="section-t" style="margin-top:18px">🗑️ Nicht interessant</div>
@@ -1568,6 +1739,13 @@ async function saveNeuObjektAdd(tid){
     closeErledigt();
     saveToast('✓ In Leadliste aufgenommen (Vorqualifikation)',1);
     await loadData();              // frisch laden → neues Objekt taucht in der Pipeline auf
+    // 12.09.2026: Die Mail dem NEUEN Objekt fest zuordnen. Ohne das hängt die
+    // Exposé-Frist davon ab, ob die automatische Erkennung Betreff und Adresse
+    // zusammenbringt – bei einem Portal-Betreff wie „Ihre Anfrage" scheitert die.
+    try{
+      const neu=OBJ.filter(x=>x._row).sort((a,b)=>b._row-a._row)[0];
+      if(neu&&neu.key&&normLoose(neu.adresse)===normLoose(adr)) await setMailObj(tid,neu.key);
+    }catch(e){}
   }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='➕ In Leadliste (Vorqualifikation)'; }
 }
 async function saveNeuObjektDrop(tid){
@@ -1956,9 +2134,8 @@ function aufLage(){
   const it=aufItems(), rot=it.filter(i=>i.sev==='rot').length;
   const ohneAngebot=AUF.hw.filter(h=>h.kontaktiert&&!h.rueck).length;
   let bits=[];
-  // Die überfälligen Punkte stehen bereits oben im roten Block – hier nur der Hinweis darauf,
-  // damit die Zahl im Blockkopf und die Zahl in dieser Zeile nicht widersprüchlich wirken.
-  if(rot) bits.push('<b style="color:var(--band-red)">'+rot+' überfällig, oben im roten Block</b>');
+  // 12.09.2026: Die überfälligen Punkte stehen jetzt HIER (rot zuerst), nicht mehr im roten Block oben.
+  if(rot) bits.push('<b style="color:var(--band-red)">'+rot+' überfällig</b>');
   if(ohneAngebot) bits.push('<b>'+ohneAngebot+'</b> '+(ohneAngebot===1?'Angebot steht aus':'Angebote stehen aus'));
   if(k&&k.budget!=null) bits.push('Budget '+euroTxt(k.budget)+' · Angebote '+euroTxt(k.angebote));
   if(k&&k.luecke!=null&&k.luecke>0) bits.push('<b style="color:var(--band-orange)">'+esc(k.lueckeLabel||'Lücke')+': '+euroTxt(k.luecke)+'</b>');
@@ -3875,6 +4052,18 @@ async function loadGmail(){
       const fromName=from.replace(/<[^>]*>/,'').replace(/["']/g,'').trim();
       const ts=h.date?(new Date(h.date)).getTime():null;
       const weOwe=!fe.includes('value.estate.group');
+      // 12.09.2026: Wer hat wann geschrieben? Exposé-Anfragen laufen über die PORTALE,
+      // nie per Mail (Korrektur Nele) – erkennbar ist eine Anfrage nur an den EINGEHENDEN
+      // Mails (Portal-Bestätigung, Makler-Antwort). Unsere eigene Mail im Thread (sentTs,
+      // Entwürfe zählen nicht) bedeutet deshalb: Rückmeldung erfolgt, Punkt erledigt.
+      let sentTs=null, replyTs=null;
+      msgs.forEach(m=>{
+        if((m.labelIds||[]).includes('DRAFT')) return;
+        const mh=mailHeaders(m), mts=mh.date?(new Date(mh.date)).getTime():null;
+        if(!mts) return;
+        if(emailOf(mh.from||'').includes('value.estate.group')){ if(!sentTs||mts>sentTs) sentTs=mts; }
+        else if(!replyTs||mts>replyTs) replyTs=mts;
+      });
       const zuo=mapMailToObject(fe,subj,fromName);
       let obj=zuo.o, unsicher=zuo.unsicher;
       const manuell=mailZuordnungManuell(tid);
@@ -3884,7 +4073,7 @@ async function loadGmail(){
       else if(manuell){ const m=objVonKey(manuell); if(m){ obj=m; unsicher=false; } }
       // „neu"-Suchauftrags-Objekte sind nie Rauschen; sonst no-reply/Newsletter filtern
       const noise=meta.cat==='neu'?false:isMailNoise(fe,subj);
-      out.push({tid,subj,from,fromEmail:fe,ts,weOwe,hasDraft:draftThreads.has(tid),cat:meta.cat,label:meta.labelName,
+      out.push({tid,subj,from,fromEmail:fe,ts,weOwe,sentTs,replyTs,hasDraft:draftThreads.has(tid),cat:meta.cat,label:meta.labelName,
                 objTitel:obj?obj.titel:null,objId:obj?obj._id:null,
                 noise:noise||(privat&&!PRIVAT_ZEIGEN),privat,wasPrivat:privat,
                 unsicher,kandidaten:(zuo.kandidaten||[]).map(x=>({key:x.key,titel:x.titel})),manuell:!!manuell});
@@ -3932,7 +4121,9 @@ function gmailThreadLink(tid){ return 'https://mail.google.com/mail/u/0/#all/'+t
 function gmailLabelLink(name){ return 'https://mail.google.com/mail/u/0/#search/'+encodeURIComponent('label:"'+name+'"'); }
 // Punkt 5: als erledigt markierte „neu"-Threads (in Leadliste aufgenommen ODER als nicht interessant ausgeblendet) nicht mehr zeigen.
 function neuHandled(tid){ return !!META['neu:'+tid+'|status']; }
-function neuThreads(){ return GMAIL.threads.filter(t=>t.cat==='neu'&&!neuHandled(t.tid)); }
+// 12.09.2026: Threads, die als Portal-Anfrage erkannt sind, stehen im Block
+// „Angefragt – zu prüfen" – nicht noch einmal unter „Neue Objekte anfragen".
+function neuThreads(){ const anf=angefragtTids(); return GMAIL.threads.filter(t=>t.cat==='neu'&&!neuHandled(t.tid)&&!anf.has(t.tid)); }
 // Mail-Items (offene Entwürfe + unbeantwortete = für uns gleichbedeutend) als eigene To-dos. Niklas bekommt alle (er macht die Mails), Nele nur ihre Objekt-Mails.
 function userMailItems(){
   // 21.08.2026: Auch der reine Posteingang zaehlt - eine Mail ohne Label soll nicht durchrutschen.
