@@ -139,10 +139,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 .hzt-meta{font-size:11px;color:var(--ink-faint);margin-top:3px}
 .hzt .stand,.hzt .vor{color:var(--ink-soft);line-height:1.45}
 .hzt .vor{font-size:12.5px}
+.hzt .todo{font-weight:700;font-size:12.5px;line-height:1.4}
 .hzt-chk{width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex:0 0 auto}
 .hzt tr.done td{opacity:.5} .hzt tr.done .hzt-obj{text-decoration:line-through}
 .hzt a.link{white-space:nowrap}
 .hz-brieflink{font-size:11px;color:var(--ink-faint);margin-top:14px;display:inline-flex;gap:5px;align-items:center;text-decoration:none}
+/* 12.09.2026 – Umbau „Briefing-Schnitt": EIN Stand-Satz + Frist-Badges statt Signalkette */
+.hz-badges{margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}
+.hz-badge{display:inline-block;font-size:10.5px;font-weight:700;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.hz-badge.rot{background:rgba(224,85,85,.16);color:#C0392B}
+.hz-badge.orange{background:rgba(227,138,43,.16);color:#B45309}
+.hz-badge.gelb{background:rgba(214,164,0,.15);color:#8A6A1F}
+.hz-badge.neutral{background:rgba(40,32,12,.07);color:var(--ink-soft)}
+.hzt tr.hzt-more td{border-top:0;padding:4px 8px 10px}
+.hzt-more button{border:0;background:transparent;color:var(--gold-d);font-weight:700;font-size:12px;cursor:pointer;padding:2px 0}
+.hz-filter{display:inline-flex;gap:4px;margin-left:10px;vertical-align:middle}
+.hz-filter button{border:1px solid var(--glass-brd);background:transparent;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;color:var(--ink-soft);cursor:pointer}
+.hz-filter button.on{background:var(--gold);color:#fff;border-color:var(--gold)}
+#briefingInhalt{overflow-x:auto;font-size:13px;line-height:1.5}
+#briefingInhalt table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
+#briefingInhalt td,#briefingInhalt th{border:1px solid rgba(40,32,12,.12);padding:6px 8px;text-align:left;vertical-align:top}
+#briefingInhalt img{max-width:100%}
 .hz-brieflink:hover{color:var(--ink-soft)}
 
 /* Feste To-dos: nach Block gruppiert statt fünfmal derselbe Blockname */
@@ -421,6 +438,7 @@ body{background:var(--bg1)}
 
   <div class="nav-tabs card">
     <button data-tab="heute" class="active">☀️ Heute</button>
+    <button data-tab="briefing">📩 Briefing</button>
     <button data-tab="pipeline">🏠 Pipeline</button>
     <button data-tab="kontakte">🧑 Kontakte</button>
     <button data-tab="woche">🗓️ Mein Wochenüberblick</button>
@@ -443,6 +461,13 @@ body{background:var(--bg1)}
     <div class="card" id="kontaktCard"><div class="section-t">🌱 Kontaktpflege <small>– Netzwerk & offene Mails</small></div><div id="kontaktMini"></div></div>
     <div class="card" id="neueObjekteCard" style="display:none"><div class="section-t">🔎 Neue Objekte anfragen <small>– aus dem Gmail-Label „neu"</small></div><div id="neueObjekteList"></div></div>
   </div></div>
+
+  <div id="tab-briefing" style="display:none">
+    <div class="card">
+      <div class="section-t">📩 Morning Briefing <small id="briefTabStand"></small></div>
+      <div id="briefingInhalt"></div>
+    </div>
+  </div>
 
   <div id="tab-pipeline" style="display:none">
     <div class="card" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1100,6 +1125,10 @@ function beobachten(){ return activeObjs().filter(o=>o.phase==='Beobachten'); }
 
 /* ============ STATE ============ */
 let currentUser='Niklas', currentTab='heute', focusSnapshot=null, weekView='Niklas', pipeView='ankauf';
+// Stufe 2 (12.09.2026): aufgeklappte Blöcke + Ampel-Filter der Heute-Ansicht (nur für die Sitzung)
+let HZ_MEHR={}, HZ_FILTER='alle';
+function hzMehr(k){ HZ_MEHR[k]=!HZ_MEHR[k]; renderHeuteZuerst(); }
+function hzFilterSet(f){ HZ_FILTER=f; renderHeuteZuerst(); }
 const MC=['🎉 Stark, Niklas! Maklercall erledigt – die wichtigste Weiche des Tages steht. 🚀','🔥 Durch! Genau so füllt man die Pipeline.','💪 Boom – Maklercall gemacht! Das ist die 1 %-Disziplin.','🏆 Erledigt! Wer den wichtigsten Call zuerst macht, dem gehört der Tag.'];
 function mcKey(){ return dkey('MC'); }              // tagesbezogen
 function doneCount(){ let n=0; doneSet.forEach(k=>{ if(!k.startsWith('MC|') && k.endsWith('|'+TODAY_STR)) n++; }); return n; }
@@ -1260,25 +1289,50 @@ function renderFocus(){
     return `<div class="focus-item${d?' done':''}"><span>${d?'✅':'⭕'}</span><span style="flex:1">${esc(f.label)}</span>${f.gmail?`<a class="link" target="_blank" href="${gmailThreadLink(f.gmail)}">öffnen</a>`:''}<button data-id="${f.id}">${d?'erledigt':'✓ erledigt'}</button></div>`; }).join(''):'<div class="empty">Keine offenen Aufgaben 🎯</div>';
   $('focusItems').querySelectorAll('button').forEach(b=>b.onclick=()=>handleErledigtClick(b.dataset.id));
 }
-// „Stand" = aktueller Zustand (Leadliste-Status J), plus Mail-Hinweis. To-do = die eine nächste Handlung.
-function hzStand(o){
-  const bits=[o.status||phaseLabelShort(o.phase)];
-  // 12.09.2026: Exposé-Lage (angefragt / Antwort da / Rückmeldefrist) ersetzt den generischen Mail-Hinweis.
-  const ex=angefragtInfo(o);
-  if(ex) bits.push(ex.stand);
-  if(o.mail&&o.mail.state==='draft') bits.push('✉️ Entwurf offen');
-  else if(!ex&&o.mail&&o.mail.state==='open') bits.push('✉️ Antwort offen'+(o.mail.ageDays?' ('+o.mail.ageDays+' T)':''));
-  // Punkt 4: Telefon-Stand sichtbar machen – ein geführtes Telefonat ist genauso ein Stand wie eine Mail.
-  // Punkt 3: bei Wiedervorlage aus „Beobachten" den Termin und seine Herkunft zeigen
-  if(o.phase==='Beobachten'){ const d=wvDateOf(o); if(d){ const du=daysUntil(d);
-    bits.push('👁️ Wiedervorlage '+fmtDate(d)+(du<0?' (seit '+(-du)+' T fällig)':du===0?' (heute)':'')+' · '+wvQuelle(o)); } }
-  const k=kanalOf(o);
-  const telT=o.anruf?daysSince(o.anruf):null;
-  if(k==='tel') bits.push(telT==null?'📞 noch nicht telefoniert':(telT===0?'📞 heute telefoniert':'📞 zuletzt telefoniert vor '+telT+' T'));
-  // Eskalations-Hinweis nur, wenn er etwas Neues sagt (sonst stünde „vor 16 T" zweimal in der Zeile).
-  if(o._eskaliert>=STALE_YELLOW && o._eskaliert!==telT) bits.push('⚠ seit '+o._eskaliert+' T ohne Bewegung');
-  return bits.filter(Boolean).join(' · ');
+/* „Stand" im Briefing-Schnitt (12.09.2026, Wunsch Nele): EIN kuratierter Satz statt
+   einer Kette aus bis zu sechs Signalen. Rangfolge: eigene Leadliste-Notiz vom
+   Briefing-Tag oder jünger (sticht alles – sie ist der neuere Stand) → Stand aus dem
+   Morning Briefing → jüngste Leadliste-Notiz → Phasen-Standard. Fristen, Mails und
+   Stillstand werden farbige BADGES unter dem Satz, keine Textkette mehr.            */
+function letzteNotizVon(o){
+  const zeilen=String(o.nextStep||'').split('\n').map(z=>z.trim()).filter(Boolean);
+  for(let i=zeilen.length-1;i>=0;i--){
+    const d=parseDate(zeilen[i]);
+    if(d&&daysUntil(d)<=0) return {date:d,text:zeilen[i].replace(/^\[\d{1,2}\.\d{1,2}\.\d{2,4}\]\s*/,'').trim()};
+  }
+  return null;
 }
+function kurz(s,n){ s=String(s||'').trim(); return s.length>n?s.slice(0,n-1)+'…':s; }
+function hzStandSatz(o){
+  const note=letzteNotizVon(o);
+  const bd=GMAIL.briefingDate||null;
+  const bi=briefingInfo(o);
+  if(note&&bd&&+note.date>=new Date(bd.getFullYear(),bd.getMonth(),bd.getDate()).getTime()) return kurz(note.text,150);
+  if(bi&&bi.stand&&bi.stand.length>3) return kurz(bi.stand,150);
+  if(note) return kurz(note.text,150);
+  return o.status||phaseLabelShort(o.phase);
+}
+function hzBadges(o){
+  const b=[];
+  const ex=angefragtInfo(o);
+  if(ex){
+    if(ex.typ==='pruefen') b.push({t:'🧐 Rückmeldung bis '+fmtDate(ex.frist)+(ex.rest<0?' · '+(-ex.rest)+' T drüber':ex.rest===0?' · heute!':' · noch '+ex.rest+' T'),c:ex.rest<=2?'rot':'orange'});
+    else if(ex.typ==='nachfassen') b.push({t:'🔎 seit '+ex.seit+' T ohne Antwort',c:'rot'});
+    else b.push({t:'🔎 angefragt '+fmtDate(ex.anf)+' · Antwort steht aus',c:'neutral'});
+  }
+  if(o.mail&&o.mail.state==='draft') b.push({t:'✏️ Entwurf offen',c:'gelb'});
+  else if(!ex&&o.mail&&o.mail.state==='open') b.push({t:'✉️ Antwort offen'+(o.mail.ageDays?' ('+o.mail.ageDays+' T)':''),c:'orange'});
+  const f=o.fael||{state:'none'};
+  if(f.state==='overdue') b.push({t:'⏰ '+f.txt,c:'rot'});
+  else if(f.state==='today') b.push({t:'⏰ Wiedervorlage heute',c:'orange'});
+  else if(f.state==='soon') b.push({t:'⏰ '+f.txt,c:'gelb'});
+  if(o.phase==='Beobachten'&&f.state==='none'){ const d=wvDateOf(o); if(d){ const du=daysUntil(d);
+    b.push({t:'👁️ Wiedervorlage '+fmtDate(d)+(du<0?' (seit '+(-du)+' T)':du===0?' (heute)':''),c:du<=0?'orange':'neutral'}); } }
+  if(!ex&&o._eskaliert>=STALE_RED) b.push({t:'⚠ seit '+o._eskaliert+' T ohne Bewegung',c:'rot'});
+  else if(!ex&&o._eskaliert>=STALE_YELLOW) b.push({t:'⚠ '+o._eskaliert+' T still',c:'gelb'});
+  return b;
+}
+function hzBadgesHtml(list){ return list.length?'<div class="hz-badges">'+list.map(x=>'<span class="hz-badge '+x.c+'">'+esc(x.t)+'</span>').join('')+'</div>':''; }
 const HZ_TODO={Neu:'Sichten',Vorqualifikation:'Vorqualifizieren & Daten sammeln',Kalkulieren:'Kalkulieren & bewerten','Angebot vorbereiten':'Angebot vorbereiten','Angebot raus':'Nachfassen',Verhandlung:'Verhandeln',Kaufvertrag:'Kaufvertrag/Notar anstoßen',Beobachten:'Wiedervorlage – reaktivieren oder vertagen'};
 function hzTodo(o){
   const k=kanalOf(o);
@@ -1320,20 +1374,44 @@ function kanalAusText(txt){
   if(/🧮|\bintern\b|kalkul|bewert|pr[üu]fen|unterlagen sichten/.test(t)) return 'intern';
   return '';
 }
+/* 12.09.2026: Vorher las der Parser feste Spaltenpositionen (Zelle 1 = To-do, längste
+   Zelle = Vorschlag). Das Briefing hat aber je Abschnitt andere Spalten (mal Kanal an
+   Position 2, mal Ampel an Position 1) – dabei landete z. B. „E-Mail" als To-do, und
+   der kuratierte STAND ging komplett verloren. Jetzt werden die Spalten über die
+   KOPFZEILE der jeweiligen Tabelle erkannt; der alte Weg bleibt als Rückfall.        */
 function briefingVorschlagMap(){
   if(!GMAIL.briefingHtml) return {};        // noch kein Briefing geladen → nichts cachen
   if(GMAIL._vmap) return GMAIL._vmap;
   const map={};
   try{
     const doc=new DOMParser().parseFromString(sanitizeBriefing(GMAIL.briefingHtml),'text/html');
-    doc.querySelectorAll('table tr').forEach(tr=>{
-      const cells=[...tr.children].filter(c=>c.tagName==='TD').map(c=>(c.textContent||'').trim());
-      if(cells.length<3) return;
-      const key=normLoose(cells[0]); if(!key) return;
-      const vor=cells.slice(2).filter(t=>t.length>3).sort((a,b)=>b.length-a.length)[0];
-      const todo=cells[1]||'';
-      const kanal=kanalAusText(cells.join(' '));
-      if(vor||todo) map[key]={vor:vor||'',todo,kanal};
+    doc.querySelectorAll('table').forEach(tab=>{
+      const rows=[...tab.querySelectorAll('tr')];
+      // Kopfzeile finden: erste Zeile mit th-Zellen, sonst die erste Zeile.
+      const headTr=rows.find(r=>r.querySelector('th'))||rows[0]; if(!headTr) return;
+      const heads=[...headTr.children].map(c=>norm(c.textContent||''));
+      const idx=w=>heads.findIndex(h=>h.includes(w));
+      let iKey=idx('objekt'); if(iKey<0) iKey=idx('absender'); if(iKey<0) iKey=idx('kontakt');
+      const iStand=idx('stand'), iTodo=idx('to-do')>=0?idx('to-do'):idx('todo'), iVor=idx('vorschlag');
+      rows.forEach(tr=>{
+        if(tr===headTr) return;
+        const cells=[...tr.children].filter(c=>c.tagName==='TD').map(c=>(c.textContent||'').trim());
+        if(cells.length<3) return;
+        let key,stand='',todo='',vor='';
+        if(iKey>=0&&(iStand>=0||iTodo>=0||iVor>=0)){
+          key=normLoose(cells[iKey]||'');
+          stand=iStand>=0?(cells[iStand]||''):'';
+          todo=iTodo>=0?(cells[iTodo]||''):'';
+          vor=iVor>=0?(cells[iVor]||''):'';
+        } else {  // Rückfall: alte Heuristik für Tabellen ohne erkennbare Kopfzeile
+          key=normLoose(cells[0]||'');
+          vor=cells.slice(2).filter(t=>t.length>3).sort((a,b)=>b.length-a.length)[0]||'';
+          todo=cells[1]||'';
+        }
+        if(!key) return;
+        const kanal=kanalAusText(cells.join(' '));
+        if(stand||vor||todo){ if(!map[key]||stand) map[key]={vor,todo,kanal,stand}; }
+      });
     });
   }catch(e){}
   GMAIL._vmap=map; return map;
@@ -1384,8 +1462,9 @@ function hztRow(o){
   const d=isDone(o);
   return `<tr class="hzt-row${d?' done':''}" data-id="${o._id}">`
     +`<td><input type="checkbox" class="hzt-chk"${d?' checked':''} onclick="event.stopPropagation();event.preventDefault();handleErledigtClick('${o._id}')"></td>`
-    +`<td><span class="hzt-dot" style="background:${bandColor(o.score)}"></span><span class="hzt-obj">${esc(o.titel)}</span><div class="hzt-meta">${esc(phaseLabelShort(o.phase))} · <span class="owner ${effOwner(o)}">${effOwner(o)}</span></div></td>`
-    +`<td class="stand">${esc(hzStand(o))}</td>`
+    +`<td><span class="hzt-dot" style="background:${bandColor(o.score)}"></span><span class="hzt-obj">${esc(o.titel)}</span><div class="hzt-meta">${o.seller?esc(kurz(o.seller,26))+' · ':''}${esc(phaseLabelShort(o.phase))} · <span class="owner ${effOwner(o)}">${effOwner(o)}</span></div></td>`
+    +`<td class="stand">${esc(hzStandSatz(o))}${hzBadgesHtml(hzBadges(o))}</td>`
+    +`<td class="todo">${esc(hzTodo(o))}</td>`
     +`<td class="vor">${esc(hzVorschlag(o))}</td>`
     +`<td>${hzMailLink(o)}</td></tr>`;
 }
@@ -1433,7 +1512,9 @@ function renderHeuteZuerst(){
   // Lage-Zeile (wie im Briefing)
   const red=objs.filter(o=>o.score>=100).length, mailWait=objs.filter(o=>o.mail).length+(currentUser==='Nele'?mailOnly.length:0);
   const aufN=aufItems().length;
-  h+=`<div class="hz-lage">Lage: <b>${objs.length}</b> ${objs.length===1?'offener Vorgang':'offene Vorgänge'}${red?`, davon <b style="color:var(--band-red)">${red} dringend</b>`:''}${aufN?` · <b>${aufN}</b> ${aufN===1?'Punkt':'Punkte'} Aufwertung`:''}${mailWait?` · <b>${mailWait}</b> ${mailWait===1?'Mail wartet':'Mails warten'}`:''} · gefiltert für <b>${currentUser}</b>.</div>`;
+  h+=`<div class="hz-lage">Lage: <b>${objs.length}</b> ${objs.length===1?'offener Vorgang':'offene Vorgänge'}${red?`, davon <b style="color:var(--band-red)">${red} dringend</b>`:''}${aufN?` · <b>${aufN}</b> ${aufN===1?'Punkt':'Punkte'} Aufwertung`:''}${mailWait?` · <b>${mailWait}</b> ${mailWait===1?'Mail wartet':'Mails warten'}`:''} · gefiltert für <b>${currentUser}</b>.`
+    +`<span class="hz-filter"><button class="${HZ_FILTER==='alle'?'on':''}" onclick="hzFilterSet('alle')">Alles</button>`
+    +`<button class="${HZ_FILTER==='dringend'?'on':''}" onclick="hzFilterSet('dringend')">🔴 nur Dringendes</button></span></div>`;
   // (21.08.2026 entfernt) Der Hinweisstreifen „x neue Objekte aus Suchaufträgen" sagte dasselbe
   // wie der Block „Neue Objekte anfragen" weiter unten – doppelt gemoppelt.
   if(hasCalScope()&&CAL.state==='ready'){ const c=dayCapacity(); if(c<objs.length) h+=`<div class="wt-hint" style="margin:0 0 8px">🗓️ Nur ~${freeHrsTxt()} Std frei heute – realistisch schaffst du die Top ${c}. Der Rest wartet geordnet.</div>`; }
@@ -1469,77 +1550,90 @@ function renderHeuteZuerst(){
   const byPhase=(a,b)=>(FUNNEL.indexOf(a.phase)-FUNNEL.indexOf(b.phase))||(b.score-a.score);
   deals.sort((a,b)=>((b.score>=100)-(a.score>=100))||byPhase(a,b)); beob.sort(byScore);
   angefragt.sort((a,b)=>(exposeRang(a.ex)-exposeRang(b.ex))||(b.o.score-a.o.score));
-  const kopf=(farbe,txt,n,hinweis)=>`<tr class="hzt-cat"><td colspan="5"><span class="hz-cat" style="color:${farbe}">${txt} <small style="color:var(--ink-faint);font-weight:600">(${n})${hinweis?' – '+hinweis:''}</small></span></td></tr>`;
+  const kopf=(farbe,txt,n,hinweis)=>`<tr class="hzt-cat"><td colspan="6"><span class="hz-cat" style="color:${farbe}">${txt} <small style="color:var(--ink-faint);font-weight:600">(${n})${hinweis?' – '+hinweis:''}</small></span></td></tr>`;
+  /* Stufe 2 (12.09.2026): Je Block nur die Top 5 – der Rest hinter „x weitere anzeigen".
+     Der Filter „nur Dringendes" blendet Grünes und die Rand-Blöcke ganz aus. */
+  const MAX_ZEILEN=5;
+  const blockRows=(rows,key)=>{
+    const offen=!!HZ_MEHR[key];
+    let out=(offen?rows:rows.slice(0,MAX_ZEILEN)).join('');
+    if(rows.length>MAX_ZEILEN) out+=`<tr class="hzt-more"><td></td><td colspan="5"><button onclick="hzMehr('${key}')">${offen?'▲ weniger anzeigen':'▼ '+(rows.length-MAX_ZEILEN)+' weitere anzeigen'}</button></td></tr>`;
+    return out;
+  };
+  const nurDringend=HZ_FILTER==='dringend';
+  const fAng=nurDringend?angefragt.filter(x=>exposeRang(x.ex)<=1):angefragt;
+  const fAnfM=nurDringend?anfMails.filter(x=>exposeRang(x.info)<=1):anfMails;
+  const fDeals=nurDringend?deals.filter(o=>o.score>=60):deals;
+  const fAuf=nurDringend?aufAlle.filter(i=>i.sev!=='bald'):aufAlle;
   let body='';
 
   // 1 – Angefragt – zu prüfen: angefragte Exposés (Leadliste-Vermerk + reine Mail-Anfragen).
-  // Rot = Rückmeldefrist gerissen oder Makler 7 T still · Orange = Exposé da, prüfen · Teal = wartet.
-  if(angefragt.length||anfMails.length){
-    body+=kopf('#0D9488','🧐 Angefragt – zu prüfen',angefragt.length+anfMails.length,'Exposé da → prüfen & binnen '+EXPOSE_FRIST+' T antworten · '+EXPOSE_FRIST+' T still → nachfassen · ➕ trägt in die Leadliste ein');
-    body+=angefragt.map(x=>hztRow(x.o)).join('')+anfMails.map(hztAngefragtRow).join('');
+  if(fAng.length||fAnfM.length){
+    body+=kopf('#0D9488','🧐 Angefragt – zu prüfen',fAng.length+fAnfM.length,'Exposé da → prüfen & binnen '+EXPOSE_FRIST+' T antworten · '+EXPOSE_FRIST+' T still → nachfassen · ➕ trägt in die Leadliste ein');
+    body+=blockRows(fAng.map(x=>hztRow(x.o)).concat(fAnfM.map(hztAngefragtRow)),'ang');
   }
   // 2 – Deals in Arbeit: Kalkulation bis Kaufvertrag; Rotes steht oben, die Ampel zeigt die Dringlichkeit
-  if(deals.length){
-    body+=kopf('var(--band-orange)','💰 Deals in Arbeit',deals.length,'alles aus der Leadliste – Ampel vorn zeigt, was dringend ist');
-    body+=deals.map(hztRow).join('');
+  if(fDeals.length){
+    body+=kopf('var(--band-orange)','💰 Deals in Arbeit',fDeals.length,'alles aus der Leadliste – Ampel vorn zeigt, was dringend ist');
+    body+=blockRows(fDeals.map(hztRow),'deals');
   }
-  // 3 – Aufwertung: ALLE Aufgaben aus Projektzeitplan, Handwerkern und Terminvorschlägen –
-  // seit 12.09.2026 auch die überfälligen (rot zuerst), die vorher oben im roten Block standen.
-  if(aufAlle.length){
+  // 3 – Aufwertung: ALLE Aufgaben aus Projektzeitplan, Handwerkern und Terminvorschlägen (rot zuerst)
+  if(fAuf.length){
     const aufTitel=AUFS.filter(a=>a.state==='ready').length>1
       ? '🏗️ Aufwertung <small style="font-weight:600">('+AUFS.filter(a=>a.state==='ready').length+' Objekte)</small>'
       : '🏗️ Aufwertung '+esc(aufObjektName());
-    body+=kopf('#B45309',aufTitel,aufAlle.length,aufLage());
-    body+=aufAlle.map(hztAufRow).join('');
-  } else if(AUF.state==='error'){
+    body+=kopf('#B45309',aufTitel,fAuf.length,aufLage());
+    body+=blockRows(fAuf.map(hztAufRow),'auf');
+  } else if(!nurDringend&&AUF.state==='error'){
     body+=kopf('var(--ink-faint)','🏗️ Aufwertung',0,'Plan nicht lesbar: '+esc(AUF.error||''));
   }
-  // 3b – Verkaufs-Wächter (Reservierung ohne Notartermin, Kaufpreis nicht eingegangen):
-  // standen früher im roten Block, jetzt eigene Kategorie – die Ampel zeigt den Ernst.
+  // 3b – Verkaufs-Wächter (Reservierung ohne Notartermin, Kaufpreis nicht eingegangen)
   if(vkOffen.length){
     body+=kopf('var(--band-red)','💰 Verkauf',vkOffen.length,'Notartermin, Geldeingang & Co. – nichts davon darf liegen bleiben');
-    body+=vkOffen.map(hztAufRow).join('');
+    body+=blockRows(vkOffen.map(hztAufRow),'vk');
   }
-  // 4 – neue Objekte anfragen: NUR bei Nele, und nur was noch nicht in der Leadliste steht
+  // 4 – neue Objekte anfragen: NUR bei Nele, nicht im Dringend-Filter
   const istNele=currentUser==='Nele';
-  const neuMails=(istNele&&gmailReady)?neuThreads().slice().sort((a,b)=>(b.ts||0)-(a.ts||0)):[];
-  const mailsHier=istNele?mailOnly:[];
+  const neuMails=(istNele&&gmailReady&&!nurDringend)?neuThreads().slice().sort((a,b)=>(b.ts||0)-(a.ts||0)):[];
+  const mailsHier=(istNele&&!nurDringend)?mailOnly:[];
   if(neuMails.length||mailsHier.length){
     const hinweis=[neuMails.length?neuMails.length+' aus dem Label „neu"':'',
                    mailsHier.length?mailsHier.length+(mailsHier.length===1?' Mail ohne Objekt':' Mails ohne Objekt'):''].filter(Boolean).join(' · ');
     body+=kopf('#14B8A6','🔎 Neue Objekte anfragen',neuMails.length+mailsHier.length,hinweis);
-    body+=neuMails.map(hztNeuRow).join('')+mailsHier.map(hztMailOnlyRow).join('');
+    body+=blockRows(neuMails.map(hztNeuRow).concat(mailsHier.map(hztMailOnlyRow)),'neu');
     const pz=privatZahl();
-    if(pz) body+=`<tr class="hzt-row"><td></td><td colspan="4" style="color:var(--ink-faint);font-size:12px">`
+    if(pz) body+=`<tr class="hzt-row"><td></td><td colspan="5" style="color:var(--ink-faint);font-size:12px">`
       +`${pz} ${pz===1?'Mail ist':'Mails sind'} als privat ausgeblendet `
       +`<button class="iconbtn" id="privatBtn" style="padding:2px 8px;font-size:11px;margin-left:6px">${PRIVAT_ZEIGEN?'wieder ausblenden':'anzeigen'}</button></td></tr>`;
   }
-  // 5 – Beobachten: wichtig, aber nie dringender als ein laufender Vorgang
-  if(beob.length){
+  // 5 – Beobachten: nicht im Dringend-Filter
+  if(!nurDringend&&beob.length){
     body+=kopf('var(--ink-faint)','👁️ Beobachten',beob.length,'Wiedervorlage erreicht – reaktivieren oder vertagen');
-    body+=beob.map(hztRow).join('');
+    body+=blockRows(beob.map(hztRow),'beob');
   }
-  // 6 – Absagen
+  // 6 – Absagen (bleiben auch im Dringend-Filter – sie sind eine offene Handlung)
   const abs=absagen();
   if(abs.length){
     body+=kopf('var(--band-orange)','📤 Absagen offen',abs.length,'anklicken, vermerken → „Beobachten"');
-    body+=abs.map(hztAbsageRow).join('');
+    body+=blockRows(abs.map(hztAbsageRow),'abs');
   }
-  // 7 – mit Termin geparkt
+  // 7 – mit Termin geparkt: standardmäßig EINGEKLAPPT (Stufe 2)
   const snz=snoozedTasks();
-  if(snz.length){
+  if(!nurDringend&&snz.length){
     body+=kopf('var(--ink-faint)','⏳ Wiedervorlage geplant',snz.length,'taucht am Termin automatisch wieder oben auf');
-    body+=snz.map(hztSnoozeRow).join('');
+    if(HZ_MEHR['snz']) body+=snz.map(hztSnoozeRow).join('');
+    body+=`<tr class="hzt-more"><td></td><td colspan="5"><button onclick="hzMehr('snz')">${HZ_MEHR['snz']?'▲ einklappen':'▼ '+snz.length+' geparkte anzeigen'}</button></td></tr>`;
   }
-  // 8 – heute erledigt (Objekte und Aufwertungspunkte)
+  // 8 – heute erledigt: standardmäßig EINGEKLAPPT (Stufe 2)
   const aufDoneList=aufItemsDone().concat(vkErledigt);
-  if(done.length||aufDoneList.length){
+  if(!nurDringend&&(done.length||aufDoneList.length)){
     body+=kopf('var(--green)','✓ Heute erledigt',done.length+aufDoneList.length,'');
-    body+=done.map(hztRow).join('')+aufDoneList.map(hztAufRow).join('');
+    if(HZ_MEHR['done']) body+=done.map(hztRow).join('')+aufDoneList.map(hztAufRow).join('');
+    body+=`<tr class="hzt-more"><td></td><td colspan="5"><button onclick="hzMehr('done')">${HZ_MEHR['done']?'▲ einklappen':'▼ Erledigtes anzeigen'}</button></td></tr>`;
   }
   if(body){
-    h+=`<div class="hzt-wrap"><table class="hzt"><colgroup><col style="width:30px"><col style="width:21%"><col style="width:20%"><col style="width:17%"><col><col style="width:104px"></colgroup>`
-      +`<thead><tr><th style="width:34px"></th><th style="width:24%">Objekt</th><th style="width:19%">Stand</th><th>Vorschlag</th><th style="width:15%">Aktion</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    h+=`<div class="hzt-wrap"><table class="hzt"><colgroup><col style="width:30px"><col style="width:20%"><col style="width:25%"><col style="width:13%"><col><col style="width:96px"></colgroup>`
+      +`<thead><tr><th></th><th>Objekt</th><th>Stand</th><th>To-do</th><th>Vorschlag</th><th>Aktion</th></tr></thead><tbody>${body}</tbody></table></div>`;
   } else h+='<div class="empty">Nichts offen – stark! 🎯</div>';
   if(GMAIL.briefingHtml){
     const bd=GMAIL.briefingDate, alt=bd?daysSince(bd):null;
@@ -1651,7 +1745,8 @@ function hztAngefragtRow(x){
     +`<td><input type="checkbox" class="hzt-chk" onclick="event.stopPropagation();event.preventDefault();openNeuObjekt('${escA(t.tid)}')"></td>`
     +`<td><span class="hzt-dot" style="background:${ANF_FARBE[exposeRang(info)]}"></span><span class="hzt-obj">${esc(t.subj)}</span><div class="hzt-meta">🧐 ${esc(mailSenderName(t))} · noch nicht in der Leadliste</div></td>`
     +`<td class="stand">${esc(info.stand)}</td>`
-    +`<td class="vor">${esc(info.vorschlag||(info.todo+' – mit ➕ in die Leadliste übernehmen, dann läuft die Frist im Objekt weiter.'))}</td>`
+    +`<td class="todo">${esc(info.todo)}</td>`
+    +`<td class="vor">${esc(info.vorschlag||'Mit ➕ in die Leadliste übernehmen – dann läuft die Frist im Objekt weiter.')}</td>`
     +`<td><button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();openNeuObjekt('${escA(t.tid)}')">➕ eintragen</button><br>`
     +`<button class="iconbtn" style="padding:3px 8px;font-size:11px;margin-top:4px" onclick="event.stopPropagation();openMailZuordnung('${escA(t.tid)}')" title="Wenn das Objekt schon in der Leadliste steht: Mail der Zeile zuordnen statt doppelt anzulegen">🔗 zuordnen</button><br>`
     +`<a class="link" target="_blank" style="font-size:11px" href="${gmailThreadLink(t.tid)}" onclick="event.stopPropagation()">✉️ Mail</a></td></tr>`;
@@ -2558,6 +2653,7 @@ function hztAufRow(it){
     +`<td><input type="checkbox" class="hzt-chk"${d?' checked':''} onclick="event.stopPropagation();event.preventDefault();handleAufErledigtClick('${it.id}')"></td>`
     +`<td><span class="hzt-dot" style="background:${AUF_SEV_COLOR[it.sev]}"></span><span class="hzt-obj">${esc(it.titel)}</span><div class="hzt-meta">${it.icon||'🏗️'} ${esc(it.meta||'Aufwertung')}</div></td>`
     +`<td class="stand">${esc(it.stand)}</td>`
+    +`<td class="todo">${esc(it.todo||'')}</td>`
     +`<td class="vor">${esc(it.vorschlag)}</td>`
     +`<td>${aufAktion(it)}</td></tr>`;
 }
@@ -4870,11 +4966,28 @@ async function saveKontaktNote(id){
     closeDetail();
   }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='In CRM ergänzen'; }
 }
-function switchTab(t){ currentTab=t; ['heute','pipeline','kontakte','woche'].forEach(x=>$('tab-'+x).style.display=x===t?'':'none'); document.querySelectorAll('.nav-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t)); renderAll(); }
+function switchTab(t){ currentTab=t; ['heute','briefing','pipeline','kontakte','woche'].forEach(x=>$('tab-'+x).style.display=x===t?'':'none'); document.querySelectorAll('.nav-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t)); renderAll(); }
+// Stufe 3 (12.09.2026): Das Morning Briefing von 5:00 als eigener Reiter – es wird ohnehin
+// geladen (Gmail-Entwurf), vorher gab es nur den kleinen Link unten in „Heute zuerst".
+function renderBriefingTab(){
+  const el=$('briefingInhalt'), st=$('briefTabStand'); if(!el) return;
+  if(!(hasGmailScope()&&GMAIL.state==='ready')){
+    st.textContent=''; el.innerHTML='<div class="empty">Gmail noch nicht verbunden bzw. noch am Laden – gleich nochmal öffnen.</div>'; return;
+  }
+  if(!GMAIL.briefingHtml){
+    st.textContent='';
+    el.innerHTML='<div class="empty">Kein frisches Briefing gefunden. Der 5:00-Lauf legt es als Gmail-Entwurf an – <a class="link" target="_blank" href="https://mail.google.com/mail/u/0/#drafts">Gmail-Entwürfe öffnen</a>.</div>';
+    return;
+  }
+  const bd=GMAIL.briefingDate, alt=bd?daysSince(bd):null;
+  st.textContent='– '+(bd?(alt===0?'von heute':alt===1?'von gestern':'von vor '+alt+' Tagen')+', '+fmtDate(bd):'')+' · Quelle: Gmail-Entwurf';
+  el.innerHTML=sanitizeBriefing(GMAIL.briefingHtml);
+}
 function renderAll(){
   const _mt=$('moinTitle'); if(_mt) _mt.textContent='Moin, '+currentUser+' 👋';
   document.querySelectorAll('#userswitch button').forEach(b=>b.classList.toggle('active',b.dataset.u===currentUser));   // Gold-Knopf folgt immer dem aktiven Nutzer
   if(currentTab==='heute'){ renderGreet(); renderDayStrip(); renderCalendar(); renderKpis(); renderMaklercall(); renderWochenTodos(); renderFocus(); renderHeuteZuerst(); renderKontaktMini(); renderNeueObjekte(); }
+  if(currentTab==='briefing') renderBriefingTab();
   if(currentTab==='pipeline') renderBoard();
   if(currentTab==='kontakte'){ renderPartner(); renderKontakte(); }
   if(currentTab==='woche'){ renderWeek(); renderTrack(); }
