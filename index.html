@@ -1575,6 +1575,9 @@ function renderHeuteZuerst(){
     if(fa){ angefragt.push({o,ex:fa.zustand}); return; }
     const ex=angefragtInfo(o);
     if(ex){ angefragt.push({o,ex}); return; }
+    // 12.09.2026 (Regel Nele): JEDES Objekt in Vorqualifikation gehört in „Angefragt –
+    // zu prüfen", bis es auf „Kalkulieren" rückt – auch ohne Anfrage-Vermerk oder Mail.
+    if(o.phase==='Vorqualifikation'){ angefragt.push({o,ex:null}); return; }
     deals.push(o);
   });
   const anfMails=gmailReady?angefragtMailItems():[];
@@ -1586,7 +1589,9 @@ function renderHeuteZuerst(){
   // Notiz „abgesagt/nicht sinnvoll" sagt, stehen HINTER den frischen (Korrektur Nele).
   const byPhase=(a,b)=>(FUNNEL.indexOf(a.phase)-FUNNEL.indexOf(b.phase))||(b.score-a.score);
   deals.sort((a,b)=>((notizNegativ(a)?1:0)-(notizNegativ(b)?1:0))||((b.score>=100)-(a.score>=100))||byPhase(a,b)); beob.sort(byScore);
-  angefragt.sort((a,b)=>(exposeRang(a.ex)-exposeRang(b.ex))||(b.o.score-a.o.score));
+  // Rangfolge im Angefragt-Block: überfällig/nachfassen → prüfen → wartet → Vorqualifikation ohne Frist-Info
+  const angRang=x=>x.ex?exposeRang(x.ex):3;
+  angefragt.sort((a,b)=>(angRang(a)-angRang(b))||(b.o.score-a.o.score));
   const kopf=(farbe,txt,n,hinweis)=>`<tr class="hzt-cat"><td colspan="6"><span class="hz-cat" style="color:${farbe}">${txt} <small style="color:var(--ink-faint);font-weight:600">(${n})${hinweis?' – '+hinweis:''}</small></span></td></tr>`;
   /* Stufe 2 (12.09.2026): Je Block nur die Top 5 – der Rest hinter „x weitere anzeigen".
      Der Filter „nur Dringendes" blendet Grünes und die Rand-Blöcke ganz aus. */
@@ -1598,7 +1603,7 @@ function renderHeuteZuerst(){
     return out;
   };
   const nurDringend=HZ_FILTER==='dringend';
-  const fAng=nurDringend?angefragt.filter(x=>exposeRang(x.ex)<=1):angefragt;
+  const fAng=nurDringend?angefragt.filter(x=>x.ex?exposeRang(x.ex)<=1:x.o.score>=60):angefragt;
   const fAnfM=nurDringend?anfMails.filter(x=>exposeRang(x.info)<=1):anfMails;
   const fDeals=nurDringend?deals.filter(o=>o.score>=60):deals;
   const fAuf=nurDringend?aufAlle.filter(i=>i.sev!=='bald'):aufAlle;
