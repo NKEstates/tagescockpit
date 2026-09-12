@@ -599,6 +599,13 @@ async function persistStateSilent(key,feld,wert){
 
 /* ============ HELPERS ============ */
 function esc(s){ return String(s==null?'':s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+/* 23.08.2026: esc() schützt < > & — NICHT das Apostroph. Wo ein Wert in einen
+   onclick-Befehl geschrieben wird, steht er aber zwischen einfachen Anführungs-
+   zeichen: Eine Adresse wie „St. Jürgen's Hof" beendet dort die Zeichenkette und
+   macht die Schaltfläche wirkungslos — ohne Fehlermeldung, sie tut einfach nichts.
+   escA() ist für genau diese Stellen. Neuer Code sollte stattdessen data-Attribute
+   und addEventListener benutzen; escA ist die Absicherung für den Bestand.      */
+function escA(s){ return esc(s).replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
 function parseDate(s){ if(!s) return null; const m=String(s).match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/); if(!m) return null; let y=+m[3]; if(y<100)y+=2000; return new Date(y,(+m[2])-1,+m[1]); }
 // Alle Datumsangaben aus einem Text (z. B. mehrere „[TT.MM.JJJJ] …"-Notizen) ziehen.
 function parseAllDates(s){ const out=[]; const re=/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/g; let m; while((m=re.exec(String(s||'')))){ let y=+m[3]; if(y<100)y+=2000; out.push(new Date(y,(+m[2])-1,+m[1])); } return out; }
@@ -1272,7 +1279,7 @@ function hztMailOnlyRow(m){
     +`<td>${m.hasDraft?'Entwurf prüfen & senden':'Antworten'}</td>`
     +`<td class="vor">—</td>`
     +`<td><a class="link" target="_blank" href="${gmailThreadLink(m.tid)}" onclick="event.stopPropagation()">${m.hasDraft?'✏️ senden':'✉️ schreiben'}</a>`
-    +`<br><button class="iconbtn" style="padding:3px 8px;font-size:11px;margin-top:4px" onclick="event.stopPropagation();openMailZuordnung('${esc(m.tid)}')">🔗 zuordnen</button></td></tr>`;
+    +`<br><button class="iconbtn" style="padding:3px 8px;font-size:11px;margin-top:4px" onclick="event.stopPropagation();openMailZuordnung('${escA(m.tid)}')">🔗 zuordnen</button></td></tr>`;
 }
 function renderHeuteZuerst(){
   const objs=openTasks(), done=doneObjs();   // alle EIGENEN offenen Vorgänge, nach Dringlichkeit sortiert
@@ -1348,6 +1355,10 @@ function renderHeuteZuerst(){
                    mailsHier.length?mailsHier.length+(mailsHier.length===1?' Mail ohne Objekt':' Mails ohne Objekt'):''].filter(Boolean).join(' · ');
     body+=kopf('#14B8A6','🔎 Neue Objekte anfragen',neuMails.length+mailsHier.length,hinweis);
     body+=neuMails.map(hztNeuRow).join('')+mailsHier.map(hztMailOnlyRow).join('');
+    const pz=privatZahl();
+    if(pz) body+=`<tr class="hzt-row"><td></td><td colspan="4" style="color:var(--ink-faint);font-size:12px">`
+      +`${pz} ${pz===1?'Mail ist':'Mails sind'} als privat ausgeblendet `
+      +`<button class="iconbtn" id="privatBtn" style="padding:2px 8px;font-size:11px;margin-left:6px">${PRIVAT_ZEIGEN?'wieder ausblenden':'anzeigen'}</button></td></tr>`;
   }
   // 5 – Beobachten: wichtig, aber nie dringender als ein laufender Vorgang
   if(beob.length){
@@ -1382,6 +1393,7 @@ function renderHeuteZuerst(){
     h+=`<a class="hz-brieflink" target="_blank" href="https://mail.google.com/mail/u/0/#drafts">📩 Ganzes Morning Briefing in Gmail öffnen${stand?` <small style="font-weight:600;color:var(--ink-faint)">· Briefing ${stand}</small>`:''}</a>`;
   }
   $('heuteZuerst').innerHTML=h;
+  { const pb=$('privatBtn'); if(pb) pb.onclick=e=>{ e.stopPropagation(); privatUmschalten(); }; }
   $('heuteZuerst').querySelectorAll('tr.hzt-row[data-id]').forEach(tr=>tr.onclick=()=>openDetail(tr.dataset.id));
   $('heuteZuerst').querySelectorAll('tr.hzt-row[data-abs]').forEach(tr=>tr.onclick=()=>openAbsage(tr.dataset.abs));
   $('heuteZuerst').querySelectorAll('tr.hzt-row[data-gmail]').forEach(tr=>tr.onclick=e=>{ if(e.target.tagName!=='A') window.open(gmailThreadLink(tr.dataset.gmail),'_blank'); });
@@ -2167,12 +2179,15 @@ async function gmailCreateDraft(to,subject,body,threadId){
   if(threadId) message.threadId=threadId;
   return apiPost('https://gmail.googleapis.com/gmail/v1/users/me/drafts',{message});
 }
+// 01.09.2026: Signatur folgt dem aktiven Nutzer. Vorher stand hier fest „Nele Stein" –
+// der Familienname ist aber Kyrath (Stein ist der Name des Beraters, nicht eurer).
+function mailGruss(){ return ['Mit freundlichen Grüßen','',(currentUser==='Niklas'?'Niklas':'Nele')+' Kyrath','UpgradeHomes eGbR'].join('\n'); }
 function hwNachfassText(h){
   return ['Sehr geehrte Damen und Herren,','',
     'wir hatten Ihnen am '+(h.kontaktiert?fmtDate(h.kontaktiert):'zuletzt')+' eine Anfrage zu unserem Vorhaben in '+aufObjektName(h._obj)+' geschickt ('+(h.paket?h.paket+', ':'')+h.gewerk+').','',
     'Da wir die Vergabe in den nächsten Tagen abschließen möchten, wollte ich kurz nachfragen, ob Sie uns ein Angebot zusenden können. Falls Sie derzeit keine Kapazitäten haben, geben Sie uns bitte ebenfalls kurz Bescheid – dann planen wir anders.','',
     'Für Rückfragen zum Leistungsumfang stehe ich Ihnen gern zur Verfügung.','',
-    'Mit freundlichen Grüßen','','Nele Stein','UpgradeHomes eGbR'].join('\n');
+    mailGruss()].join('\n');
 }
 async function aufDraft(id){
   const it=aufItemsAll().find(x=>x.id===id); if(!it||!it.hw) return;
@@ -2184,6 +2199,116 @@ async function aufDraft(id){
     await gmailCreateDraft(h.mail,'Nachfrage Angebot – '+aufObjektName(h._obj)+' ('+(h.paket||h.gewerk)+')',hwNachfassText(h));
     saveToast('✓ Entwurf in Gmail angelegt – dort prüfen und senden',1);
   }catch(e){ saveToast('⚠ Entwurf nicht angelegt: '+e.message,0,1); }
+}
+
+/* ---- Mail-Entwürfe zu einer Zeitplan-Aufgabe (01.09.2026) -----------------
+   Die Zeilen aus dem Projektzeitplan hatten bisher nur den Sprung in die Tabelle
+   („Plan öffnen"). Der nächste Schritt ist aber fast immer eine Mail an die
+   betroffenen Betriebe. Dieses Fenster schlägt Empfänger (nach Gewerk und
+   Aufgabentyp vorausgewählt), Betreff und Text vor und legt je Betrieb EINEN
+   Gmail-Entwurf an – gesendet wird ausschließlich von Hand in Gmail.
+   Platzhalter stehen in «…» und müssen vor dem Senden ersetzt werden.          */
+let AUF_MAIL_CTX=null;
+function aufMailArt(titel){
+  const s=norm(titel);
+  if(/aufma|sammeltermin|vor ort|besichtig/.test(s)) return 'termin';
+  if(/nachhalten|r[üu]ckmeld|nachfass|frist/.test(s)) return 'nachfassen';
+  if(/vergleich|vergabe|vergeben|beauftrag/.test(s)) return 'vergabe';
+  return 'standard';
+}
+function aufMailVorlage(art,objName,titel){
+  if(art==='termin') return {betreff:'Terminabstimmung Aufmaß vor Ort – '+objName,
+    text:['Sehr geehrte Damen und Herren,','',
+      'für unser Vorhaben in '+objName+' möchten wir mit allen beteiligten Gewerken einen gemeinsamen Aufmaß-Termin vor Ort vereinbaren.','',
+      'Unser Vorschlag: «DATUM» um «UHRZEIT» Uhr, Treffpunkt «TREFFPUNKT».','',
+      'Bitte geben Sie uns kurz Bescheid, ob der Termin für Sie passt – oder nennen Sie uns zwei Alternativtermine in derselben Woche.','',
+      mailGruss()].join('\n')};
+  if(art==='nachfassen') return {betreff:'Nachfrage Angebot – '+objName,
+    text:['Sehr geehrte Damen und Herren,','',
+      'wir hatten Ihnen eine Anfrage zu unserem Vorhaben in '+objName+' geschickt. Da wir die Vergabe in den nächsten Tagen abschließen möchten, wollten wir kurz nachfragen, ob Ihr Angebot noch kommt.','',
+      'Bitte senden Sie es uns bis «DATUM». Falls Sie derzeit keine Kapazitäten haben, geben Sie uns bitte ebenfalls kurz Bescheid – dann planen wir anders.','',
+      mailGruss()].join('\n')};
+  if(art==='vergabe') return {betreff:'Ausführungstermin bestätigen – '+objName,
+    text:['Sehr geehrte Damen und Herren,','',
+      'wir schließen derzeit die Vergabe der Arbeiten in '+objName+' ab. Bitte bestätigen Sie uns kurz, dass der besprochene Ausführungszeitraum «ZEITRAUM» bei Ihnen weiterhin steht.','',
+      'Sollte sich daran etwas geändert haben, geben Sie uns bitte umgehend Bescheid.','',
+      mailGruss()].join('\n')};
+  return {betreff:objName+' – '+titel,
+    text:['Sehr geehrte Damen und Herren,','',
+      'wir melden uns zu unserem Vorhaben in '+objName+' («ANLIEGEN KURZ ERGÄNZEN»).','',
+      'Bitte geben Sie uns kurz Rückmeldung.','',
+      mailGruss()].join('\n')};
+}
+function openAufMail(id){
+  const it=aufItemsAll().find(x=>x.id===id); if(!it) return;
+  if(!hasComposeScope()){ saveToast('⚠ Entwurf-Berechtigung fehlt – bitte oben rechts über ↻ neu anmelden.',0,1); return; }
+  const objName=aufObjektName(it.obj);
+  const art=aufMailArt(it.plan?it.plan.titel:it.titel);
+  // Abgesagte/abgelehnte Betriebe fliegen raus – an die schreibt niemand mehr.
+  const kandidaten=AUF.hw.filter(h=>h._obj===it.obj&&!/abgesagt|abgelehnt/.test(norm(h.status)));
+  const mitMail=kandidaten.filter(h=>h.mail), ohneMail=kandidaten.filter(h=>!h.mail);
+  if(!mitMail.length){ saveToast('⚠ Kein Betrieb mit E-Mail-Adresse in der Handwerkerliste.',0,1); return; }
+  const g=norm((it.plan&&it.plan.gewerk)||'');
+  const alleGewerke=!g||g==='-'||/alle/.test(g);
+  const passt=h=>alleGewerke||norm(h.gewerk).includes(g)||g.includes(norm(h.gewerk));
+  const vorauswahl=h=>{
+    if(!passt(h)) return false;
+    if(art==='nachfassen') return !!h.kontaktiert&&!h.rueck&&!/beauftragt/.test(norm(h.status));   // nur die Stillen
+    return true;
+  };
+  const v=aufMailVorlage(art,objName,it.plan?it.plan.titel:it.titel);
+  AUF_MAIL_CTX={id,hw:mitMail};
+  $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
+    <div class="detail-head"><h2>✏️ Mail-Entwürfe: ${esc(it.plan?it.plan.titel:it.titel)}</h2>
+      <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">${esc(objName)} · je Betrieb wird EIN Entwurf in Gmail angelegt – gesendet wird nichts.</div></div>
+    <div class="field"><label>An diese Betriebe</label>
+      ${mitMail.map((h,i)=>`<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin:4px 0;font-size:13px">
+        <input type="checkbox" class="amHw" data-i="${i}"${vorauswahl(h)?' checked':''} style="margin-top:2px">
+        <span><b>${esc(h.firma)}</b> · ${esc(h.gewerk||'—')}${h.paket?' · '+esc(h.paket):''}<br>
+        <span style="color:var(--ink-faint);font-size:12px">${esc(h.mail)}${h.kontaktiert&&!h.rueck?' · seit '+daysSince(h.kontaktiert)+' T ohne Rückmeldung':''}${/beauftragt/.test(norm(h.status))?' · beauftragt':''}</span></span></label>`).join('')}
+      ${ohneMail.length?`<div style="font-size:12px;color:var(--ink-faint);margin-top:6px">Nur telefonisch erreichbar: ${ohneMail.map(h=>esc(h.firma)+(h.tel?' ('+esc(h.tel)+')':'')).join(', ')}</div>`:''}</div>
+    <div class="field"><label>Betreff</label><input id="amBetreff" type="text" value="${esc(v.betreff).replace(/"/g,'&quot;')}"></div>
+    <div class="field"><label>Text – Platzhalter in «…» vor dem Senden ersetzen</label>
+      <textarea id="amText" style="min-height:180px">${esc(v.text)}</textarea></div>
+    <div id="amErr"></div>
+    <div class="erl-actions"><button class="savebtn" id="amSave">✏️ Entwürfe in Gmail anlegen</button><button class="btn-ghost" onclick="closeErledigt()">Abbrechen</button></div>`;
+  $('erlOverlay').classList.add('open');
+  $('amSave').onclick=aufMailAnlegen;
+}
+async function aufMailAnlegen(){
+  if(!AUF_MAIL_CTX) return;
+  const gewaehlt=[...document.querySelectorAll('.amHw:checked')].map(x=>AUF_MAIL_CTX.hw[+x.dataset.i]).filter(Boolean);
+  const betreff=($('amBetreff').value||'').trim(), text=$('amText').value||'', errEl=$('amErr'); errEl.innerHTML='';
+  if(!gewaehlt.length){ errEl.innerHTML='<div class="erl-err">Bitte mindestens einen Betrieb anhaken.</div>'; return; }
+  if(!betreff){ errEl.innerHTML='<div class="erl-err">Bitte einen Betreff eintragen.</div>'; return; }
+  const btn=$('amSave'); btn.disabled=true;
+  let ok=0; const fehler=[];
+  for(const h of gewaehlt){
+    btn.textContent='Lege an … ('+(ok+1)+'/'+gewaehlt.length+')';
+    try{ await gmailCreateDraft(h.mail,betreff,text); ok++; }
+    catch(e){ fehler.push(h.firma+': '+e.message); }
+  }
+  if(fehler.length){
+    errEl.innerHTML='<div class="erl-err">⚠ '+ok+' von '+gewaehlt.length+' angelegt. Nicht geklappt: '+esc(fehler.join(' · '))+'</div>';
+    btn.disabled=false; btn.textContent='✏️ Entwürfe in Gmail anlegen'; return;
+  }
+  closeErledigt();
+  saveToast('✓ '+ok+' Entwurf'+(ok===1?'':'e')+' in Gmail angelegt – dort Platzhalter ersetzen und senden',1);
+}
+
+/* ---- Angebotsvergleich per Knopf (01.09.2026) -----------------------------
+   Das Auslesen der Angebote (Mails + PDF-Anhänge) und das Eintragen in die
+   Aufwertungstabelle macht Claude, nicht das Cockpit – das braucht Urteil über
+   Positionen und Leistungsumfang. Der Knopf legt den fertigen Arbeitsauftrag in
+   die Zwischenablage: in Claude einfügen (Strg+V), abschicken, fertig.          */
+function copyAngebotsvergleich(objKey){
+  const objName=aufObjektName(objKey);
+  const cmd='Angebotsvergleich '+objName+': Lies die neuen Handwerker-Angebote aus Gmail (Label „Aufwertung", inklusive PDF-Anhängen), trage Preise und Status in die Aufwertungstabelle ein (Reiter Handwerker-Kontaktstatus, Paket-Reiter und Kostenübersicht) und vergleiche je Paket gegen das Budget. Keine Zahlen erfinden – Unlesbares als UNKLAR markieren. Tabelle: '+aufSheetUrl(objKey);
+  const fertig=()=>saveToast('✓ Arbeitsauftrag kopiert – in Claude einfügen (Strg+V)',1);
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(cmd).then(fertig,()=>saveToast('⚠ Kopieren nicht möglich – bitte von Hand: „Angebotsvergleich '+objName+'"',0,1));
+    else{ const ta=document.createElement('textarea'); ta.value=cmd; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); fertig(); }
+  }catch(e){ saveToast('⚠ Kopieren nicht möglich: '+e.message,0,1); }
 }
 
 /* ---- Terminvorschlag bestätigen → Google Kalender ------------------------ */
@@ -2236,6 +2361,16 @@ function aufAktion(it){
   if(it.art==='termin') return `<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();openAufTermin('${it.id}')">📅 eintragen</button>`;
   if(it.art==='mail') return `<a class="link" target="_blank" href="${esc(it.link)}" onclick="event.stopPropagation()">${it.hasDraft?'✏️ senden':'✉️ schreiben'}</a>`;
   if(it.art==='hw'&&it.mail) return `<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();aufDraft('${it.id}')">✏️ Entwurf</button>`;
+  if(it.art==='plan'){
+    // 01.09.2026: Zu jeder Zeitplan-Aufgabe gehört der vorbereitete nächste Schritt,
+    // nicht nur der Sprung in den Plan: Mail-Entwürfe an die betroffenen Betriebe,
+    // beim Angebotsvergleich zusätzlich der fertige Arbeitsauftrag für Claude.
+    const teile=[];
+    if(/vergleich|vergabe|vergeben/.test(norm(it.titel))) teile.push(`<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();copyAngebotsvergleich('${escA(it.obj||'')}')">🧮 Vergleich</button>`);
+    if(AUF.hw.some(h=>h._obj===it.obj&&h.mail)) teile.push(`<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();openAufMail('${escA(it.id)}')">✏️ Mail</button>`);
+    teile.push(`<a class="link" target="_blank" href="${esc(it.link||aufSheetUrl())}" onclick="event.stopPropagation()">📊 Plan</a>`);
+    return teile.join(' ');
+  }
   if(it.tel){ const href='tel:'+String(it.tel).replace(/[^\d+]/g,'');
     return `<a class="link" href="${href}" onclick="event.stopPropagation()">📞 anrufen</a>`; }
   return `<a class="link" target="_blank" href="${esc(it.link||aufSheetUrl())}" onclick="event.stopPropagation()">📊 Plan</a>`;
@@ -2625,7 +2760,7 @@ function hwZeile(h,key){
   const tel=h.tel?`<a class="link" href="tel:${String(h.tel).replace(/[^\d+]/g,'')}">📞 ${esc(h.tel)}</a>`:'';
   const mail=h.mail?`<a class="link" href="mailto:${esc(h.mail)}">✉️ ${esc(h.mail)}</a>`
                    :`<span style="color:var(--ink-faint);font-size:12px">keine E-Mail – nur telefonisch</span>`;
-  const draft=h.mail?`<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="aufDraftHw('${esc(key)}','${esc(h.id)}')">✏️ Entwurf</button>`:'';
+  const draft=h.mail?`<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="aufDraftHw('${escA(key)}','${escA(h.id)}')">✏️ Entwurf</button>`:'';
   return `<div class="mini"><span class="dot" style="background:${ampel}"></span><span class="mt">
       <b>${esc(h.firma)}</b>${h.ort?' · '+esc(h.ort):''}<br>
       <span style="color:var(--ink-soft)">${esc(stand)}${h.angebot?' · Angebot '+euroTxt(h.angebot):''}${h.notiz?' · '+esc(h.notiz):''}</span>${antZeile}<br>
@@ -3625,6 +3760,16 @@ function mapMailToObject(fromEmail,subject,fromName){
    die Aufzeichnung, welche Zuordnungen danebenlagen. Genau die brauchen wir, um die
    Erkennung später nachzuschärfen, statt sie nach Gefühl zu ändern.               */
 function mailZuordnungManuell(tid){ return META['mailobj:'+tid+'|obj']||''; }
+/* Als privat markierte Mails sind normalerweise unsichtbar. Damit das keine
+   Einbahnstraße ist, lassen sie sich im Block „Neue Objekte anfragen" wieder
+   einblenden — sonst käme man an eine versehentlich markierte Mail nie heran. */
+let PRIVAT_ZEIGEN=false;
+function privatZahl(){ return (GMAIL.threads||[]).filter(t=>t.privat).length; }
+function privatUmschalten(){
+  PRIVAT_ZEIGEN=!PRIVAT_ZEIGEN;
+  (GMAIL.threads||[]).forEach(t=>{ if(t.privat) t.noise=!PRIVAT_ZEIGEN; });
+  renderAll();
+}
 /* Fenster: „Zu welchem Objekt gehört diese Mail?"
    Oben die Vorschläge der Erkennung, darunter alle offenen Objekte zum Suchen,
    und die Möglichkeit, ausdrücklich KEIN Objekt zu wählen. Das Letzte ist wichtig:
@@ -3633,11 +3778,17 @@ function mailZuordnungManuell(tid){ return META['mailobj:'+tid+'|obj']||''; }
 function openMailZuordnung(tid){
   const t=(GMAIL.threads||[]).find(x=>x.tid===tid); if(!t) return;
   const jetzt=t.objId?(OBJ.find(x=>x._id===t.objId)||null):null;
+  const manuell=mailZuordnungManuell(tid);
   const vorschlag=(t.kandidaten||[]).filter(k=>!jetzt||k.key!==jetzt.key);
-  const zeile=(key,titel,extra)=>`<div class="mini" style="cursor:pointer" onclick="setMailObj('${esc(tid)}','${esc(key)}')">`
-    +`<span class="dot" style="background:${extra==='aktuell'?'var(--green)':'#93C5FD'}"></span>`
-    +`<span class="mt"><b>${esc(titel)}</b>${extra&&extra!=='aktuell'?'<br><span style="color:var(--ink-soft)">'+esc(extra)+'</span>':''}</span>`
-    +`${extra==='aktuell'?'<span style="color:var(--green);font-size:12px">aktuell zugeordnet</span>':''}</div>`;
+  /* 23.08.2026: Die Zeilen trugen ihren Klick-Befehl als onclick-Attribut, mit
+     Adresse und Verkäufername mitten hineingeschrieben. esc() schützt aber nur
+     < > und &, NICHT das Apostroph — eine Adresse wie „St. Jürgen's Hof" hätte
+     die Zeichenkette beendet und die Zeile unklickbar gemacht. Jetzt steht der
+     Schlüssel in einem data-Attribut und der Klick wird unten angemeldet.
+     Damit ist diese ganze Fehlerklasse weg.                                    */
+  const zeile=(key,titel,unten,farbe)=>`<div class="mini mz-w" data-key="${esc(key)}" style="cursor:pointer${farbe?';border-left:3px solid '+farbe:''}">`
+    +`<span class="dot" style="background:${farbe||'#93C5FD'}"></span>`
+    +`<span class="mt"><b>${esc(titel)}</b>${unten?'<br><span style="color:var(--ink-soft)">'+esc(unten)+'</span>':''}</span></div>`;
   $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
     <div class="detail-head">
       <div style="font-size:12px;color:var(--ink-faint);font-weight:700;letter-spacing:.03em">🔗 MAIL ZUORDNEN</div>
@@ -3646,15 +3797,14 @@ function openMailZuordnung(tid){
       <div class="deeplinks"><a class="link" target="_blank" href="${gmailThreadLink(tid)}">✉️ Mail öffnen</a></div>
     </div>
     ${t.unsicher?`<div class="wt-hint" style="margin:12px 0">Die Erkennung war sich nicht sicher — mehrere Objekte passen fast gleich gut. Deshalb ist die Mail bisher keinem zugeordnet.</div>`:''}
-    ${jetzt?`<div class="section-t" style="margin-top:12px">Aktuell</div>`+zeile(jetzt.key,jetzt.titel,'aktuell'):''}
+    ${jetzt?`<div class="section-t" style="margin-top:12px">Aktuell zugeordnet</div>`+zeile(jetzt.key,jetzt.titel,jetzt.seller,'var(--green)'):''}
     ${vorschlag.length?`<div class="section-t" style="margin-top:14px">Vorschläge der Erkennung</div>`+vorschlag.map(k=>zeile(k.key,k.titel,'')).join(''):''}
     <div class="section-t" style="margin-top:14px">Alle offenen Objekte</div>
     <input id="mzSuche" type="text" placeholder="Suchen: Adresse oder Verkäufer …" style="width:100%;margin-bottom:8px">
-    <div id="mzListe" style="max-height:260px;overflow:auto"></div>
-    <div class="section-t" style="margin-top:14px">Oder</div>
-    <div class="mini" style="cursor:pointer" onclick="setMailObj('${esc(tid)}','-')">
-      <span class="dot" style="background:var(--ink-faint)"></span>
-      <span class="mt"><b>Gehört zu keinem Objekt</b><br><span style="color:var(--ink-soft)">Wird künftig nicht mehr geraten und bleibt in „Neue Objekte anfragen".</span></span></div>`;
+    <div id="mzListe" style="max-height:240px;overflow:auto"></div>
+    <div class="section-t" style="margin-top:16px">Gehört zu keinem Objekt</div>
+    ${zeile('-','Geschäftlich, aber ohne Objekt','Bleibt in „Neue Objekte anfragen" stehen. Wird künftig nicht mehr geraten.',manuell==='-'?'var(--gold)':'')}
+    ${zeile('privat','Privat','Verschwindet ganz aus dem Cockpit — taucht in keiner Liste und keiner Zählung mehr auf.',manuell==='privat'?'var(--gold)':'')}`;
   $('erlOverlay').classList.add('open');
   const mal=()=>{
     const q=normLoose($('mzSuche').value);
@@ -3662,17 +3812,32 @@ function openMailZuordnung(tid){
     $('mzListe').innerHTML=liste.length
       ? liste.map(o=>zeile(o.key,o.titel,o.seller||'')).join('')
       : '<div class="empty">Kein Objekt gefunden.</div>';
+    anmelden();
   };
+  const anmelden=()=>$('erlModal').querySelectorAll('.mz-w').forEach(el=>{
+    el.onclick=()=>setMailObj(tid,el.dataset.key);
+  });
   $('mzSuche').oninput=mal; mal();
 }
-function objVonKey(key){ return OBJ.find(x=>x.key===key)||null; }
+
 async function setMailObj(tid,key){
   META['mailobj:'+tid+'|obj']=key;
-  await persistState('mailobj:'+tid,'obj',key);
   const t=(GMAIL.threads||[]).find(x=>x.tid===tid);
-  if(t){ const o=key&&key!=='-'?objVonKey(key):null; t.objId=o?o._id:null; t.objTitel=o?o.titel:null; t.unsicher=false; }
+  if(t){
+    const o=(key&&key!=='-'&&key!=='privat')?objVonKey(key):null;
+    t.objId=o?o._id:null; t.objTitel=o?o.titel:null; t.unsicher=false;
+    /* „privat" heißt: raus aus dem Cockpit. Technisch wird die Mail als Rauschen
+       behandelt — dieselbe Mechanik, mit der Newsletter aussortiert werden. Sie
+       fällt damit aus allen Listen und Zählungen, bleibt in Gmail aber unberührt.
+       Rückgängig geht es über den Schalter im Block „Neue Objekte anfragen".    */
+    t.privat=(key==='privat'); if(t.privat) t.noise=true; else if(t.noise&&t.wasPrivat) t.noise=false;
+    t.wasPrivat=t.privat;
+  }
   GMAIL.byObj={}; (GMAIL.threads||[]).forEach(x=>{ if(x.objId) (GMAIL.byObj[x.objId]=GMAIL.byObj[x.objId]||[]).push(x); });
   closeErledigt(); renderAll();
+  // Erst die Ansicht aktualisieren, dann speichern — sonst wartet Nele auf Google,
+  // obwohl im Cockpit längst alles stimmt. Ein Fehlschlag meldet sich als Hinweis.
+  await persistState('mailobj:'+tid,'obj',key);
 }
 async function loadGmail(){
   if(!hasGmailScope()){ GMAIL.state='noscope'; return; }
@@ -3713,12 +3878,15 @@ async function loadGmail(){
       const zuo=mapMailToObject(fe,subj,fromName);
       let obj=zuo.o, unsicher=zuo.unsicher;
       const manuell=mailZuordnungManuell(tid);
-      if(manuell==='-'){ obj=null; unsicher=false; }
+      let privat=false;
+      if(manuell==='privat'){ obj=null; unsicher=false; privat=true; }
+      else if(manuell==='-'){ obj=null; unsicher=false; }
       else if(manuell){ const m=objVonKey(manuell); if(m){ obj=m; unsicher=false; } }
       // „neu"-Suchauftrags-Objekte sind nie Rauschen; sonst no-reply/Newsletter filtern
       const noise=meta.cat==='neu'?false:isMailNoise(fe,subj);
       out.push({tid,subj,from,fromEmail:fe,ts,weOwe,hasDraft:draftThreads.has(tid),cat:meta.cat,label:meta.labelName,
-                objTitel:obj?obj.titel:null,objId:obj?obj._id:null,noise,
+                objTitel:obj?obj.titel:null,objId:obj?obj._id:null,
+                noise:noise||(privat&&!PRIVAT_ZEIGEN),privat,wasPrivat:privat,
                 unsicher,kandidaten:(zuo.kandidaten||[]).map(x=>({key:x.key,titel:x.titel})),manuell:!!manuell});
     }
     const byObj={}; out.forEach(t=>{ if(t.objId) (byObj[t.objId]=byObj[t.objId]||[]).push(t); });
@@ -4169,7 +4337,7 @@ function openDetail(id){
       +`<div><b>Übergabe</b>${o.uebergabe?fmtDate(o.uebergabe):'—'}</div>`
     : `<div><b>Typ</b>${esc(o.typ||'—')}</div><div><b>Status</b>${esc(o.status||'—')}</div><div><b>Phase</b>${esc(phaseLabel(o.phase))}</div><div><b>Kaufpreis</b>${esc(o.kaufpreis||'—')}</div><div><b>Kalk. VK</b>${esc(o.kalkVK||'—')}</div><div><b>Angebot</b>${esc(o.angebot||'—')}</div><div><b>Fällig</b>${esc(o.fael?o.fael.txt:'—')}</div><div><b>Verkäufer</b>${esc(o.seller||'—')}</div>`;
   const objMails=(!isSale&&GMAIL.state==='ready')?(GMAIL.byObj[o._id]||[]).filter(m=>m.hasDraft||(m.weOwe&&!m.noise)):[];
-  const mailSec=objMails.length?`<div class="section-t" style="margin-top:16px">✉️ Offene Mails zu diesem Objekt</div>`+objMails.map(m=>`<div class="mini"><span class="dot" style="background:${m.hasDraft?'var(--band-yellow)':'var(--band-red)'}"></span><span class="mt" style="white-space:normal">${m.hasDraft?'✏️ Entwurf offen – abschicken':'🔴 unbeantwortet'}: ${esc(m.subj)}</span><a class="link" target="_blank" href="${gmailThreadLink(m.tid)}">${m.hasDraft?'öffnen &amp; senden':'öffnen'}</a><button class="iconbtn" style="padding:3px 8px;font-size:11px;margin-left:6px" onclick="event.stopPropagation();openMailZuordnung('${esc(m.tid)}')" title="Gehört diese Mail zu einem anderen Objekt?">🔗</button></div>`).join(''):'';
+  const mailSec=objMails.length?`<div class="section-t" style="margin-top:16px">✉️ Offene Mails zu diesem Objekt</div>`+objMails.map(m=>`<div class="mini"><span class="dot" style="background:${m.hasDraft?'var(--band-yellow)':'var(--band-red)'}"></span><span class="mt" style="white-space:normal">${m.hasDraft?'✏️ Entwurf offen – abschicken':'🔴 unbeantwortet'}: ${esc(m.subj)}</span><a class="link" target="_blank" href="${gmailThreadLink(m.tid)}">${m.hasDraft?'öffnen &amp; senden':'öffnen'}</a><button class="iconbtn" style="padding:3px 8px;font-size:11px;margin-left:6px" onclick="event.stopPropagation();openMailZuordnung('${escA(m.tid)}')" title="Gehört diese Mail zu einem anderen Objekt?">🔗</button></div>`).join(''):'';
   $('modal').innerHTML=`<button class="modal-close" onclick="closeDetail()">✕ schließen</button>
     <div class="detail-head"><h2>🏠 ${esc(o.titel)}</h2><div style="margin-top:4px">${isSale?ownerAv('Nele'):urgBadge(o.score)} <span class="owner ${effOwner(o)}">${effOwner(o)}</span></div>
       <div class="kv">${rows}</div>
@@ -4222,7 +4390,12 @@ function openErledigt(id){
   const o=OBJ.find(x=>x._id===id); if(!o) return;
   const cur=o.nextStep||'';
   const np=nextPhaseOf(o.phase);
-  const phaseOpts=BOARD_COLS.map(ph=>`<option value="${ph}" ${ph===(np||o.phase)?'selected':''}>${esc(phaseLabel(ph))}${ph===o.phase?' — unverändert':''}${ph===np?' ← Vorschlag':''}</option>`).join('');
+  // 01.09.2026: „Aufwertung" ist keine Leadlisten-Phase, sondern die Übergabe in die
+  // Objektliste. Trotzdem gehört sie in DIESES Menü: Nach der Beurkundung ist sie der
+  // nächste Schritt, und vorher gab es sie hier gar nicht — man musste den Umweg über
+  // den Übergeben-Knopf im Detailfenster kennen.
+  const phaseOpts=BOARD_COLS.map(ph=>`<option value="${ph}" ${ph===(np||o.phase)?'selected':''}>${esc(phaseLabel(ph))}${ph===o.phase?' — unverändert':''}${ph===np?' ← Vorschlag':''}</option>`).join('')
+    +`<option value="__AUFWERTUNG__">🏗️ Aufwertung — in die Objektliste übergeben${o.phase==='Kaufvertrag'?' ← nach dem Kauf':''}</option>`;
   const altU=wvAutoDate(o)?fmtDate(wvAutoDate(o)):'';
   const ow=effOwner(o);
   $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
@@ -4232,7 +4405,8 @@ function openErledigt(id){
     <div class="field"><label>Nächste Schritte (optional)</label><textarea id="erlNext" placeholder="z. B. Rückruf am Freitag, Kalkulation aufsetzen"></textarea></div>
 
     <div class="field"><label>Neue Phase (Leadliste Spalte J) – bestimmt auch, wohin die Karte in der Pipeline rückt</label>
-      <select id="erlPhase">${phaseOpts}</select></div>
+      <select id="erlPhase">${phaseOpts}</select>
+      <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">„Aufwertung" nimmt das Objekt aus dem Ankauf-Board und legt es in der <b>Objektliste</b> an – ab dann steuerst du es im Board 💰 Verkauf.</div></div>
 
     <div class="field"><label>Zuständig ab jetzt</label>
       <div class="phbtns" id="erlOwner">
@@ -4261,7 +4435,11 @@ async function saveErledigt(id){
   const getan=($('erlDone').value||'').trim(), next=($('erlNext').value||'').trim();
   const errEl=$('erlErr'); errEl.innerHTML='';
   if(!getan&&!next){ errEl.innerHTML='<div class="erl-err">Bitte kurz eintragen, was du getan hast.</div>'; return; }
-  const neuePhase=$('erlPhase').value||o.phase;
+  // 01.09.2026: „__AUFWERTUNG__" ist kein Phasenwert für Spalte J, sondern löst die
+  // Übergabe in die Objektliste aus (gleicher Weg wie der Knopf im Detailfenster).
+  const rawPhase=$('erlPhase').value||o.phase;
+  const uebergabe=rawPhase==='__AUFWERTUNG__';
+  const neuePhase=uebergabe?o.phase:rawPhase;
   const neuerOwner=(($('erlOwner').querySelector('button.on')||{}).dataset||{}).ow||effOwner(o);
   const wv=($('erlWv').value||'').trim();               // ISO yyyy-mm-dd oder ''
   const wvDate=wv?parseISO(wv):null;
@@ -4269,6 +4447,7 @@ async function saveErledigt(id){
   const btn=$('erlSave'); btn.disabled=true; btn.textContent='Speichere …';
   let add=`[${fmtDate(new Date())}] ✓ ${getan||'erledigt'}`+(next?`  →  nächste Schritte: ${next}`:'');
   if(neuePhase!==o.phase) add+=`  ·  Phase: ${o.phase} → ${neuePhase}`;
+  if(uebergabe) add+=`  ·  → Aufwertung (in die Objektliste übergeben)`;
   if(neuerOwner!==effOwner(o)) add+=`  ·  Zuständig: ${neuerOwner}`;
   if(wvDate) add+=`  ·  Wiedervorlage: ${fmtDate(wvDate)}`;
   try{
@@ -4287,6 +4466,20 @@ async function saveErledigt(id){
       if(META[o._id+'|snooze']){ META[o._id+'|snooze']=''; persistStateSilent(o._id,'snooze',''); }
     }
     META[o._id+'|touched']=TODAY_STR; persistStateSilent(o._id,'touched',TODAY_STR);   // kurze Pause im Tagesfokus
+    if(uebergabe){
+      // Wie objektUebergeben(): Status „Verkaufsphase" setzen, Zeile in der Objektliste
+      // anlegen (Dopplung über den Lead-Schlüssel ausgeschlossen), dann alles neu laden.
+      closeErledigt();
+      toggleDone(id);
+      o.phase='Verkaufsphase'; o.uebergeben=true; o.active=false;
+      await persistPhase(o);
+      try{
+        const r=await uebergabeInObjektliste(o);
+        saveToast('✓ In Leadliste ergänzt · '+r.text+' – lade neu …',1);
+      }catch(e){ saveToast('⚠ Status gesetzt, aber Objektliste nicht ergänzt: '+e.message,0,1); }
+      await loadData();
+      return;
+    }
     saveToast('✓ In Leadliste ergänzt'+(neuePhase!==o.phase?' · Phase verschoben':'')+(wvDate?' · Wiedervorlage gesetzt':''),1);
     closeErledigt();
     toggleDone(id);                               // erst nach erfolgreichem Speichern abhaken
