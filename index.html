@@ -457,7 +457,7 @@ body{background:var(--bg1)}
       <div class="focus-msg" id="focusMsg"></div>
       <div class="focus-items" id="focusItems"></div>
     </div>
-    <div class="card"><div class="section-t">🔥 Heute zuerst <small>– dein Tages-Briefing · nach Dringlichkeit gruppiert</small></div><div id="heuteZuerst"></div></div>
+    <div class="card"><div class="section-t">🔥 Heute zuerst</div><div id="heuteZuerst"></div></div>
     <div class="card" id="kontaktCard"><div class="section-t">🌱 Kontaktpflege <small>– Netzwerk & offene Mails</small></div><div id="kontaktMini"></div></div>
     <div class="card" id="neueObjekteCard" style="display:none"><div class="section-t">🔎 Neue Objekte anfragen <small>– aus dem Gmail-Label „neu"</small></div><div id="neueObjekteList"></div></div>
   </div></div>
@@ -830,7 +830,9 @@ function scoreOf(o){
   // Ausgenommen: Beobachten / Absage senden / passt nicht (nicht im FUNNEL). Nur bei bekannter letzter Aktivität
   // (frisch angelegte, nie berührte Objekte werden nicht geflutet). Stuft nur HOCH, nie herab.
   o._eskaliert=0;
-  if(FUNNEL.includes(o.phase)){
+  // 12.09.2026 (Korrektur Nele): Sagt die jüngste Notiz „abgesagt"/„nicht sinnvoll",
+  // liegt der Vorgang BEWUSST – Stillstand eskaliert dann nicht mehr auf rot.
+  if(FUNNEL.includes(o.phase)&&!notizNegativ(o)){
     const la=lastActivity(o), st=la?daysSince(la):null;
     if(st!=null && st>=STALE_RED){ base=Math.max(base,100); o._eskaliert=st; }
     else if(st!=null && st>=STALE_YELLOW){ base=Math.max(base,30); o._eskaliert=st; }
@@ -839,7 +841,9 @@ function scoreOf(o){
   }
   // 12.09.2026: Wochenfrist für angefragte Exposés (Regel Nele). Antwort da → prüfen
   // (ab 2 Resttagen rot), Makler seit 7 T still → nachfassen (rot).
-  const ex=angefragtInfo(o);
+  // Auch eine FOLGE-Anfrage („abgesagt + neu angefragt") trägt die Frist.
+  const fa=folgeAnfrageInfo(o);
+  const ex=fa?fa.zustand:angefragtInfo(o);
   if(ex){ if(ex.typ==='nachfassen'||ex.ueberfaellig) base=Math.max(base,100);
           else if(ex.typ==='pruefen') base=Math.max(base,ex.rest<=2?100:60); }
   return base;
@@ -1298,9 +1302,30 @@ function letzteNotizVon(o){
   const zeilen=String(o.nextStep||'').split('\n').map(z=>z.trim()).filter(Boolean);
   for(let i=zeilen.length-1;i>=0;i--){
     const d=parseDate(zeilen[i]);
-    if(d&&daysUntil(d)<=0) return {date:d,text:zeilen[i].replace(/^\[\d{1,2}\.\d{1,2}\.\d{2,4}\]\s*/,'').trim()};
+    if(d&&daysUntil(d)<=0) return {date:d,text:zeilen[i].replace(/^\[?\d{1,2}\.\d{1,2}\.\d{2,4}\]?[:\s]*/,'').trim()};
   }
   return null;
+}
+/* 12.09.2026 (Korrektur Nele): Steht in der JÜNGSTEN Notiz „abgesagt" oder „nicht
+   sinnvoll", ist der Vorgang kein Dringend-Kandidat – er liegt zwar lange, aber
+   bewusst. Er eskaliert nicht mehr rot und rückt in „Deals in Arbeit" HINTER die
+   frischen Vorgänge (z. B. neue Vorqualifikationen). Eine neuere Notiz hebt das auf. */
+const NOTIZ_NEG_RE=/abgesagt|absage|nicht sinnvoll|passt nicht|kein interesse|verworfen|zu teuer/;
+function notizNegativ(o){ const n=letzteNotizVon(o); return !!n&&NOTIZ_NEG_RE.test(norm(n.text)); }
+/* 12.09.2026 (Regel Nele): Steht in EINER Notiz „abgesagt" UND „angefragt" (typisch:
+   Objekt abgesagt, aber beim selben Makler das Nachbarobjekt angefragt, z. B. „die 6a"),
+   gewinnt die ANFRAGE. Sie gehört aber zu einem NEUEN Objekt: Das alte bleibt abgesagt,
+   das Cockpit bietet ➕ „als neues Objekt anlegen" an. Bis dahin läuft die Wochenfrist
+   sichtbar an der alten Zeile weiter. */
+function folgeAnfrageInfo(o){
+  const n=letzteNotizVon(o); if(!n) return null;
+  const t=norm(n.text);
+  if(!(NOTIZ_NEG_RE.test(t)&&/angefragt/.test(t))) return null;
+  const ds=parseAllDates(n.text).filter(d=>daysUntil(d)<=0);
+  const anf=ds.length?new Date(Math.min(...ds.map(d=>+d))):n.date;
+  const mails=((typeof GMAIL!=='undefined'&&GMAIL.byObj&&GMAIL.byObj[o._id])||[]).filter(m=>m.weOwe&&!m.noise&&m.ts&&m.ts>=+anf);
+  const antwort=mails.length?new Date(Math.max(...mails.map(m=>m.ts))):null;
+  return {anf,antwort,zustand:exposeZustand(anf,antwort)};
 }
 function kurz(s,n){ s=String(s||'').trim(); return s.length>n?s.slice(0,n-1)+'…':s; }
 function hzStandSatz(o){
@@ -1314,7 +1339,10 @@ function hzStandSatz(o){
 }
 function hzBadges(o){
   const b=[];
-  const ex=angefragtInfo(o);
+  // Folge-Anfrage: Frist-Badge des Anfrage-Zustands + Hinweis, dass ein NEUES Objekt entsteht.
+  const fa=folgeAnfrageInfo(o);
+  const ex=fa?fa.zustand:angefragtInfo(o);
+  if(fa) b.push({t:'↪ Folgeanfrage – neues Objekt anlegen',c:'neutral'});
   if(ex){
     if(ex.typ==='pruefen') b.push({t:'🧐 Rückmeldung bis '+fmtDate(ex.frist)+(ex.rest<0?' · '+(-ex.rest)+' T drüber':ex.rest===0?' · heute!':' · noch '+ex.rest+' T'),c:ex.rest<=2?'rot':'orange'});
     else if(ex.typ==='nachfassen') b.push({t:'🔎 seit '+ex.seit+' T ohne Antwort',c:'rot'});
@@ -1330,19 +1358,24 @@ function hzBadges(o){
     b.push({t:'👁️ Wiedervorlage '+fmtDate(d)+(du<0?' (seit '+(-du)+' T)':du===0?' (heute)':''),c:du<=0?'orange':'neutral'}); } }
   if(!ex&&o._eskaliert>=STALE_RED) b.push({t:'⚠ seit '+o._eskaliert+' T ohne Bewegung',c:'rot'});
   else if(!ex&&o._eskaliert>=STALE_YELLOW) b.push({t:'⚠ '+o._eskaliert+' T still',c:'gelb'});
+  if(!fa&&notizNegativ(o)) b.push({t:'🗂 lt. Notiz abgesagt / nicht sinnvoll',c:'neutral'});
   return b;
 }
 function hzBadgesHtml(list){ return list.length?'<div class="hz-badges">'+list.map(x=>'<span class="hz-badge '+x.c+'">'+esc(x.t)+'</span>').join('')+'</div>':''; }
-const HZ_TODO={Neu:'Sichten',Vorqualifikation:'Vorqualifizieren & Daten sammeln',Kalkulieren:'Kalkulieren & bewerten','Angebot vorbereiten':'Angebot vorbereiten','Angebot raus':'Nachfassen',Verhandlung:'Verhandeln',Kaufvertrag:'Kaufvertrag/Notar anstoßen',Beobachten:'Wiedervorlage – reaktivieren oder vertagen'};
+/* 12.09.2026 (Korrektur Nele): Das To-do beschreibt die AUFGABE in Worten – wie im
+   Briefing („Kalkulation anlegen"), nie nur den Kanal. Der Kanal (anrufen/Mail)
+   steht bereits als Knopf in der Aktions-Spalte und wird hier nicht wiederholt. */
+const HZ_TODO={Neu:'Sichten & gegen das Profil prüfen',Vorqualifikation:'Vorqualifizieren: Baujahr, Miete, Zustand erfragen',Kalkulieren:'Kalkulation anlegen & bewerten','Angebot vorbereiten':'Angebot fertig machen & rausschicken','Angebot raus':'Beim Verkäufer nachfassen',Verhandlung:'Konditionen verhandeln',Kaufvertrag:'Notartermin & Unterlagen anstoßen',Beobachten:'Reaktivieren oder neu vertagen'};
 function hzTodo(o){
-  const k=kanalOf(o);
-  if(k==='mail'&&o.mail&&o.mail.state==='draft') return '✉️ Entwurf prüfen & senden';
-  // 12.09.2026: Die Exposé-Regel ist eine feste Ansage von Nele – sie schlägt das (heuristische) Briefing.
-  const ex=angefragtInfo(o); if(ex&&ex.typ!=='warten') return ex.todo;
+  // Folge-Anfrage gewinnt: die neue Anfrage gehört als EIGENES Objekt in die Leadliste.
+  if(folgeAnfrageInfo(o)) return 'Neue Anfrage als eigenes Objekt anlegen (➕)';
+  if(o.mail&&o.mail.state==='draft') return 'Entwurf prüfen & senden';
+  // Die Exposé-Regel ist eine feste Ansage von Nele – sie schlägt das (heuristische) Briefing.
+  const ex=angefragtInfo(o); if(ex&&ex.typ!=='warten') return ex.todo.replace(/^[^\wÄÖÜäöü]+\s*/,'');
   const bi=briefingInfo(o); if(bi&&bi.todo&&bi.todo.length>2) return bi.todo;   // Briefing-To-do hat Vorrang
-  if(k==='mail'&&o.mail&&o.mail.state==='open') return '✉️ Antworten';
-  if(k==='tel') return '📞 Anrufen';
-  return (KANAL_ICON[k]||'')+' '+(HZ_TODO[o.phase]||'Nächsten Schritt festlegen');
+  if(notizNegativ(o)) return 'Entscheiden: Absage senden oder auf „Beobachten"';
+  if(o.mail&&o.mail.state==='open') return 'Antwort schreiben';
+  return HZ_TODO[o.phase]||'Nächsten Schritt festlegen';
 }
 const HZ_VOR={Neu:'Objekt kurz gegen das Ankaufsprofil prüfen.',Vorqualifikation:'Verkäufer/Makler anrufen: Baujahr, Miete, Zustand erfragen.',Kalkulieren:'Kalkulation aufsetzen (Kaufpreis, Sanierung, Verkaufserlös).','Angebot vorbereiten':'Angebot final machen und rausschicken.','Angebot raus':'Freundlich nachfassen, ggf. Frist setzen.',Verhandlung:'Konditionen abstimmen – Preis und Übergabe klären.',Kaufvertrag:'Notartermin vereinbaren, Unterlagen zusammenstellen.',Beobachten:'Wiedervorlage erreicht: kurz prüfen, ob das Objekt noch am Markt ist – dann reaktivieren oder neu vertagen.'};
 // „Vorschlag" = kombiniert: bevorzugt der Text aus dem Morning-Briefing-Entwurf (echte Einschätzung), sonst interne Notiz (Spalte W), sonst Phasen-Standard.
@@ -1359,8 +1392,12 @@ function hzVorschlag(o){
     if(o.phase==='Verhandlung') return 'Telefonisch abstimmen – Preis und Übergabe klären.';
     return t!=null?('Nachtelefonieren – letzter Anruf vor '+t+' T.'):'Erstkontakt telefonisch herstellen.';
   }
-  // Interne Notiz nur noch als letzte Reserve und ohne den führenden [Datum]-Block, damit „Vorschlag“ nicht „Stand“ doppelt.
-  if(o.nextStep){ const letzte=String(o.nextStep).split('\n').filter(Boolean).pop()||''; const clean=letzte.replace(/^\[\d{1,2}\.\d{1,2}\.\d{2,4}\]\s*/,'').trim(); if(clean.length>3) return clean; }
+  // 12.09.2026: Folge-Anfrage vor Absage-Vorschlag – die Anfrage gewinnt (Regel Nele).
+  if(folgeAnfrageInfo(o)) return 'Gleicher Makler, neues Objekt: die Anfrage per ➕ als eigene Zeile anlegen – dieses Objekt bleibt abgesagt, die Wochenfrist läuft dann am neuen.';
+  // Bei „abgesagt/nicht sinnvoll" in der jüngsten Notiz einen echten Vorschlag machen.
+  if(notizNegativ(o)) return 'Absage sauber vermerken – über das Häkchen rückt das Objekt auf „Beobachten" (Wiedervorlage 30/60 T).';
+  // Interne Notiz nur als Reserve – und NIE, wenn sie schon als Stand-Satz in der Zeile steht (sonst doppelt).
+  if(o.nextStep){ const letzte=String(o.nextStep).split('\n').filter(Boolean).pop()||''; const clean=letzte.replace(/^\[?\d{1,2}\.\d{1,2}\.\d{2,4}\]?[:\s]*/,'').trim(); if(clean.length>3&&kurz(clean,150)!==hzStandSatz(o)) return clean; }
   return HZ_VOR[o.phase]||'Nächsten Schritt festlegen.';
 }
 // Vorschläge aus dem eingebetteten Briefing je Objekt herauslesen (heuristisch, mit sicherem Fallback).
@@ -1466,7 +1503,7 @@ function hztRow(o){
     +`<td class="stand">${esc(hzStandSatz(o))}${hzBadgesHtml(hzBadges(o))}</td>`
     +`<td class="todo">${esc(hzTodo(o))}</td>`
     +`<td class="vor">${esc(hzVorschlag(o))}</td>`
-    +`<td>${hzMailLink(o)}</td></tr>`;
+    +`<td>${folgeAnfrageInfo(o)?`<button class="iconbtn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();openFolgeObjekt('${o._id}')">➕ neues Objekt</button>`:hzMailLink(o)}</td></tr>`;
 }
 // Geparkter Vorgang mit Wiedervorlage-Termin – Klick öffnet das Detail (dort kann der Termin geändert werden).
 function hztSnoozeRow(o){
@@ -1509,15 +1546,11 @@ function renderHeuteZuerst(){
   const anfTids=gmailReady?angefragtTids():new Set();
   const mailOnly=gmailReady?userMailItems().filter(m=>!m.objId&&m.cat!=='aufwertung'&&!anfTids.has(m.tid)):[];
   let h='';
-  // Lage-Zeile (wie im Briefing)
-  const red=objs.filter(o=>o.score>=100).length, mailWait=objs.filter(o=>o.mail).length+(currentUser==='Nele'?mailOnly.length:0);
-  const aufN=aufItems().length;
-  h+=`<div class="hz-lage">Lage: <b>${objs.length}</b> ${objs.length===1?'offener Vorgang':'offene Vorgänge'}${red?`, davon <b style="color:var(--band-red)">${red} dringend</b>`:''}${aufN?` · <b>${aufN}</b> ${aufN===1?'Punkt':'Punkte'} Aufwertung`:''}${mailWait?` · <b>${mailWait}</b> ${mailWait===1?'Mail wartet':'Mails warten'}`:''} · gefiltert für <b>${currentUser}</b>.`
-    +`<span class="hz-filter"><button class="${HZ_FILTER==='alle'?'on':''}" onclick="hzFilterSet('alle')">Alles</button>`
+  // 12.09.2026 (Wunsch Nele): Die Lage-Zeile und der Kalender-Hinweis sind raus –
+  // sie machten den Kopf unruhig, ohne eine Entscheidung zu tragen. Oben stehen
+  // nur noch die Filter-Knöpfe; die Zahlen stehen an den Blockköpfen.
+  h+=`<div class="hz-lage" style="text-align:right"><span class="hz-filter" style="margin-left:0"><button class="${HZ_FILTER==='alle'?'on':''}" onclick="hzFilterSet('alle')">Alles</button>`
     +`<button class="${HZ_FILTER==='dringend'?'on':''}" onclick="hzFilterSet('dringend')">🔴 nur Dringendes</button></span></div>`;
-  // (21.08.2026 entfernt) Der Hinweisstreifen „x neue Objekte aus Suchaufträgen" sagte dasselbe
-  // wie der Block „Neue Objekte anfragen" weiter unten – doppelt gemoppelt.
-  if(hasCalScope()&&CAL.state==='ready'){ const c=dayCapacity(); if(c<objs.length) h+=`<div class="wt-hint" style="margin:0 0 8px">🗓️ Nur ~${freeHrsTxt()} Std frei heute – realistisch schaffst du die Top ${c}. Der Rest wartet geordnet.</div>`; }
   /* ===== 21.08.2026: Gliederung nach ARBEITSSTRANG statt nach Punktzahl. =====
      Vorher bestimmte allein die Punktzahl die Reihenfolge. Dadurch stand eine
      Beobachten-Wiedervorlage (die nur eine kurze Prüfung ist) über der
@@ -1537,6 +1570,9 @@ function renderHeuteZuerst(){
   const angefragt=[], deals=[], beob=[];
   objs.forEach(o=>{
     if(o.phase==='Beobachten'){ beob.push(o); return; }
+    // Folge-Anfrage („abgesagt + neu angefragt") gewinnt gegen die Absage (Regel Nele)
+    const fa=folgeAnfrageInfo(o);
+    if(fa){ angefragt.push({o,ex:fa.zustand}); return; }
     const ex=angefragtInfo(o);
     if(ex){ angefragt.push({o,ex}); return; }
     deals.push(o);
@@ -1546,9 +1582,10 @@ function renderHeuteZuerst(){
   const vkAlle=vkItems();
   const vkOffen=vkAlle.filter(i=>!aufDone(i.id)), vkErledigt=vkAlle.filter(i=>aufDone(i.id));
   const byScore=(a,b)=>b.score-a.score;
-  // Deals: Rotes (Ampel) zuerst, darunter die gewohnte Phasenreihenfolge.
+  // Deals: Rotes (Ampel) zuerst, darunter Phasenreihenfolge. Vorgänge, deren jüngste
+  // Notiz „abgesagt/nicht sinnvoll" sagt, stehen HINTER den frischen (Korrektur Nele).
   const byPhase=(a,b)=>(FUNNEL.indexOf(a.phase)-FUNNEL.indexOf(b.phase))||(b.score-a.score);
-  deals.sort((a,b)=>((b.score>=100)-(a.score>=100))||byPhase(a,b)); beob.sort(byScore);
+  deals.sort((a,b)=>((notizNegativ(a)?1:0)-(notizNegativ(b)?1:0))||((b.score>=100)-(a.score>=100))||byPhase(a,b)); beob.sort(byScore);
   angefragt.sort((a,b)=>(exposeRang(a.ex)-exposeRang(b.ex))||(b.o.score-a.o.score));
   const kopf=(farbe,txt,n,hinweis)=>`<tr class="hzt-cat"><td colspan="6"><span class="hz-cat" style="color:${farbe}">${txt} <small style="color:var(--ink-faint);font-weight:600">(${n})${hinweis?' – '+hinweis:''}</small></span></td></tr>`;
   /* Stufe 2 (12.09.2026): Je Block nur die Top 5 – der Rest hinter „x weitere anzeigen".
@@ -1568,13 +1605,14 @@ function renderHeuteZuerst(){
   let body='';
 
   // 1 – Angefragt – zu prüfen: angefragte Exposés (Leadliste-Vermerk + reine Mail-Anfragen).
+  // 12.09.2026: Blockköpfe ohne Erklärtexte (Wunsch Nele) – nur Titel, Zahl und echte Kennzahlen.
   if(fAng.length||fAnfM.length){
-    body+=kopf('#0D9488','🧐 Angefragt – zu prüfen',fAng.length+fAnfM.length,'Exposé da → prüfen & binnen '+EXPOSE_FRIST+' T antworten · '+EXPOSE_FRIST+' T still → nachfassen · ➕ trägt in die Leadliste ein');
+    body+=kopf('#0D9488','🧐 Angefragt – zu prüfen',fAng.length+fAnfM.length,'');
     body+=blockRows(fAng.map(x=>hztRow(x.o)).concat(fAnfM.map(hztAngefragtRow)),'ang');
   }
-  // 2 – Deals in Arbeit: Kalkulation bis Kaufvertrag; Rotes steht oben, die Ampel zeigt die Dringlichkeit
+  // 2 – Deals in Arbeit: Kalkulation bis Kaufvertrag; Rotes oben, Abgesagtes/Nicht-Sinnvolles unten
   if(fDeals.length){
-    body+=kopf('var(--band-orange)','💰 Deals in Arbeit',fDeals.length,'alles aus der Leadliste – Ampel vorn zeigt, was dringend ist');
+    body+=kopf('var(--band-orange)','💰 Deals in Arbeit',fDeals.length,'');
     body+=blockRows(fDeals.map(hztRow),'deals');
   }
   // 3 – Aufwertung: ALLE Aufgaben aus Projektzeitplan, Handwerkern und Terminvorschlägen (rot zuerst)
@@ -1589,7 +1627,7 @@ function renderHeuteZuerst(){
   }
   // 3b – Verkaufs-Wächter (Reservierung ohne Notartermin, Kaufpreis nicht eingegangen)
   if(vkOffen.length){
-    body+=kopf('var(--band-red)','💰 Verkauf',vkOffen.length,'Notartermin, Geldeingang & Co. – nichts davon darf liegen bleiben');
+    body+=kopf('var(--band-red)','💰 Verkauf',vkOffen.length,'');
     body+=blockRows(vkOffen.map(hztAufRow),'vk');
   }
   // 4 – neue Objekte anfragen: NUR bei Nele, nicht im Dringend-Filter
@@ -1608,19 +1646,19 @@ function renderHeuteZuerst(){
   }
   // 5 – Beobachten: nicht im Dringend-Filter
   if(!nurDringend&&beob.length){
-    body+=kopf('var(--ink-faint)','👁️ Beobachten',beob.length,'Wiedervorlage erreicht – reaktivieren oder vertagen');
+    body+=kopf('var(--ink-faint)','👁️ Beobachten',beob.length,'');
     body+=blockRows(beob.map(hztRow),'beob');
   }
   // 6 – Absagen (bleiben auch im Dringend-Filter – sie sind eine offene Handlung)
   const abs=absagen();
   if(abs.length){
-    body+=kopf('var(--band-orange)','📤 Absagen offen',abs.length,'anklicken, vermerken → „Beobachten"');
+    body+=kopf('var(--band-orange)','📤 Absagen offen',abs.length,'');
     body+=blockRows(abs.map(hztAbsageRow),'abs');
   }
   // 7 – mit Termin geparkt: standardmäßig EINGEKLAPPT (Stufe 2)
   const snz=snoozedTasks();
   if(!nurDringend&&snz.length){
-    body+=kopf('var(--ink-faint)','⏳ Wiedervorlage geplant',snz.length,'taucht am Termin automatisch wieder oben auf');
+    body+=kopf('var(--ink-faint)','⏳ Wiedervorlage geplant',snz.length,'');
     if(HZ_MEHR['snz']) body+=snz.map(hztSnoozeRow).join('');
     body+=`<tr class="hzt-more"><td></td><td colspan="5"><button onclick="hzMehr('snz')">${HZ_MEHR['snz']?'▲ einklappen':'▼ '+snz.length+' geparkte anzeigen'}</button></td></tr>`;
   }
@@ -1841,6 +1879,50 @@ async function saveNeuObjektAdd(tid){
       const neu=OBJ.filter(x=>x._row).sort((a,b)=>b._row-a._row)[0];
       if(neu&&neu.key&&normLoose(neu.adresse)===normLoose(adr)) await setMailObj(tid,neu.key);
     }catch(e){}
+  }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='➕ In Leadliste (Vorqualifikation)'; }
+}
+/* ===== Folge-Anfrage → eigenes Objekt (12.09.2026, Regel Nele) ==================
+   „abgesagt + neu angefragt" in einer Notiz: Die Anfrage gilt einem NEUEN Objekt
+   (gleicher Makler, z. B. das Nachbarhaus). Dieses Fenster legt die neue Zeile an –
+   Makler und Kontakt kommen vom alten Objekt, das Anfrage-Datum aus der Notiz.
+   Beim alten Objekt wird vermerkt, dass die Folgeanfrage jetzt eigenständig läuft
+   (mit „abgesagt" im Vermerk, damit es ruhig einsortiert bleibt).                 */
+function openFolgeObjekt(id){
+  const o=OBJ.find(x=>x._id===id); if(!o) return;
+  const fa=folgeAnfrageInfo(o); if(!fa) return;
+  $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
+    <div class="detail-head"><h2>➕ Folgeanfrage als neues Objekt</h2>
+      <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">Aus <b>${esc(o.titel)}</b> – das alte Objekt bleibt abgesagt, die Wochenfrist läuft am neuen weiter.</div></div>
+    <div class="field"><label>Adresse / Objekt (das NEUE Objekt)</label><textarea id="foAdr" style="min-height:38px" placeholder="z. B. ${escA(o.titel)}a"></textarea></div>
+    <div class="field"><label>Makler / Verkäufer</label><textarea id="foSeller" style="min-height:38px">${esc(o.seller||'')}</textarea></div>
+    <div class="field"><label>Notiz</label><textarea id="foNote">Exposé/Unterlagen angefragt am ${fmtDate(fa.anf)} (Folgeanfrage aus ${esc(o.titel)})</textarea></div>
+    <div id="foErr"></div>
+    <div class="erl-actions"><button class="savebtn" id="foAdd">➕ In Leadliste (Vorqualifikation)</button><button class="btn-ghost" onclick="closeErledigt()">Abbrechen</button></div>`;
+  $('erlOverlay').classList.add('open');
+  setTimeout(()=>{ const t=$('foAdr'); if(t) t.focus(); },40);
+  $('foAdd').onclick=()=>saveFolgeObjekt(id);
+}
+async function saveFolgeObjekt(id){
+  const o=OBJ.find(x=>x._id===id); if(!o) return;
+  const adr=($('foAdr').value||'').trim(), seller=($('foSeller').value||'').trim(), note=($('foNote').value||'').trim();
+  const errEl=$('foErr'); errEl.innerHTML='';
+  if(!adr){ errEl.innerHTML='<div class="erl-err">Bitte die Adresse des neuen Objekts eintragen.</div>'; return; }
+  const btn=$('foAdd'); btn.disabled=true; btn.textContent='Speichere …';
+  try{
+    const row=new Array(24).fill('');
+    row[1]=seller;                 // B  Verkäufer/Makler (vom alten Objekt)
+    row[2]=o.tel||'';              // C  Kontakt (vom alten Objekt)
+    row[8]=adr;                    // I  Adresse
+    row[9]='Vorqualifikation';     // J  Status/Phase
+    row[22]=`[${fmtDate(new Date())}] angefragt: ${note||('Folgeanfrage aus '+o.titel)}`;   // W
+    await sheetsAppend('Leadliste!A:X',row);
+    // Altes Objekt: Vermerk MIT „abgesagt", damit die Folgeanfrage-Erkennung dort erlischt
+    // und die Zeile ruhig (hinten in „Deals in Arbeit") einsortiert bleibt.
+    const combined=await appendCell('Leadliste','W',o._row,`[${fmtDate(new Date())}] abgesagt – Folgeanfrage als eigenes Objekt angelegt: ${adr}`,o.nextStep||'');
+    o.nextStep=combined; o.task=combined;
+    closeErledigt();
+    saveToast('✓ Neues Objekt angelegt (Vorqualifikation) – altes bleibt abgesagt',1);
+    await loadData();
   }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='➕ In Leadliste (Vorqualifikation)'; }
 }
 async function saveNeuObjektDrop(tid){
