@@ -70,6 +70,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 
 /* Daystrip / Maklercall */
 .daystrip .ds-h{font-weight:800;font-size:14px;margin-bottom:9px}
+/* 12.09.2026 – Kopfzeile der Heute-Ansicht: drei kompakte Karten nebeneinander */
+.kopf-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.kopf-row .card{padding:10px 14px}
+.kopf-row .greet-msg{font-size:12px;line-height:1.45}
+.kopf-row .ds-h{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);margin-bottom:7px;font-weight:800}
+.kopf-row .ds-chip{padding:3px 10px;font-size:11px}
+.kopf-row .section-t{font-size:11px;margin-bottom:6px}
+.kopf-row #calCard{max-height:150px;overflow:auto}
 .ds-list{display:flex;gap:8px;flex-wrap:wrap}
 .ds-chip{background:rgba(255,255,255,.08);border:1px solid rgba(227,194,100,.28);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px}
 .ds-chip .pill{width:9px;height:9px;border-radius:3px}
@@ -110,6 +118,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 .wt-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex:0 0 auto}
 .wt-item.wtdone .mt{text-decoration:line-through;color:var(--ink-faint)}
 .wt-hint{font-size:11px;color:var(--ink-faint);margin-top:2px}
+/* 12.09.2026 – feste Wochen-To-dos als Einzeiler im Tagesfokus */
+.wt-zeile{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;font-weight:700;color:var(--ink-soft);margin:2px 0 12px}
+.wt-zeile small{font-weight:600;color:var(--ink-faint)}
+.wt-chip{border:1px solid var(--glass-brd);background:rgba(255,255,255,.08);border-radius:999px;padding:3px 11px;font-size:11.5px;font-weight:700;color:var(--ink-soft);cursor:pointer}
+.wt-chip.done{opacity:.55;text-decoration:line-through}
 /* Morning-Briefing-Einbettung (eigenes helles Feld, damit die Mail-Optik lesbar bleibt) */
 .briefing{background:#fff;color:#16294B;border-radius:12px;padding:12px 14px;margin-top:8px;overflow-x:auto;font-size:13px;line-height:1.45}
 .briefing table{border-collapse:collapse;max-width:100%}
@@ -151,6 +164,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 .hz-badge.orange{background:rgba(227,138,43,.16);color:#B45309}
 .hz-badge.gelb{background:rgba(214,164,0,.15);color:#8A6A1F}
 .hz-badge.neutral{background:rgba(40,32,12,.07);color:var(--ink-soft)}
+/* 12.09.2026 – Verlauf (Leadliste Spalte W) als Stichpunkte statt fettem Textblock */
+.verlauf{display:flex;flex-direction:column;gap:6px}
+.verlauf-e{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.5;background:rgba(255,255,255,.06);border-radius:8px;padding:7px 10px}
+.verlauf-e.neu{border-left:3px solid var(--gold);border-radius:0 8px 8px 0}
+.verlauf-d{flex:none;font-size:11px;font-weight:700;color:var(--ink-faint);margin-top:1px;min-width:72px}
+.verlauf-t{flex:1;color:var(--ink);font-weight:400;white-space:pre-wrap;min-width:0}
+.verlauf-h{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);margin:10px 0 5px}
 .hzt tr.hzt-more td{border-top:0;padding:4px 8px 10px}
 .hzt-more button{border:0;background:transparent;color:var(--gold-d);font-weight:700;font-size:12px;cursor:pointer;padding:2px 0}
 .hz-filter{display:inline-flex;gap:4px;margin-left:10px;vertical-align:middle}
@@ -284,6 +304,8 @@ body{background:var(--bg1)}
 .focus-item{background:#F5F2E9} .focus-rail{background:rgba(40,32,12,.10)}
 .hz-item{background:#F5F2E9} .hz-item:hover{background:#EFEBDD}
 .mini{background:#F5F2E9}
+.verlauf-e{background:#F5F2E9}
+.wt-chip{background:#F5F2E9}
 .kon-row{cursor:pointer} .kon-row:hover{background:#EFEBDD}
 .hzt td{border-top:1px solid rgba(40,32,12,.09)}
 .hzt tr.hzt-row:hover td{background:#F7F4EC}
@@ -445,14 +467,19 @@ body{background:var(--bg1)}
   </div>
 
   <div id="tab-heute"><div class="stack">
-    <div class="card greet" id="greetCard"></div>
-    <div class="card daystrip" id="dayStrip"></div>
-    <div class="card" id="calCard" style="display:none"></div>
-    <div class="card"><div class="kpis" id="kpis"></div></div>
+    <!-- 12.09.2026 (Wunsch Nele): Gruß, Fokusblöcke und Kalender kompakt NEBENEINANDER,
+         damit man schneller zu den Aufgaben kommt -->
+    <div class="kopf-row">
+      <div class="card greet" id="greetCard"></div>
+      <div class="card daystrip" id="dayStrip"></div>
+      <div class="card" id="calCard" style="display:none"></div>
+    </div>
+    <!-- 12.09.2026 (Wunsch Nele): KPI-Kacheln entfernt, feste Wochen-To-dos als
+         Einzeiler in den Tagesfokus gerückt – weniger Karten, schneller bei den Aufgaben -->
     <div id="maklercallSlot"></div>
-    <div class="card" id="wochenTodosCard" style="display:none"></div>
     <div class="card">
       <div class="section-t">🎯 Tagesfokus – deine Top 3</div>
+      <div id="wochenTodosZeile"></div>
       <div class="focus-track" id="focusTrack"></div>
       <div class="focus-msg" id="focusMsg"></div>
       <div class="focus-items" id="focusItems"></div>
@@ -1260,24 +1287,25 @@ function renderMaklercall(){
   } else slot.innerHTML=`<div class="card maklercall done"><div class="mc-h">${MC[NOW.getDate()%MC.length]}</div></div>`;
 }
 function ensureSnapshot(){ if(focusSnapshot) return;
-  /* 12.09.2026 (Regel Nele): Der Tagesfokus zeigt die drei wichtigsten Themen
-     QUELLENÜBERGREIFEND – Leadliste, angefragte Exposés, Aufwertung und Verkauf.
-     Den Block „Reißt heute" gibt es nicht mehr; was früher dort stand, muss hier
-     um die drei Plätze konkurrieren. Punktzahlen: Leadliste = Score, Aufwertung/
-     Verkauf rot 100 · heute 65 · bald 35, Mail-Anfrage nachfassen/überfällig 100 ·
-     prüfen 60 · warten 20. */
+  /* 12.09.2026 (Regel Nele, verschärft): Der Tagesfokus folgt festen RÄNGEN, nicht
+     nur der Punktzahl – vorher standen drei Beobachten-Wiedervorlagen ganz oben.
+     Rang 0: Verhandlung – schlägt alles.
+     Rang 1: alles Aktive (Angefragt-Fristen, Deals, Aufwertung, Verkauf, Mail-Anfragen),
+             innerhalb nach Dringlichkeit (Score).
+     Rang 2: Beobachten – geht NIE vor Deals oder angefragte Objekte. */
   const kand=activeObjs().filter(o=>inTagesliste(o)&&mine(o)&&!focusSuppressed(o))
-    .map(o=>({id:o._id,score:o.score,label:phaseLabelShort(o.phase)+' · '+actionKeyword(o)+' – '+o.titel}));
+    .map(o=>({id:o._id,score:o.score,tier:o.phase==='Verhandlung'?0:(o.phase==='Beobachten'?2:1),
+              label:phaseLabelShort(o.phase)+' · '+actionKeyword(o)+' – '+o.titel}));
   const SEV_PTS={rot:100,heute:65,bald:35};
   try{
-    aufItems().forEach(it=>kand.push({id:it.id,score:SEV_PTS[it.sev]||35,label:'🏗️ '+it.titel}));
-    vkItems().filter(it=>!aufDone(it.id)).forEach(it=>kand.push({id:it.id,score:SEV_PTS[it.sev]||100,label:'💰 '+it.titel}));
+    aufItems().forEach(it=>kand.push({id:it.id,score:SEV_PTS[it.sev]||35,tier:1,label:'🏗️ '+it.titel}));
+    vkItems().filter(it=>!aufDone(it.id)).forEach(it=>kand.push({id:it.id,score:SEV_PTS[it.sev]||100,tier:1,label:'💰 '+it.titel}));
     if(hasGmailScope()&&GMAIL.state==='ready') angefragtMailItems().forEach(x=>{
       const r=exposeRang(x.info);
-      kand.push({id:'anf|'+x.t.tid,score:r===0?100:r===1?60:20,label:x.info.todo+' – '+x.t.subj,gmail:x.t.tid});
+      kand.push({id:'anf|'+x.t.tid,score:r===0?100:r===1?60:20,tier:1,label:x.info.todo+' – '+x.t.subj,gmail:x.t.tid});
     });
   }catch(e){}
-  const snap=kand.filter(k=>!doneSet.has(dkey(k.id))).sort((a,b)=>b.score-a.score).slice(0,3);
+  const snap=kand.filter(k=>!doneSet.has(dkey(k.id))).sort((a,b)=>(a.tier-b.tier)||(b.score-a.score)).slice(0,3);
   if(snap.length<3&&hasGmailScope()&&GMAIL.state==='ready'){   // auffüllen mit dem dringendsten Mail-Entwurf
     for(const m of userMailItems()){ if(snap.length>=3)break; if(m.objId&&snap.some(s=>s.id===m.objId))continue; const id='mail|'+m.tid; if(snap.some(s=>s.id===id))continue; snap.push({id,label:'✉️ '+(m.hasDraft?'Entwurf senden':'Antwort schreiben')+' – '+m.subj,gmail:m.tid}); }
   }
@@ -1290,7 +1318,7 @@ function renderFocus(){
   $('focusTrack').innerHTML=`<div class="focus-rail"></div><div class="focus-fill" style="width:${pct}%"></div>`+marks.map((m,i)=>`<span class="fm ${done>=m[1]?'on':''}" style="left:${at[i]}%">${m[0]}</span>`).join('');
   $('focusMsg').textContent=['Auf geht’s – schon der Start zählt. 🙂 wartet.','Guter Start! Weiter zum 😃','Stark dran – ein Schritt zum 🤩!','🤩 Tagesziel erreicht!'][Math.min(done,3)];
   $('focusItems').innerHTML=focusSnapshot.length?focusSnapshot.map(f=>{ const d=doneSet.has(dkey(f.id));
-    return `<div class="focus-item${d?' done':''}"><span>${d?'✅':'⭕'}</span><span style="flex:1">${esc(f.label)}</span>${f.gmail?`<a class="link" target="_blank" href="${gmailThreadLink(f.gmail)}">öffnen</a>`:''}<button data-id="${f.id}">${d?'erledigt':'✓ erledigt'}</button></div>`; }).join(''):'<div class="empty">Keine offenen Aufgaben 🎯</div>';
+    return `<div class="focus-item${d?' done':''}"><span>${d?'✅':'⭕'}</span><span style="flex:1">${esc(f.label)}</span>${f.gmail?`<a class="link" target="_blank" href="${gmailThreadLink(f.gmail)}">öffnen</a>`:''}<button data-id="${f.id}">${d?'✓ erfasst':'Fortschritt erfassen'}</button></div>`; }).join(''):'<div class="empty">Keine offenen Aufgaben 🎯</div>';
   $('focusItems').querySelectorAll('button').forEach(b=>b.onclick=()=>handleErledigtClick(b.dataset.id));
 }
 /* „Stand" im Briefing-Schnitt (12.09.2026, Wunsch Nele): EIN kuratierter Satz statt
@@ -1328,6 +1356,41 @@ function folgeAnfrageInfo(o){
   return {anf,antwort,zustand:exposeZustand(anf,antwort)};
 }
 function kurz(s,n){ s=String(s||'').trim(); return s.length>n?s.slice(0,n-1)+'…':s; }
+/* 12.09.2026 (Wunsch Nele): Der Inhalt von Spalte W wird nicht mehr als ein fetter
+   Textblock gezeigt, sondern als VERLAUF – ein Stichpunkt je Eintrag. Alte, von Hand
+   ineinandergeschriebene Notizen werden an ihren Datums-Markern getrennt. Gruppiert
+   wird heuristisch in „Nächste Schritte & Stand" (Aktions-Wörter) und „Infos zum
+   Objekt" – echtes Umformulieren kann nur Claude (Morning Briefing), das Cockpit
+   sortiert nur. Neueste zuerst.                                                   */
+function verlaufEintraege(txt){
+  const out=[];
+  String(txt||'').split('\n').map(z=>z.trim()).filter(Boolean).forEach(z=>{
+    const re=/(?:\[|(?<=\s)|^)(\d{1,2}\.\d{1,2}\.\d{4})(?:\]|:)/g;
+    const cuts=[]; let m;
+    while((m=re.exec(z))) cuts.push(m.index);
+    if(cuts.length<=1){ out.push(z); return; }
+    if(cuts[0]>0) out.push(z.slice(0,cuts[0]).trim());
+    cuts.push(z.length);
+    for(let i=0;i<cuts.length-1;i++){ const t=z.slice(cuts[i],cuts[i+1]).trim(); if(t) out.push(t); }
+  });
+  return out.map(t=>({d:parseDate(t),text:t.replace(/^\[?\d{1,2}\.\d{1,2}\.\d{2,4}\]?[:\s–-]*/,'').trim()}))
+    .filter(e=>e.text&&!/^\[?\d{1,2}\.\d{1,2}\.\d{2,4}\]?:?$/.test(e.text));   // leere Datums-Schnipsel raus
+}
+const VERLAUF_SCHRITT_RE=/nachfass|anruf|rückruf|zurückruf|angefragt|abwarten|warten|ausstehend|rückmeldung|noch keine|prüfen|kalkul|absage|termin|melden|senden|schicken|klären|offen|nächste schritte|zurückgestellt|wiedervorlage|wiederaufnahme|erledigt/;
+function verlaufHTML(txt){
+  const es=verlaufEintraege(txt);
+  if(!es.length) return '<div class="empty">Noch kein Eintrag.</div>';
+  const alle=es.slice().reverse();   // neueste zuerst
+  // Explizite Präfixe (schreibt der Skill leadliste-w-aufraeumen) schlagen die Wort-Heuristik.
+  const istSchritt=e=>{const t=norm(e.text); if(/^info:/.test(t)) return false;
+    if(/^(nächster schritt|naechster schritt|schritt|to.?do):/.test(t)) return true;
+    return VERLAUF_SCHRITT_RE.test(t);};
+  const schritte=alle.filter(istSchritt);
+  const infos=alle.filter(e=>!istSchritt(e));
+  const teil=(titel,list,markErst)=>list.length?`<div class="verlauf-h">${titel}</div><div class="verlauf">`
+    +list.map((e,i)=>`<div class="verlauf-e${markErst&&i===0?' neu':''}"><span class="verlauf-d">${e.d?fmtDate(e.d):'–'}</span><span class="verlauf-t">${esc(e.text)}</span></div>`).join('')+'</div>':'';
+  return teil('📌 Nächste Schritte & Stand',schritte,true)+teil('ℹ️ Infos zum Objekt',infos,false);
+}
 function hzStandSatz(o){
   const note=letzteNotizVon(o);
   const bd=GMAIL.briefingDate||null;
@@ -1575,9 +1638,9 @@ function renderHeuteZuerst(){
     if(fa){ angefragt.push({o,ex:fa.zustand}); return; }
     const ex=angefragtInfo(o);
     if(ex){ angefragt.push({o,ex}); return; }
-    // 12.09.2026 (Regel Nele): JEDES Objekt in Vorqualifikation gehört in „Angefragt –
-    // zu prüfen", bis es auf „Kalkulieren" rückt – auch ohne Anfrage-Vermerk oder Mail.
-    if(o.phase==='Vorqualifikation'){ angefragt.push({o,ex:null}); return; }
+    // 12.09.2026 (Regel Nele): JEDES Objekt in „Neu" oder „Vorqualifikation" gehört in
+    // „Angefragt – zu prüfen", bis es auf „Kalkulieren" rückt – auch ohne Vermerk/Mail.
+    if(o.phase==='Neu'||o.phase==='Vorqualifikation'){ angefragt.push({o,ex:null}); return; }
     deals.push(o);
   });
   const anfMails=gmailReady?angefragtMailItems():[];
@@ -1894,13 +1957,15 @@ async function saveNeuObjektAdd(tid){
    (mit „abgesagt" im Vermerk, damit es ruhig einsortiert bleibt).                 */
 function openFolgeObjekt(id){
   const o=OBJ.find(x=>x._id===id); if(!o) return;
-  const fa=folgeAnfrageInfo(o); if(!fa) return;
+  // 12.09.2026: Auch OHNE Mischfall-Notiz nutzbar (➕ im Pipeline-Detailfenster) –
+  // dann wird das alte Objekt nicht angefasst, nur Makler & Kontakt übernommen.
+  const fa=folgeAnfrageInfo(o);
   $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
-    <div class="detail-head"><h2>➕ Folgeanfrage als neues Objekt</h2>
-      <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">Aus <b>${esc(o.titel)}</b> – das alte Objekt bleibt abgesagt, die Wochenfrist läuft am neuen weiter.</div></div>
+    <div class="detail-head"><h2>➕ ${fa?'Folgeanfrage als neues Objekt':'Neues Objekt vom selben Makler'}</h2>
+      <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">Aus <b>${esc(o.titel)}</b> – ${fa?'das alte Objekt bleibt abgesagt, die Wochenfrist läuft am neuen weiter.':'Makler & Kontakt werden übernommen, das neue Objekt startet in der Vorqualifikation.'}</div></div>
     <div class="field"><label>Adresse / Objekt (das NEUE Objekt)</label><textarea id="foAdr" style="min-height:38px" placeholder="z. B. ${escA(o.titel)}a"></textarea></div>
     <div class="field"><label>Makler / Verkäufer</label><textarea id="foSeller" style="min-height:38px">${esc(o.seller||'')}</textarea></div>
-    <div class="field"><label>Notiz</label><textarea id="foNote">Exposé/Unterlagen angefragt am ${fmtDate(fa.anf)} (Folgeanfrage aus ${esc(o.titel)})</textarea></div>
+    <div class="field"><label>Notiz</label><textarea id="foNote">Exposé/Unterlagen angefragt am ${fmtDate(fa?fa.anf:new Date())} (${fa?'Folgeanfrage aus':'Folgeobjekt zu'} ${esc(o.titel)})</textarea></div>
     <div id="foErr"></div>
     <div class="erl-actions"><button class="savebtn" id="foAdd">➕ In Leadliste (Vorqualifikation)</button><button class="btn-ghost" onclick="closeErledigt()">Abbrechen</button></div>`;
   $('erlOverlay').classList.add('open');
@@ -1921,12 +1986,15 @@ async function saveFolgeObjekt(id){
     row[9]='Vorqualifikation';     // J  Status/Phase
     row[22]=`[${fmtDate(new Date())}] angefragt: ${note||('Folgeanfrage aus '+o.titel)}`;   // W
     await sheetsAppend('Leadliste!A:X',row);
-    // Altes Objekt: Vermerk MIT „abgesagt", damit die Folgeanfrage-Erkennung dort erlischt
-    // und die Zeile ruhig (hinten in „Deals in Arbeit") einsortiert bleibt.
-    const combined=await appendCell('Leadliste','W',o._row,`[${fmtDate(new Date())}] abgesagt – Folgeanfrage als eigenes Objekt angelegt: ${adr}`,o.nextStep||'');
-    o.nextStep=combined; o.task=combined;
+    // Nur im Mischfall („abgesagt + angefragt") bekommt das ALTE Objekt den Vermerk mit
+    // „abgesagt" – so erlischt die Folgeanfrage-Erkennung dort und die Zeile bleibt ruhig.
+    // Ohne Mischfall (➕ aus dem Detailfenster) wird das alte Objekt NICHT verändert.
+    if(folgeAnfrageInfo(o)){
+      const combined=await appendCell('Leadliste','W',o._row,`[${fmtDate(new Date())}] abgesagt – Folgeanfrage als eigenes Objekt angelegt: ${adr}`,o.nextStep||'');
+      o.nextStep=combined; o.task=combined;
+    }
     closeErledigt();
-    saveToast('✓ Neues Objekt angelegt (Vorqualifikation) – altes bleibt abgesagt',1);
+    saveToast('✓ Neues Objekt angelegt (Vorqualifikation)',1);
     await loadData();
   }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='➕ In Leadliste (Vorqualifikation)'; }
 }
@@ -1948,31 +2016,18 @@ function todayWeekTodos(){
 }
 function wtKey(t){ return 'wt|'+t.di+'|'+t.ci+'|'+t.k+'|'+TODAY_STR; }   // tagesbezogen → setzt sich täglich zurück
 function toggleWeekTodo(key){ const nowDone=!doneSet.has(key); if(nowDone){ doneSet.add(key); burst(12); } else doneSet.delete(key); persistState(key,'done',nowDone?'1':'0'); renderAll(); }
+/* 12.09.2026 (Wunsch Nele): Die festen Wochen-To-dos sind keine eigene Karte mehr,
+   sondern EINE Zeile im Tagesfokus (über dem Balken). Klick auf einen Chip hakt ab. */
 function renderWochenTodos(){
-  const card=$('wochenTodosCard'), items=todayWeekTodos();
-  if(!items.length){ card.style.display='none'; card.innerHTML=''; return; }
-  card.style.display='';
+  const el=$('wochenTodosZeile'); if(!el) return;
+  const items=todayWeekTodos();
+  if(!items.length){ el.innerHTML=''; return; }
   const done=items.filter(t=>doneSet.has(wtKey(t))).length;
-  let h=`<div class="section-t">📌 Feste To-dos heute <small>– aus deinem Wochenplan (${WEEK[CURRENT_WEEKDAY].day}) · ${done}/${items.length}</small></div>`;
-  /* 23.08.2026: Vorher stand der Blockname in JEDER Zeile — bei drei Punkten aus
-     „Wochenplanung + Weekly Review" dreimal derselbe Text, und das Auge musste die
-     Zusammengehörigkeit selbst herstellen. Jetzt einmal als Überschrift, darunter
-     nur noch das, was sich wirklich unterscheidet. */
-  const gruppen=[];
-  items.forEach(t=>{ let g=gruppen.find(x=>x.block===t.block);
-    if(!g){ g={block:t.block,label:t.label,items:[]}; gruppen.push(g); } g.items.push(t); });
-  h+=gruppen.map(g=>{
-    const col=g.label?LBL[g.label]:'#94a3b8';
-    const offen=g.items.filter(t=>!doneSet.has(wtKey(t))).length;
-    return `<div class="wt-grp"><span class="dot" style="background:${col}"></span><span>${esc(g.block)}</span>`
-      +`<small style="font-weight:600;color:var(--ink-faint);font-size:11px">${offen?offen+' von '+g.items.length+' offen':'✓ fertig'}</small></div>`
-      +`<div class="wt-sub">`+g.items.map(t=>{ const d=doneSet.has(wtKey(t));
-        return `<div class="mini wt-item${d?' wtdone':''}" data-key="${esc(wtKey(t))}"><input type="checkbox" ${d?'checked':''}><span class="mt" style="font-weight:500;color:var(--ink-soft)">${esc(t.text)}</span></div>`;
-      }).join('')+`</div>`;
-  }).join('');
-  h+=`<div class="wt-hint">Diese Punkte sind fest eingeplant – erst sie, dann die Akquise. Häkchen gelten nur für heute.</div>`;
-  card.innerHTML=h;
-  card.querySelectorAll('.wt-item input').forEach(cb=>cb.onclick=()=>toggleWeekTodo(cb.closest('.wt-item').dataset.key));
+  el.innerHTML=`<div class="wt-zeile"><span>📌 Fest heute:</span>`
+    +items.map(t=>{ const d=doneSet.has(wtKey(t));
+      return `<button class="wt-chip${d?' done':''}" data-key="${esc(wtKey(t))}" title="${esc(t.block)} – Klick hakt für heute ab">${d?'✓ ':''}${esc(t.text)}</button>`; }).join('')
+    +`<small>${done}/${items.length}</small></div>`;
+  el.querySelectorAll('.wt-chip').forEach(b=>b.onclick=()=>toggleWeekTodo(b.dataset.key));
 }
 
 
@@ -4657,16 +4712,12 @@ function uebergabeSectionHTML(o){
   const schluessel=leadSchluessel(o);
   const schon=(SALE||[]).find(x=>x.leadKey&&x.leadKey.trim()===schluessel);
   if(schon) return `<div class="section-t" style="margin-top:16px">➡️ Übergeben</div>`
-    +`<div class="mini"><span class="dot" style="background:var(--green)"></span><span class="mt">`
-    +`Dieses Objekt wird bereits in der Objektliste geführt${schon.kuerzel?' als <b>'+esc(schon.kuerzel)+'</b>':''}.<br>`
-    +`<span style="color:var(--ink-soft)">Verkaufsphase und Aufwertung stehen im Board 💰 Verkauf.</span></span></div>`;
+    +`<div style="font-size:11.5px;color:var(--ink-faint)">✓ Wird bereits in der Objektliste geführt${schon.kuerzel?' als <b>'+esc(schon.kuerzel)+'</b>':''} – Verkaufsphase &amp; Aufwertung im Board 💰 Verkauf.</div>`;
+  // 12.09.2026 (Wunsch Nele): Erklärtext klein NEBEN dem Knopf statt als eigener Kasten davor.
   return `<div class="section-t" style="margin-top:16px">➡️ In den Verkauf übergeben</div>`
-    +`<div class="mini"><span class="dot" style="background:var(--band-yellow)"></span><span class="mt" style="white-space:normal">`
-    +`Legt eine Zeile in der <b>Objektliste</b> an und nimmt das Objekt aus dem Ankauf-Board. `
-    +`Ab dann führt die Objektliste — Verkaufsphase und Aufwertung steuerst du im Board 💰 Verkauf.<br>`
-    +`<span style="color:var(--ink-soft)">Eine doppelte Zeile kann dabei nicht entstehen; erkannt wird das Objekt an Adresse und Verkäufer.</span>`
-    +`</span></div>`
-    +`<button class="savebtn" id="dtUeber">➡️ In den Verkauf übergeben</button>`;
+    +`<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">`
+    +`<button class="savebtn" id="dtUeber" style="margin:0;width:auto">➡️ In den Verkauf übergeben</button>`
+    +`<span style="flex:1;min-width:180px;font-size:11.5px;line-height:1.4;color:var(--ink-faint)">Legt eine Zeile in der Objektliste an und nimmt das Objekt aus dem Ankauf-Board – Dopplung ausgeschlossen. Ab dann steuerst du es im Board 💰 Verkauf.</span></div>`;
 }
 
 /* Alles, was ein Verkaufsobjekt im Detailfenster braucht. Vorher stand hier gar
@@ -4722,15 +4773,19 @@ function openDetail(id){
     ${!isSale?terminSectionHTML(o):''}
     ${!isSale?`<div class="section-t" style="margin-top:16px">🎯 Follow-up ${briefingInfo(o)?'<small style="color:var(--gold)">aus dem Morning Briefing</small>':'<small>aus Leadliste / Phase</small>'}</div>
       <div class="mini"><span class="dot" style="background:${bandColor(o.score)}"></span><span class="mt" style="white-space:normal">${KANAL_ICON[kanalOf(o)]||''} <b>${esc(hzTodo(o))}</b> – ${esc(hzVorschlag(o))}</span></div>`:''}
-    <div class="section-t" style="margin-top:16px">📋 Nächster Schritt (Leadliste Spalte W)</div>
-    <div class="mini"><span class="dot" style="background:${isSale?'#93C5FD':bandColor(o.score)}"></span><span class="mt">${esc(o.task||o.nextStep||'—')}</span></div>
+    <div class="section-t" style="margin-top:16px">📋 Verlauf (Leadliste Spalte W)</div>
+    ${verlaufHTML(o.nextStep||o.task)}
     ${!isSale?wvSectionHTML(o):''}
     ${!isSale?`<div class="section-t" style="margin-top:16px">👤 Zuständig</div><div class="phbtns"><button class="phbtn${effOwner(o)==='Nele'?' on':''}" data-ow="Nele">Nele</button><button class="phbtn${effOwner(o)==='Niklas'?' on':''}" data-ow="Niklas">Niklas</button></div>`:''}
     ${!isSale?`<div class="section-t" style="margin-top:16px">🔀 Phase / Status ändern</div><div class="phbtns">${BOARD_COLS.map(ph=>`<button class="phbtn${o.phase===ph?' on':''}" data-ph="${ph}">${esc(phaseLabelShort(ph))}</button>`).join('')}</div>`:''}
+    ${!isSale?`<div class="section-t" style="margin-top:16px">➕ Neues Objekt vom selben Makler</div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <button class="savebtn" id="dtFolge" style="margin:0;width:auto">➕ Folgeobjekt anlegen</button>
+        <span style="flex:1;min-width:180px;font-size:11.5px;line-height:1.4;color:var(--ink-faint)">Neue Leadliste-Zeile (Vorqualifikation) – Makler &amp; Kontakt werden übernommen.</span>
+      </div>`:''}
     ${!isSale?uebergabeSectionHTML(o):''}
     ${isSale?vkSectionHTML(o):''}
     ${!isSale?`<div class="section-t" style="margin-top:16px">✏️ Status / Notiz ergänzen</div>
-      ${o.nextStep?`<div class="erl-cur">${esc(o.nextStep)}</div>`:''}
       <div class="field"><textarea id="dtNote" placeholder="Aktuellen Stand als Text ergänzen … (wird an die Leadliste angehängt, nichts wird überschrieben)"></textarea></div>
       <button class="savebtn" id="dtNoteSave">In Leadliste ergänzen</button><div id="dtNoteErr"></div>`:''}
     ${o.notiz?`<div class="section-t" style="margin-top:16px">📝 Notiz</div><div style="font-size:13px;color:var(--ink-soft)">${esc(o.notiz)}</div>`:''}`;
@@ -4739,6 +4794,7 @@ function openDetail(id){
   $('modal').querySelectorAll('.phbtn[data-vk]').forEach(b=>b.onclick=async()=>{ await vkPhaseSetzen(o,b.dataset.vk); openDetail(id); });
   $('modal').querySelectorAll('.phbtn[data-nutz]').forEach(b=>b.onclick=async()=>{ await persistNutzung(o,b.dataset.nutz); renderAll(); openDetail(id); });
   { const u=$('dtUeber'); if(u) u.onclick=()=>{ u.disabled=true; u.textContent='… wird übergeben'; objektUebergeben(id); }; }
+  { const fg=$('dtFolge'); if(fg) fg.onclick=()=>{ closeDetail(); openFolgeObjekt(id); }; }
   const _dt=$('dtNoteSave'); if(_dt) _dt.onclick=()=>saveDetailNote(id);
   const _ls=$('lsSave'); if(_ls) _ls.onclick=()=>saveListingUrl(id);   // Punkt 1
   const _wv=$('wvSave'); if(_wv) _wv.onclick=()=>saveWiedervorlage(id);
@@ -4794,7 +4850,7 @@ function openErledigt(id){
       <div style="align-self:center;font-size:12px;color:var(--ink-faint)">Bis dahin verschwindet der Vorgang aus „Heute zuerst" und dem Tagesfokus.</div></div>
       ${altU?`<div style="font-size:12px;color:var(--ink-faint);margin-top:4px">Automatische Wiedervorlage aus der Leadliste: <b>${esc(altU)}</b> – ein Datum hier sticht sie.</div>`:''}
     </div>
-    ${cur?`<div class="field"><label>Bisheriger Stand in der Leadliste</label><div class="erl-cur">${esc(cur)}</div></div>`:''}
+    ${cur?`<div class="field"><label>Bisheriger Stand in der Leadliste</label>${verlaufHTML(cur)}</div>`:''}
     <div id="erlErr"></div>
     <div class="erl-actions"><button class="savebtn" id="erlSave">✓ Speichern &amp; erledigt</button><button class="btn-ghost" onclick="closeErledigt()">Abbrechen</button></div>`;
   $('erlOverlay').classList.add('open');
@@ -4869,7 +4925,7 @@ function openAbsage(id){
     <div class="detail-head"><h2>📤 Absage: ${esc(o.titel)}</h2>
       <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">Nach dem Speichern rückt das Objekt automatisch auf <b>Beobachten</b> (Wiedervorlage in 30/60 Tagen) und der Vermerk wird in der Leadliste (Spalte „Notizen aktueller Stand") ergänzt.</div></div>
     <div class="field"><label>Vermerk (optional)</label><textarea id="absNote" placeholder="z. B. Absage per Mail gesendet – Kaufpreis zu hoch"></textarea></div>
-    ${o.nextStep?`<div class="field"><label>Bisheriger Stand in der Leadliste</label><div class="erl-cur">${esc(o.nextStep)}</div></div>`:''}
+    ${o.nextStep?`<div class="field"><label>Bisheriger Stand in der Leadliste</label>${verlaufHTML(o.nextStep)}</div>`:''}
     <div id="absErr"></div>
     <div class="erl-actions"><button class="savebtn" id="absSave">✓ Abgesagt → Beobachten</button><button class="btn-ghost" onclick="closeErledigt()">Abbrechen</button></div>`;
   $('erlOverlay').classList.add('open');
@@ -5073,7 +5129,7 @@ function renderBriefingTab(){
 function renderAll(){
   const _mt=$('moinTitle'); if(_mt) _mt.textContent='Moin, '+currentUser+' 👋';
   document.querySelectorAll('#userswitch button').forEach(b=>b.classList.toggle('active',b.dataset.u===currentUser));   // Gold-Knopf folgt immer dem aktiven Nutzer
-  if(currentTab==='heute'){ renderGreet(); renderDayStrip(); renderCalendar(); renderKpis(); renderMaklercall(); renderWochenTodos(); renderFocus(); renderHeuteZuerst(); renderKontaktMini(); renderNeueObjekte(); }
+  if(currentTab==='heute'){ renderGreet(); renderDayStrip(); renderCalendar(); renderMaklercall(); renderWochenTodos(); renderFocus(); renderHeuteZuerst(); renderKontaktMini(); renderNeueObjekte(); }   // 12.09.2026: KPI-Kacheln entfernt (Wunsch Nele)
   if(currentTab==='briefing') renderBriefingTab();
   if(currentTab==='pipeline') renderBoard();
   if(currentTab==='kontakte'){ renderPartner(); renderKontakte(); }
