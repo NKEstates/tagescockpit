@@ -171,6 +171,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 .verlauf-d{flex:none;font-size:11px;font-weight:700;color:var(--ink-faint);margin-top:1px;min-width:72px}
 .verlauf-t{flex:1;color:var(--ink);font-weight:400;white-space:pre-wrap;min-width:0}
 .verlauf-h{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);margin:10px 0 5px}
+.verlauf-mehr summary{cursor:pointer;list-style:none}
+.verlauf-mehr summary::-webkit-details-marker{display:none}
+.verlauf-mehr summary::after{content:' mehr ▾';color:var(--gold-d);font-weight:700;font-size:11px;white-space:nowrap}
+.verlauf-mehr[open] summary{display:none}
 .hzt tr.hzt-more td{border-top:0;padding:4px 8px 10px}
 .hzt-more button{border:0;background:transparent;color:var(--gold-d);font-weight:700;font-size:12px;cursor:pointer;padding:2px 0}
 .hz-filter{display:inline-flex;gap:4px;margin-left:10px;vertical-align:middle}
@@ -213,6 +217,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
 .kc-follow-k{flex:none}
 .kc-follow-t{flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;color:var(--ink-soft)}
 .kc-follow-src{flex:none;font-size:9px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--gold);align-self:flex-end}
+/* 24.09.2026 – Kachel neu: Stern für Prio A, drei feste Zeilen, Kennzeichen */
+.kc-card.prioA{border:1.5px solid var(--gold);box-shadow:0 1px 2px rgba(40,32,12,.05),0 12px 30px rgba(138,106,31,.16)}
+.kc-star{margin-left:auto;background:#16294B;color:#EADFC0;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:800;white-space:nowrap}
+.kc-star.dim{background:rgba(22,41,75,.35);color:#16294B}
+.kc-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.kc-chip{font-size:10px;font-weight:700;border-radius:6px;padding:2px 6px;background:var(--bg1);color:var(--ink-soft);border:1px solid var(--glass-brd);white-space:nowrap}
+.kc-chip.gold{background:var(--gold-soft);color:#5C4612;border-color:transparent}
+.kc-lines{margin-top:8px;padding-top:8px;border-top:1px solid rgba(40,32,12,.09);display:flex;flex-direction:column;gap:4px}
+.kc-line{display:flex;gap:8px;align-items:flex-start;font-size:11.5px;line-height:1.35}
+.kc-line-k{flex:none;width:60px;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);padding-top:2px}
+.kc-line.next .kc-line-k{color:var(--gold-d)}
+.kc-line.next .kc-line-t{font-weight:700;color:var(--ink)}
+.kc-line-t{flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--ink-soft)}
+.kc-line-t.dim{color:var(--ink-faint)}
+.kc-src{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);text-align:right;margin-top:2px}
 .kc-snooze{margin-top:6px;font-size:11px;font-weight:700;color:var(--ink-faint)}
 .kc-card.snoozed{opacity:.6}
 .kc-avatar{width:20px;height:20px;border-radius:50%;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}
@@ -402,6 +421,22 @@ body{background:var(--bg1)}
 #toast{background:#241F17;color:#F4F1E9}
 /* Erledigt-Popup */
 .field textarea{width:100%;padding:9px;border:1px solid var(--glass-brd);border-radius:10px;font-family:inherit;font-size:14px;background:#fff;color:var(--ink);resize:vertical;min-height:64px}
+/* 24.09.2026 – Detailfenster zweispaltig (Baustein 3) */
+.modal.wide{max-width:1040px}
+.dt-grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:0;clear:both}
+.dt-left{border-right:1px solid var(--glass-brd);padding-right:18px}
+.dt-right{padding-left:20px;min-width:0}
+.dt-row{display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;padding:7px 0;border-top:1px solid rgba(40,32,12,.07);font-size:12.5px;align-items:center}
+.dt-row b{font-weight:600;color:var(--ink-soft);font-size:11.5px}
+.dt-pill{display:inline-block;background:#7C5CBF;color:#fff;font-weight:700;font-size:11.5px;border-radius:8px;padding:4px 12px;min-width:110px;text-align:center}
+.dt-tabs{display:flex;gap:2px;border-bottom:1px solid var(--glass-brd);margin-bottom:14px;flex-wrap:wrap}
+.dt-tab{border:0;background:transparent;padding:8px 10px 9px;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink-soft);border-bottom:3px solid transparent;cursor:pointer}
+.dt-tab.on{color:var(--ink);border-bottom-color:var(--gold)}
+.dt-tab small{font-size:10px;background:var(--bg1);border-radius:999px;padding:1px 6px;color:var(--ink-faint)}
+.dt-pane{display:none}.dt-pane.on{display:block}
+.dt-next{background:#FCFBF6;border:1px solid rgba(180,137,43,.35);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.dt-next .t{font-size:15px;font-weight:800;line-height:1.3;margin:6px 0}
+@media(max-width:860px){.dt-grid{grid-template-columns:1fr}.dt-left{border-right:0;padding-right:0;border-bottom:1px solid var(--glass-brd);padding-bottom:12px;margin-bottom:12px}.dt-right{padding-left:0}}
 .erl-cur{background:#F5F2E9;border:1px solid var(--glass-brd);border-radius:10px;padding:9px 11px;font-size:12px;color:var(--ink-soft);white-space:pre-wrap;max-height:120px;overflow:auto;margin-top:4px}
 .erl-err{color:var(--red);font-size:12px;font-weight:700;margin-top:8px}
 .erl-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
@@ -769,7 +804,12 @@ function exposeZustand(anf,antwort){
 // Rangfolge für die Sortierung im Block: Nachfassen/überfällig → prüfen → warten.
 function exposeRang(z){ return (z.typ==='nachfassen'||z.ueberfaellig)?0:(z.typ==='pruefen'?1:2); }
 function angefragtInfo(o){
-  if(o.phase!=='Neu'&&o.phase!=='Vorqualifikation') return null;
+  // 24.09.2026 (Fall Im Sieke 1): Stand ein angefragtes Objekt versehentlich auf Kalkulieren,
+  // fiel es hier durch und zwei Besichtigungseinladungen blieben unbemerkt. Eine spaetere
+  // Phase blockiert nur noch, wenn wirklich etwas gerechnet wurde (Angebotspreis in Spalte Q
+  // oder eine NEXT:-Zeile in Spalte W) - sonst wird der Widerspruch im Vorschlag genannt.
+  o._phaseWiderspruch=false;
+  if(o.phase!=='Neu'&&o.phase!=='Vorqualifikation'){ if(o.angebot||wNext(o)) return null; o._phaseWiderspruch=true; }
   let anf=null, letzteNotiz=null;
   String(o.nextStep||'').split('\n').forEach(z=>{
     const stamp=parseDate(z); if(!stamp||daysUntil(stamp)>0) return;   // Zukunftsdaten (Wiedervorlagen) zählen nicht
@@ -790,7 +830,9 @@ function angefragtInfo(o){
   if(!anf&&!antwort) return null;                                // weder Vermerk noch Makler-Mail
   if(antwort&&letzteNotiz&&+letzteNotiz>+antwort) return null;   // seit der Antwort wurde gehandelt → normale Logik
   if(!antwort&&letzteNotiz&&+letzteNotiz>+anf) return null;      // nach der Anfrage passierte schon etwas
-  return exposeZustand(anf||antwort,antwort);
+  const z=exposeZustand(anf||antwort,antwort);
+  if(z&&o._phaseWiderspruch) z.vorschlag='Phase passt nicht (steht auf '+o.phase+', aber nichts gerechnet) - auf Neu setzen. '+(z.vorschlag||'');
+  return z;
 }
 /* Anfragen, die NUR als Mail existieren (noch keine Leadliste-Zeile).
    WICHTIG (Korrektur Nele, 12.09.2026): Angefragt wird immer ÜBER DIE PORTALE, nie
@@ -993,7 +1035,7 @@ function mapLeadliste(rows){
   rows.slice(1).forEach((r,i)=>{
     const o={ _id:'L'+i, _row:i+2, seller:(r[1]||'').trim(), tel:(r[2]||'').trim(),
       anruf:parseDate(r[3]), besichtigung:parseDate(r[4]),
-      typ:(r[7]||'').trim(), adresse:(r[8]||'').trim(), status:(r[9]||'').trim(),
+      typ:(r[7]||'').trim(), adresse:(r[8]||'').trim(), status:(r[9]||'').trim(), flaeche:(r[11]||'').trim(),
       kaufpreis:(r[12]||'').trim(), kalkVK:(r[14]||'').trim(),
       angebot:(r[16]||'').trim(), angebotGueltig:parseDate(r[19]),
       nachfass1:parseDate(r[20]), nachfass2:parseDate(r[21]),
@@ -1383,15 +1425,26 @@ function verlaufHTML(txt){
   const es=verlaufEintraege(txt);
   if(!es.length) return '<div class="empty">Noch kein Eintrag.</div>';
   const alle=es.slice().reverse();   // neueste zuerst
-  // Explizite Präfixe (schreibt der Skill leadliste-w-aufraeumen) schlagen die Wort-Heuristik.
+  /* 13.09.2026 (Korrektur Nele): Ein NÄCHSTER SCHRITT ist kurz. Lange Fließtexte
+     (Analysen, Besichtigungsberichte) sind Infos – auch wenn Wörter wie „prüfen"
+     darin vorkommen; sonst landet die halbe Analyse bei den Schritten.
+     Explizite Präfixe (Info: / Nächster Schritt: / Next step) schlagen alles. */
   const istSchritt=e=>{const t=norm(e.text); if(/^info:/.test(t)) return false;
-    if(/^(nächster schritt|naechster schritt|schritt|to.?do):/.test(t)) return true;
-    return VERLAUF_SCHRITT_RE.test(t);};
+    if(/^(nächster schritt|naechster schritt|next step|schritt|to.?do)s?\s*\d*:/.test(t)) return true;
+    return e.text.length<=200&&VERLAUF_SCHRITT_RE.test(t);};
   const schritte=alle.filter(istSchritt);
   const infos=alle.filter(e=>!istSchritt(e));
+  const zeile=(e,cls)=>{
+    // Lange Info-Blöcke eingeklappt: erste Zeile sichtbar, Rest hinter „mehr".
+    const inhalt=e.text.length>250
+      ?`<details class="verlauf-mehr"><summary>${esc(kurz(e.text,140))}</summary><div>${esc(e.text)}</div></details>`
+      :esc(e.text);
+    return `<div class="verlauf-e${cls}"><span class="verlauf-d">${e.d?fmtDate(e.d):'–'}</span><span class="verlauf-t">${inhalt}</span></div>`;
+  };
   const teil=(titel,list,markErst)=>list.length?`<div class="verlauf-h">${titel}</div><div class="verlauf">`
-    +list.map((e,i)=>`<div class="verlauf-e${markErst&&i===0?' neu':''}"><span class="verlauf-d">${e.d?fmtDate(e.d):'–'}</span><span class="verlauf-t">${esc(e.text)}</span></div>`).join('')+'</div>':'';
-  return teil('📌 Nächste Schritte & Stand',schritte,true)+teil('ℹ️ Infos zum Objekt',infos,false);
+    +list.map((e,i)=>zeile(e,markErst&&i===0?' neu':'')).join('')+'</div>':'';
+  // Reihenfolge (Korrektur Nele): Infos KNAPP OBEN, die nächsten Schritte darunter.
+  return teil('ℹ️ Infos zum Objekt',infos,false)+teil('📌 Nächste Schritte & Stand',schritte,true);
 }
 function hzStandSatz(o){
   const note=letzteNotizVon(o);
@@ -1431,15 +1484,25 @@ function hzBadgesHtml(list){ return list.length?'<div class="hz-badges">'+list.m
    Briefing („Kalkulation anlegen"), nie nur den Kanal. Der Kanal (anrufen/Mail)
    steht bereits als Knopf in der Aktions-Spalte und wird hier nicht wiederholt. */
 const HZ_TODO={Neu:'Sichten & gegen das Profil prüfen',Vorqualifikation:'Vorqualifizieren: Baujahr, Miete, Zustand erfragen',Kalkulieren:'Kalkulation anlegen & bewerten','Angebot vorbereiten':'Angebot fertig machen & rausschicken','Angebot raus':'Beim Verkäufer nachfassen',Verhandlung:'Konditionen verhandeln',Kaufvertrag:'Notartermin & Unterlagen anstoßen',Beobachten:'Reaktivieren oder neu vertagen'};
+/* 24.09.2026 (Entscheidung Nele): Spalte W hat ein festes Format – Zeile 1 „NEXT: …" ist der
+   nächste Schritt, Zeile 2 „WIE: …" der Weg, alles darunter der Verlauf. Kachel, Tageszeile und
+   Detail lesen dieselben zwei Zeilen; der Skill objektpruefung-kalkulation schreibt sie so. */
+function wNext(o){ const m=String(o.nextStep||'').match(/^\s*NEXT:\s*(.+)$/m); return m?m[1].trim():''; }
+function wWie(o){  const m=String(o.nextStep||'').match(/^\s*WIE:\s*(.+)$/m);  return m?m[1].trim():''; }
+function wVerlauf(o){ return String(o.nextStep||'').split(/\r?\n/).filter(z=>z.trim()&&!/^\s*(NEXT|WIE):/.test(z)).join('\n'); }
 function hzTodo(o){
   // Folge-Anfrage gewinnt: die neue Anfrage gehört als EIGENES Objekt in die Leadliste.
   if(folgeAnfrageInfo(o)) return 'Neue Anfrage als eigenes Objekt anlegen (➕)';
+  { const n=wNext(o); if(n) return n; }   // festes Format in Spalte W schlägt alle Heuristiken
   if(o.mail&&o.mail.state==='draft') return 'Entwurf prüfen & senden';
   // Die Exposé-Regel ist eine feste Ansage von Nele – sie schlägt das (heuristische) Briefing.
   const ex=angefragtInfo(o); if(ex&&ex.typ!=='warten') return ex.todo.replace(/^[^\wÄÖÜäöü]+\s*/,'');
   const bi=briefingInfo(o); if(bi&&bi.todo&&bi.todo.length>2) return bi.todo;   // Briefing-To-do hat Vorrang
   if(notizNegativ(o)) return 'Entscheiden: Absage senden oder auf „Beobachten"';
   if(o.mail&&o.mail.state==='open') return 'Antwort schreiben';
+  // 24.09.2026 (Prozessregel Nele): Steht in Kalkulieren ein Angebotspreis, ist der nächste
+  // Schritt immer das Telefonat – die Mail geht erst nach dem Gespräch raus, nie als Erstkontakt.
+  if(o.phase==='Kalkulieren'&&o.angebot) return 'Angebot mündlich besprechen – erst dann die Mail';
   return HZ_TODO[o.phase]||'Nächsten Schritt festlegen';
 }
 const HZ_VOR={Neu:'Objekt kurz gegen das Ankaufsprofil prüfen.',Vorqualifikation:'Verkäufer/Makler anrufen: Baujahr, Miete, Zustand erfragen.',Kalkulieren:'Kalkulation aufsetzen (Kaufpreis, Sanierung, Verkaufserlös).','Angebot vorbereiten':'Angebot final machen und rausschicken.','Angebot raus':'Freundlich nachfassen, ggf. Frist setzen.',Verhandlung:'Konditionen abstimmen – Preis und Übergabe klären.',Kaufvertrag:'Notartermin vereinbaren, Unterlagen zusammenstellen.',Beobachten:'Wiedervorlage erreicht: kurz prüfen, ob das Objekt noch am Markt ist – dann reaktivieren oder neu vertagen.'};
@@ -1448,7 +1511,9 @@ function hzVorschlag(o){
   const k=kanalOf(o);
   if(k==='mail'&&o.mail&&o.mail.state==='draft') return 'Entwurf in Gmail kurz prüfen und abschicken.';
   const ex=angefragtInfo(o); if(ex&&ex.vorschlag) return ex.vorschlag;   // 12.09.2026: Exposé-Regel vor Briefing
+  { const w=wWie(o); if(w) return w; }   // festes Format in Spalte W
   const b=briefingVorschlag(o); if(b) return b;
+  if(o.phase==='Kalkulieren'&&o.angebot) return 'Makler anrufen und den Preis '+o.angebot+' mündlich besprechen. Danach im Detail „Angebot erstellen" drücken.';
   if(k==='mail'&&o.mail&&o.mail.state==='open') return 'Freundlich beantworten und offene Punkte klären.';
   if(k==='tel'){
     const t=o.anruf?daysSince(o.anruf):null;
@@ -1694,6 +1759,18 @@ function renderHeuteZuerst(){
   const fVk=nurFokus?vkOffen.filter(i=>FOK.has(String(i.id))):vkOffen;
   const fBeob=nurFokus?beob.filter(o=>FOK.has(String(o._id))):beob;
   let body='';
+
+  // 0 – Beste Chancen (24.09.2026, Entscheidung Nele): alle Objekte mit Prio A ganz oben,
+  // unabhängig von Dringlichkeit und Zuständigkeit. Die Prio kommt allein aus Spalte X
+  // der Leadliste und wird vom Skill objektpruefung-kalkulation gesetzt (Verhandlungs-
+  // abstand bis 45 %). Die bestehende Sortierung darunter bleibt unverändert – A verdrängt
+  // keine überfällige Frist, es steht daneben. Erledigte und abgesagte fallen heraus.
+  const chancen=OBJ.filter(o=>o.prio==='A'&&o.active&&!o.rejected&&!o.uebergeben&&!isDone(o))
+                   .sort((a,b)=>(b.score-a.score)||byPhase(a,b));
+  if(chancen.length&&!nurDringend){
+    body+=kopf('var(--gold-d)','⭐ Beste Chancen – Prio A',chancen.length,'Verhandlungsabstand bis 45 %');
+    body+=blockRows(chancen.map(hztRow),'chancen');
+  }
 
   // 1 – Angefragt – zu prüfen: angefragte Exposés (Leadliste-Vermerk + reine Mail-Anfragen).
   // 12.09.2026: Blockköpfe ohne Erklärtexte (Wunsch Nele) – nur Titel, Zahl und echte Kennzahlen.
@@ -3741,10 +3818,47 @@ function followUpHTML(o){
   const quelle=(bi&&bi.vor)?'Aus dem Morning Briefing':'Aus der Leadliste / Phase';
   return `<div class="kc-follow" title="${esc(quelle)}: ${esc(txt)}"><span class="kc-follow-k">${KANAL_ICON[k]||'•'}</span><span class="kc-follow-t">${esc(txt)}</span>${(bi&&bi.vor)?'<span class="kc-follow-src">Briefing</span>':''}</div>`;
 }
+/* 24.09.2026 (Entscheidung Nele, Baustein 2): Jede Kachel zeigt dieselben drei Zeilen wie die
+   Tageszeile in „Heute zuerst" – Nächster Schritt, Vorschlag, Zuletzt – aus denselben Funktionen
+   (hzTodo, hzVorschlag, Spalte-W-Verlauf). Dazu Kennzeichen für Angebot, Verhandlungsabstand
+   und Frist. Prio A bekommt Stern und Goldrand. Kein Text existiert zweimal.                    */
+function kcZuletzt(o){
+  const v=(typeof wVerlauf==='function'?wVerlauf(o):'').split('\n').map(z=>z.trim()).filter(Boolean);
+  if(v.length) return v[0];
+  const st=hzStandSatz(o); return st||'';
+}
+function kcGewinn(o){ const m=String(o.notiz||'').match(/Gewinn[^0-9]{0,12}([0-9][0-9.]*)\s*(?:EUR|€)?/i); return m?m[1].replace(/\.$/,'')+' EUR':''; }
+function kcChipsHTML(o){
+  const chips=[];
+  if(o.angebot) chips.push('<span class="kc-chip gold">Angebot '+esc(o.angebot)+'</span>');
+  const kp=euroNum(o.kaufpreis), an=euroNum(o.angebot);
+  if(isFinite(kp)&&isFinite(an)&&kp>0&&an>0&&an<kp) chips.push('<span class="kc-chip" title="Verhandlungsabstand = (Inseratspreis − Angebot) ÷ Inseratspreis">Abstand '+Math.round((kp-an)/kp*100)+' %</span>');
+  // 24.09.2026 (Korrektur Nele): Die Frist gilt erst, wenn das Angebot wirklich raus ist - vorher
+  // ist sie nicht gueltig. Davor zaehlt der kalkulierte Gewinn (Skill schreibt ihn in Spalte K).
+  const raus=['Angebot raus','Verhandlung','Kaufvertrag'].includes(o.phase);
+  if(raus&&o.angebotGueltig) chips.push('<span class="kc-chip">gültig bis '+esc(fmtDate(o.angebotGueltig))+'</span>');
+  if(!raus){ const g=kcGewinn(o); if(g) chips.push('<span class="kc-chip" title="Kalkulierter Gewinn bei 35 % Zielmarge (KALKU!J42), aus Spalte K">Gewinn '+esc(g)+'</span>'); }
+  return chips.length?'<div class="kc-chips">'+chips.join('')+'</div>':'';
+}
+function kcLinesHTML(o){
+  const next=hzTodo(o), vor=hzVorschlag(o), zul=kcZuletzt(o);
+  const quelle=(typeof wNext==='function'&&wNext(o))?'Spalte W':(briefingInfo(o)?'Briefing':'Phase');
+  let h='<div class="kc-lines">';
+  if(next) h+='<div class="kc-line next"><span class="kc-line-k">Nächster Schritt</span><span class="kc-line-t">'+esc(next)+'</span></div>';
+  if(vor&&vor!==next) h+='<div class="kc-line"><span class="kc-line-k">Vorschlag</span><span class="kc-line-t">'+esc(vor)+'</span></div>';
+  if(zul) h+='<div class="kc-line"><span class="kc-line-k">Zuletzt</span><span class="kc-line-t dim">'+esc(zul)+'</span></div>';
+  h+='<div class="kc-src">aus '+quelle+'</div></div>';
+  return h;
+}
+function kcPrioHTML(o){
+  if(o.prio==='A') return '<span class="kc-star">★ Beste Chance · A</span>';
+  if(o.prio==='B'||o.prio==='C') return '<span class="kc-star dim">Prio '+o.prio+'</span>';
+  return '';
+}
 function pipeCard(o){
   const lnk=objAnzeigeLink(o);
   const snz=isSnoozed(o)?`<div class="kc-snooze">⏳ pausiert bis ${esc(snoozeTxt(o))}</div>`:'';
-  return `<div class="kc-card${isSnoozed(o)?' snoozed':''}" draggable="true" data-id="${o._id}"><div class="kc-bar" style="background:${bandColor(o.score)}">${urgency(o.score)[1]}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}</div><div class="kc-sub">${esc(o.typ||'')}${o.kaufpreis?' · '+esc(o.kaufpreis):''}${o.angebot?' → '+esc(o.angebot):''}</div>${mailFlagHTML(o._id)}${followUpHTML(o)}${snz}${lnk?`<div style="margin-top:6px"><a class="link" target="_blank" href="${lnk.href}" onclick="event.stopPropagation()" ondragstart="event.stopPropagation()">${lnk.txt}</a></div>`:''}<div class="kc-foot">${o.fael.state!=='none'&&o.fael.state!=='later'?`<span class="kc-due">🔥 ${esc(o.fael.txt)}</span>`:''}<span class="sp"></span>${ownerAv(effOwner(o))}</div></div></div>`;
+  return `<div class="kc-card${isSnoozed(o)?' snoozed':''}${o.prio==='A'?' prioA':''}" draggable="true" data-id="${o._id}"><div class="kc-bar" style="background:${bandColor(o.score)}">${urgency(o.score)[1]}${kcPrioHTML(o)}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}</div><div class="kc-sub">${esc(o.typ||'')}${o.kaufpreis?' · '+esc(o.kaufpreis):''}</div>${kcChipsHTML(o)}${mailFlagHTML(o._id)}${kcLinesHTML(o)}${snz}${lnk?`<div style="margin-top:6px"><a class="link" target="_blank" href="${lnk.href}" onclick="event.stopPropagation()" ondragstart="event.stopPropagation()">${lnk.txt}</a></div>`:''}<div class="kc-foot">${o.fael.state!=='none'&&o.fael.state!=='later'?`<span class="kc-due">🔥 ${esc(o.fael.txt)}</span>`:''}<span class="sp"></span>${ownerAv(effOwner(o))}</div></div></div>`;
 }
 /* ============================================================================
    VERKAUFS-PIPELINE  (Arbeitspaket B, 21.08.2026) - dritte Ansicht
@@ -4078,7 +4192,7 @@ function openPartner(id){
   const catOpts=PARTNER_CATS.map(c=>`<option value="${c}" ${v.kategorie===c?'selected':''}>${PARTNER_ICON[c]} ${c}</option>`).join('');
   const iso=v.letzter?new Date(+v.letzter-v.letzter.getTimezoneOffset()*60000).toISOString().slice(0,10):'';
   const A=(s)=>esc(s||'').replace(/"/g,'&quot;');
-  $('modal').innerHTML=`<button class="modal-close" onclick="closeDetail()">✕ schließen</button>
+  const altHTML=`<button class="modal-close" onclick="closeDetail()">✕ schließen</button>
     <h2 style="margin:0 0 4px">${neu?'＋ Partner anlegen':'🏦 '+esc(v.institut||v.name)}</h2>
     <div style="color:var(--ink-faint);font-size:12.5px;margin-bottom:8px">Nachschlagewerk für Finanzierung, Beurkundung und Bewertung – ohne Wiedervorlage-Takt.</div>
     <div class="field"><label>Kategorie</label><select id="ptCat">${catOpts}</select></div>
@@ -4312,7 +4426,7 @@ async function loadGmail(){
       const from=h.from||'', fe=emailOf(from), subj=h.subject||'(kein Betreff)';
       const fromName=from.replace(/<[^>]*>/,'').replace(/["']/g,'').trim();
       const ts=h.date?(new Date(h.date)).getTime():null;
-      const weOwe=!fe.includes('value.estate.group');
+      const weOwe=!fe.match(/value\.estate\.group|@upgradehomes\.de|@nkestates\.de/);
       // 12.09.2026: Wer hat wann geschrieben? Exposé-Anfragen laufen über die PORTALE,
       // nie per Mail (Korrektur Nele) – erkennbar ist eine Anfrage nur an den EINGEHENDEN
       // Mails (Portal-Bestätigung, Makler-Antwort). Unsere eigene Mail im Thread (sentTs,
@@ -4322,7 +4436,7 @@ async function loadGmail(){
         if((m.labelIds||[]).includes('DRAFT')) return;
         const mh=mailHeaders(m), mts=mh.date?(new Date(mh.date)).getTime():null;
         if(!mts) return;
-        if(emailOf(mh.from||'').includes('value.estate.group')){ if(!sentTs||mts>sentTs) sentTs=mts; }
+        if(emailOf(mh.from||'').match(/value\.estate\.group|@upgradehomes\.de|@nkestates\.de/)){ if(!sentTs||mts>sentTs) sentTs=mts; }
         else if(!replyTs||mts>replyTs) replyTs=mts;
       });
       const zuo=mapMailToObject(fe,subj,fromName);
@@ -4771,6 +4885,49 @@ function vkSectionHTML(o){
     +`<div class="section-t" style="margin-top:16px">🏗️ Aufwertung</div>${auf}`;
 }
 
+/* ---- Angebot erstellen (24.09.2026, Entscheidung Nele) --------------------------
+   Legt aus dem Angebotspreis der Leadliste (Spalte Q) einen Gmail-ENTWURF an – nie
+   versenden. Der Text ist ein Gerüst mit dem Preis; die objektspezifische Begründung
+   wird vor dem Senden ergänzt. Empfänger ist die erste E-Mail-Adresse aus Spalte C.
+   Voraussetzung laut Prozessregel: Der Preis wurde vorher telefonisch besprochen.  */
+function angebotEmail(o){ const m=String(o.tel||'').match(/[\w.+-]+@[\w.-]+\.\w+/); return m?m[0]:''; }
+function angebotSectionHTML(o){
+  if(!o.angebot) return '';
+  const mail=angebotEmail(o), kann=hasComposeScope()&&!!mail;
+  const hinweis=!hasComposeScope()?'Gmail-Entwürfe sind nicht freigeschaltet (config.js, gmail.compose).'
+               :!mail?'Keine E-Mail-Adresse in Spalte C – bitte in der Leadliste ergänzen.'
+               :'Legt einen Gmail-Entwurf mit dem Preis '+esc(o.angebot)+' an '+esc(mail)+' an. Erst telefonieren, dann senden.';
+  return `<div class="section-t" style="margin-top:16px">📄 Angebot erstellen</div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <button class="savebtn" id="dtAngebot" style="margin:0;width:auto"${kann?'':' disabled'}>📄 Angebot als Gmail-Entwurf anlegen</button>
+      <span style="flex:1;min-width:180px;font-size:11.5px;line-height:1.4;color:var(--ink-faint)">${hinweis}</span>
+    </div><div id="dtAngebotErr"></div>`;
+}
+async function angebotDraft(id){
+  const o=OBJ.find(x=>x._id===id); if(!o||!o.angebot) return;
+  const to=angebotEmail(o); if(!to){ saveToast('Keine E-Mail-Adresse in Spalte C',0); return; }
+  const btn=$('dtAngebot'); if(btn){ btn.disabled=true; btn.textContent='… Entwurf wird angelegt'; }
+  const ort=(o.adresse||o.titel||'').trim();
+  const anrede=(()=>{ const n=String(o.seller||'').split(/[\/(]/)[0].trim(); return n?'Sehr geehrte/r '+n+',':'Sehr geehrte Damen und Herren,'; })();
+  const body=[anrede,'',
+    'wie telefonisch besprochen, möchten wir Ihnen unser Kaufangebot für das Objekt '+ort+' schriftlich bestätigen.','',
+    'Wir haben das Objekt über die gesamte Kette gerechnet – Ankauf, Kaufnebenkosten, Aufteilung in Wohnungseigentum, Herrichtung, Finanzierung über die Haltedauer und Einzelverkauf. Maßgeblich ist für uns, was beim Weiterverkauf der einzelnen Einheiten erzielbar ist.','',
+    '[HIER die zwei bis drei objektspezifischen Gründe einsetzen, die im Telefonat genannt wurden – z. B. Mietniveau, Zustand, Baujahr, Vermarktungsdauer.]','',
+    'Vor diesem Hintergrund bieten wir Ihnen '+o.angebot+' für das Objekt.','',
+    'Der Betrag ist aus der Kalkulation abgeleitet und nicht frei gegriffen. Wir finanzieren variabel, bringen Eigenkapital für die Kaufnebenkosten mit und sind kurzfristig entscheidungsfähig.','',
+    'Unser Angebot ist bis zum [DATUM – 14 Tage] gültig.','',
+    'Für Rückfragen oder ein persönliches Gespräch stehen wir jederzeit gern zur Verfügung.','',
+    mailGruss()].join('\n');
+  try{
+    await gmailCreateDraft(to,'Kaufangebot '+ort,body);
+    saveToast('✓ Angebotsentwurf in Gmail angelegt',1);
+    if(btn){ btn.textContent='✓ Entwurf liegt in Gmail'; }
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent='📄 Angebot als Gmail-Entwurf anlegen'; }
+    const er=$('dtAngebotErr'); if(er) er.innerHTML='<div class="err">Entwurf konnte nicht angelegt werden: '+esc(String(e&&e.message||e))+'</div>';
+  }
+}
+let DT_TAB='next';   // zuletzt offener Reiter im Detailfenster
 function openDetail(id){
   const o=[...OBJ,...SALE].find(x=>x._id===id); if(!o) return;
   const isSale=o.kind==='verkauf', done=isDone(o);
@@ -4797,10 +4954,11 @@ function openDetail(id){
     ${!isSale?`<div class="section-t" style="margin-top:16px">🎯 Follow-up ${briefingInfo(o)?'<small style="color:var(--gold)">aus dem Morning Briefing</small>':'<small>aus Leadliste / Phase</small>'}</div>
       <div class="mini"><span class="dot" style="background:${bandColor(o.score)}"></span><span class="mt" style="white-space:normal">${KANAL_ICON[kanalOf(o)]||''} <b>${esc(hzTodo(o))}</b> – ${esc(hzVorschlag(o))}</span></div>`:''}
     <div class="section-t" style="margin-top:16px">📋 Verlauf (Leadliste Spalte W)</div>
-    ${verlaufHTML(o.nextStep||o.task)}
+    ${verlaufHTML(wVerlauf(o)||o.task)}
     ${!isSale?wvSectionHTML(o):''}
     ${!isSale?`<div class="section-t" style="margin-top:16px">👤 Zuständig</div><div class="phbtns"><button class="phbtn${effOwner(o)==='Nele'?' on':''}" data-ow="Nele">Nele</button><button class="phbtn${effOwner(o)==='Niklas'?' on':''}" data-ow="Niklas">Niklas</button></div>`:''}
     ${!isSale?`<div class="section-t" style="margin-top:16px">🔀 Phase / Status ändern</div><div class="phbtns">${BOARD_COLS.map(ph=>`<button class="phbtn${o.phase===ph?' on':''}" data-ph="${ph}">${esc(phaseLabelShort(ph))}</button>`).join('')}</div>`:''}
+    ${!isSale?angebotSectionHTML(o):''}
     ${!isSale?`<div class="section-t" style="margin-top:16px">➕ Neues Objekt vom selben Makler</div>
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <button class="savebtn" id="dtFolge" style="margin:0;width:auto">➕ Folgeobjekt anlegen</button>
@@ -4812,12 +4970,70 @@ function openDetail(id){
       <div class="field"><textarea id="dtNote" placeholder="Aktuellen Stand als Text ergänzen … (wird an die Leadliste angehängt, nichts wird überschrieben)"></textarea></div>
       <button class="savebtn" id="dtNoteSave">In Leadliste ergänzen</button><div id="dtNoteErr"></div>`:''}
     ${o.notiz?`<div class="section-t" style="margin-top:16px">📝 Notiz</div><div style="font-size:13px;color:var(--ink-soft)">${esc(o.notiz)}</div>`:''}`;
+  /* 24.09.2026 (Entscheidung Nele, Baustein 3): Ankauf-Objekte bekommen ein zweispaltiges Fenster –
+     links die Fakten aus der Leadliste als feste Zeilen, rechts Reiter. „Nächster Schritt" ist immer
+     offen und trägt die Knöpfe; „Verlauf" ist Spalte W als Zeitstrahl mit Eingabezeile. Alles, was
+     vorher untereinander stand, liegt jetzt in den Reitern „Mails", „Unterlagen" und „Ändern".
+     Verkaufsobjekte behalten den bisherigen Aufbau (altHTML).                                     */
+  let neuHTML='';
+  if(!isSale){
+    const kp=euroNum(o.kaufpreis), an=euroNum(o.angebot);
+    const abstand=(isFinite(kp)&&isFinite(an)&&kp>0&&an>0&&an<kp)?Math.round((kp-an)/kp*100)+' %':'';
+    const zeile=(k,v)=>`<div class="dt-row"><b>${k}</b><span>${v||'—'}</span></div>`;
+    const wv=o.nachfass1?fmtDate(o.nachfass1):(isSnoozed(o)?snoozeTxt(o):'');
+    const links=`<div class="deeplinks" style="margin-top:12px"><a class="link" target="_blank" href="https://docs.google.com/spreadsheets/d/${CFG.SHEET_ID}/edit">📊 Zeile in der Leadliste</a><a class="link" target="_blank" href="https://mail.google.com/mail/u/0/#search/${gmailQ}">✉️ In Gmail suchen</a></div>`;
+    const left=`<div class="dt-left">
+      <div class="detail-head"><h2>${o.prio==='A'?'<span class="kc-star" style="margin:0 6px 0 0">★ A</span>':'🏠 '}${esc(o.titel)}</h2><div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${urgBadge(o.score)}<span class="owner ${effOwner(o)}">${effOwner(o)}</span></div></div>
+      <div style="margin-top:12px">
+        ${zeile('Phase',`<span class="dt-pill">${esc(phaseLabel(o.phase))}</span>`)}
+        ${zeile('Prio',o.prio?`<span class="kc-chip${o.prio==='A'?' gold':''}">${o.prio==='A'?'A · Beste Chance':'Prio '+esc(o.prio)}</span>${abstand?' <small style="color:var(--ink-faint)">Abstand '+abstand+'</small>':''}`:'')}
+        ${zeile('Inseratspreis',esc(o.kaufpreis||''))}
+        ${zeile('Unser Angebot',o.angebot?`<b style="color:#5C4612;font-size:13px">${esc(o.angebot)}</b>`:'')}
+        ${zeile('Kalk. Verkauf',esc(o.kalkVK||''))}
+        ${zeile('Objekt',[o.typ,o.flaeche].filter(Boolean).map(esc).join(' · '))}
+        ${zeile('Kontakt',(o.seller?esc(o.seller):'')+(o.tel?`<br><small style="color:var(--ink-faint)">${esc(o.tel)}</small>`:''))}
+        ${zeile('Angebot gültig',o.angebotGueltig?'bis '+fmtDate(o.angebotGueltig):'')}
+        ${zeile('Wiedervorlage',esc(wv))}
+        ${zeile('Zuständig',`<span class="phbtns"><button class="phbtn${effOwner(o)==='Nele'?' on':''}" data-ow="Nele">Nele</button><button class="phbtn${effOwner(o)==='Niklas'?' on':''}" data-ow="Niklas">Niklas</button></span>`)}
+      </div>${links}</div>`;
+    const tabs=[['next','Nächster Schritt'],['verlauf','Verlauf'],['mails','Mails'+(objMails.length?` <small>${objMails.length}</small>`:'')],['unterlagen','Unterlagen'],['aendern','Ändern']];
+    const aktiv=(typeof DT_TAB==='string'&&tabs.some(t=>t[0]===DT_TAB))?DT_TAB:'next';
+    const paneNext=`<div class="dt-next"><div style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:${bandColor(o.score)};width:9px;height:9px;border-radius:50%;display:inline-block"></span><span class="kc-line-k" style="width:auto;color:var(--gold-d)">Nächster Schritt</span><span style="margin-left:auto">${urgBadge(o.score)}</span></div>
+        <div class="t">${KANAL_ICON[kanalOf(o)]||''} ${esc(hzTodo(o))}</div>
+        <div style="font-size:13px;line-height:1.5;color:var(--ink-soft)">${esc(hzVorschlag(o))}</div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="savebtn" id="dtDone" style="margin:0;width:auto;background:#fff;color:var(--ink-soft);border:1px solid var(--glass-brd)">${done?'✓ heute erledigt':'✓ Erledigt'}</button></div>
+      </div>
+      ${angebotSectionHTML(o)}
+      ${wvSectionHTML(o)}`;
+    const paneVerlauf=`<div class="section-t">📋 Verlauf <small>aus Leadliste Spalte W · neueste zuerst</small></div>
+      ${verlaufHTML(wVerlauf(o)||o.task)}
+      <div class="field" style="margin-top:12px"><textarea id="dtNote" placeholder="Stand ergänzen … wird mit Datum an Spalte W angehängt, nichts wird überschrieben"></textarea></div>
+      <button class="savebtn" id="dtNoteSave">Anhängen</button><div id="dtNoteErr"></div>`;
+    const paneMails=mailSec||'<div class="empty">Keine offenen Mails zu diesem Objekt.</div>';
+    const paneUnterlagen=`${listingSectionHTML(o)}${terminSectionHTML(o)}${o.notiz?`<div class="section-t" style="margin-top:16px">📝 Notiz</div><div style="font-size:13px;color:var(--ink-soft)">${esc(o.notiz)}</div>`:''}`;
+    const paneAendern=`<div class="section-t">🔀 Phase / Status ändern</div><div class="phbtns">${BOARD_COLS.map(ph=>`<button class="phbtn${o.phase===ph?' on':''}" data-ph="${ph}">${esc(phaseLabelShort(ph))}</button>`).join('')}</div>
+      <div class="section-t" style="margin-top:16px">➕ Neues Objekt vom selben Makler</div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="savebtn" id="dtFolge" style="margin:0;width:auto">➕ Folgeobjekt anlegen</button><span style="flex:1;min-width:180px;font-size:11.5px;line-height:1.4;color:var(--ink-faint)">Neue Leadliste-Zeile (Vorqualifikation) – Makler &amp; Kontakt werden übernommen.</span></div>
+      ${uebergabeSectionHTML(o)}`;
+    const right=`<div class="dt-right"><div class="dt-tabs">${tabs.map(t=>`<button type="button" class="dt-tab${t[0]===aktiv?' on':''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
+      <div class="dt-pane${aktiv==='next'?' on':''}" data-pane="next">${paneNext}</div>
+      <div class="dt-pane${aktiv==='verlauf'?' on':''}" data-pane="verlauf">${paneVerlauf}</div>
+      <div class="dt-pane${aktiv==='mails'?' on':''}" data-pane="mails">${paneMails}</div>
+      <div class="dt-pane${aktiv==='unterlagen'?' on':''}" data-pane="unterlagen">${paneUnterlagen}</div>
+      <div class="dt-pane${aktiv==='aendern'?' on':''}" data-pane="aendern">${paneAendern}</div></div>`;
+    neuHTML=`<button class="modal-close" onclick="closeDetail()">✕ schließen</button><div class="dt-grid">${left}${right}</div>`;
+  }
+  $('modal').classList.toggle('wide',!isSale);
+  $('modal').innerHTML=isSale?altHTML:neuHTML;
+  $('modal').querySelectorAll('.dt-tab').forEach(b=>b.onclick=()=>{ DT_TAB=b.dataset.tab; $('modal').querySelectorAll('.dt-tab').forEach(x=>x.classList.toggle('on',x===b)); $('modal').querySelectorAll('.dt-pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===b.dataset.tab)); });
+  { const dn=$('dtDone'); if(dn) dn.onclick=()=>{ handleErledigtClick(id); openDetail(id); }; }
   $('modal').querySelectorAll('[data-ow]').forEach(b=>b.onclick=()=>{ setOwner(id,b.dataset.ow); openDetail(id); });
   $('modal').querySelectorAll('.phbtn[data-ph]').forEach(b=>b.onclick=()=>{ if(o.phase!==b.dataset.ph){ o.phase=b.dataset.ph; o.score=scoreOf(o); persistPhase(o); } openDetail(id); });
   $('modal').querySelectorAll('.phbtn[data-vk]').forEach(b=>b.onclick=async()=>{ await vkPhaseSetzen(o,b.dataset.vk); openDetail(id); });
   $('modal').querySelectorAll('.phbtn[data-nutz]').forEach(b=>b.onclick=async()=>{ await persistNutzung(o,b.dataset.nutz); renderAll(); openDetail(id); });
   { const u=$('dtUeber'); if(u) u.onclick=()=>{ u.disabled=true; u.textContent='… wird übergeben'; objektUebergeben(id); }; }
   { const fg=$('dtFolge'); if(fg) fg.onclick=()=>{ closeDetail(); openFolgeObjekt(id); }; }
+  { const ab=$('dtAngebot'); if(ab) ab.onclick=()=>angebotDraft(id); }
   const _dt=$('dtNoteSave'); if(_dt) _dt.onclick=()=>saveDetailNote(id);
   const _ls=$('lsSave'); if(_ls) _ls.onclick=()=>saveListingUrl(id);   // Punkt 1
   const _wv=$('wvSave'); if(_wv) _wv.onclick=()=>saveWiedervorlage(id);
