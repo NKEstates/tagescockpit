@@ -717,17 +717,20 @@ function detectOwnerMarker(text){
 function markerOwner(o){ return detectOwnerMarker(o.status)||detectOwnerMarker(o.nextStep); }
 
 /* ============ PHASE / SCORE ============ */
-const FUNNEL=['Neu','Vorqualifikation','Kalkulieren','Angebot vorbereiten','Angebot raus','Verhandlung','Kaufvertrag'];
+/* 24.09.2026 (Wunsch Nele): „Besichtigung" ist eine eigene Phase. Sie wird automatisch gesetzt,
+   sobald im Detailfenster ein Besichtigungstermin in den Google Kalender eingetragen wird.
+   Position im Trichter: nach „Kalkulieren" – erst rechnen, dann hinfahren (bestätigt von Nele am 24.09.2026). */
+const FUNNEL=['Neu','Vorqualifikation','Kalkulieren','Besichtigung','Angebot vorbereiten','Angebot raus','Verhandlung','Kaufvertrag'];
 const BOARD_COLS=[...FUNNEL,'Absage senden','Beobachten'];
 // ANZEIGENAME ≠ SPEICHERWERT: in der Leadliste (Spalte J) steht weiterhin der kurze Wert, angezeigt wird der lange.
 // So bleiben Sheet, phaseOf() und alte Einträge kompatibel, auch wenn wir die Beschriftung später wieder ändern.
-const PHASE_LABEL={'Vorqualifikation':'Vorqualifikation inkl. Besichtigung'};
+const PHASE_LABEL={};   // 24.09.2026: „inkl. Besichtigung" entfällt – Besichtigung ist jetzt eine eigene Phase
 function phaseLabel(ph){ return PHASE_LABEL[ph]||ph; }
-function phaseLabelShort(ph){ return ph==='Vorqualifikation'?'Vorqual. + Besichtigung':phaseLabel(ph); }
+function phaseLabelShort(ph){ return phaseLabel(ph); }
 // Punkteskala (31.07.2026 gespreizt): Rangfolge bleibt Angebot raus > Kalkulieren > neue Objekte anfragen,
 // aber die Abstände sind so gewählt, dass „Kalkulieren“ die Schwelle 30 (= 🟡 Bald) von sich aus erreicht und
 // nicht mehr zusammen mit den frischen Sichtungen in 🟢 „Im Plan“ verschwindet. Schwellen: 30 🟡 / 60 🟠 / 100 🔴.
-const PHASE_PTS={'Neu':10,'Vorqualifikation':24,'Kalkulieren':32,'Angebot vorbereiten':38,'Angebot raus':44,'Verhandlung':62,'Kaufvertrag':78,'Absage senden':34,'Beobachten':0};
+const PHASE_PTS={'Neu':10,'Vorqualifikation':24,'Kalkulieren':32,'Besichtigung':36,'Angebot vorbereiten':38,'Angebot raus':44,'Verhandlung':62,'Kaufvertrag':78,'Absage senden':34,'Beobachten':0};
 // Eine Kalkulation, die liegen bleibt, ist unser Engpass → schneller hochstufen als andere Phasen.
 const KALK_STALE_DAYS=3;
 // Standard-Zuständigkeit je Phase: Nele = Neu (Intake) + Kalkulieren + Angebot vorbereiten; Niklas = Vorqualifikation + ab „Angebot raus".
@@ -741,6 +744,7 @@ function phaseOf(o){
     if(s.includes('kaufvertrag')||s.includes('notar')) return 'Kaufvertrag';
     if(s.includes('verhand')) return 'Verhandlung';              // "Verhandlung", "verhandeln", "in Verhandlung"
     if(s.includes('vorbereit')||s.includes('angebot machen')) return 'Angebot vorbereiten';
+    if(s.includes('besichtig')) return 'Besichtigung';              // 24.09.2026: eigene Phase
     if(s.includes('vorquali')||s.includes('nachfass')||s.includes('follow')) return 'Vorqualifikation';
     if(s.includes('angebot')) return 'Angebot raus';             // "Angebot raus", "Angebot gemacht"
     if(s.includes('kalkul')) return 'Kalkulieren';
@@ -1058,7 +1062,7 @@ function mapLeadliste(rows){
        oder eine Zeile einfügt — eine darauf gespeicherte Zuordnung zeigte danach
        auf das falsche Objekt. Adresse und Verkäufer verschieben sich nicht.       */
     o.key=normLoose(o.adresse)+'|'+normLoose(o.seller);
-    o.task=o.nextStep||({'Absage senden':'Absage an Verkäufer/Makler senden','Angebot vorbereiten':'Angebot vorbereiten','Angebot raus':'Angebot nachfassen','Vorqualifikation':'Vorqualifizieren & Daten sammeln','Kalkulieren':'Kalkulieren & bewerten'}[o.phase])||'Nächsten Schritt festlegen';
+    o.task=o.nextStep||({'Absage senden':'Absage an Verkäufer/Makler senden','Angebot vorbereiten':'Angebot vorbereiten','Angebot raus':'Angebot nachfassen','Vorqualifikation':'Vorqualifizieren & Daten sammeln','Kalkulieren':'Kalkulieren & bewerten','Besichtigung':'Besichtigung durchführen & Eindruck festhalten'}[o.phase])||'Nächsten Schritt festlegen';
     out.push(o);
   });
   return out;
@@ -1283,6 +1287,7 @@ function actionKeyword(o){
     case 'Neu': return 'sichten';
     case 'Vorqualifikation': return 'vorqualifizieren';
     case 'Kalkulieren': return needsData(o)?'vorqualifizieren':'kalkulieren';
+    case 'Besichtigung': return 'besichtigen';
     case 'Angebot vorbereiten': return 'Angebot vorbereiten';
     case 'Angebot raus': return 'nachfassen';
     case 'Verhandlung': return 'verhandeln';
@@ -1483,7 +1488,7 @@ function hzBadgesHtml(list){ return list.length?'<div class="hz-badges">'+list.m
 /* 12.09.2026 (Korrektur Nele): Das To-do beschreibt die AUFGABE in Worten – wie im
    Briefing („Kalkulation anlegen"), nie nur den Kanal. Der Kanal (anrufen/Mail)
    steht bereits als Knopf in der Aktions-Spalte und wird hier nicht wiederholt. */
-const HZ_TODO={Neu:'Sichten & gegen das Profil prüfen',Vorqualifikation:'Vorqualifizieren: Baujahr, Miete, Zustand erfragen',Kalkulieren:'Kalkulation anlegen & bewerten','Angebot vorbereiten':'Angebot fertig machen & rausschicken','Angebot raus':'Beim Verkäufer nachfassen',Verhandlung:'Konditionen verhandeln',Kaufvertrag:'Notartermin & Unterlagen anstoßen',Beobachten:'Reaktivieren oder neu vertagen'};
+const HZ_TODO={Neu:'Sichten & gegen das Profil prüfen',Vorqualifikation:'Vorqualifizieren: Baujahr, Miete, Zustand erfragen',Kalkulieren:'Kalkulation anlegen & bewerten',Besichtigung:'Besichtigung durchführen & Eindruck festhalten','Angebot vorbereiten':'Angebot fertig machen & rausschicken','Angebot raus':'Beim Verkäufer nachfassen',Verhandlung:'Konditionen verhandeln',Kaufvertrag:'Notartermin & Unterlagen anstoßen',Beobachten:'Reaktivieren oder neu vertagen'};
 /* 24.09.2026 (Entscheidung Nele): Spalte W hat ein festes Format – Zeile 1 „NEXT: …" ist der
    nächste Schritt, Zeile 2 „WIE: …" der Weg, alles darunter der Verlauf. Kachel, Tageszeile und
    Detail lesen dieselben zwei Zeilen; der Skill objektpruefung-kalkulation schreibt sie so. */
@@ -1505,7 +1510,7 @@ function hzTodo(o){
   if(o.phase==='Kalkulieren'&&o.angebot) return 'Angebot mündlich besprechen – erst dann die Mail';
   return HZ_TODO[o.phase]||'Nächsten Schritt festlegen';
 }
-const HZ_VOR={Neu:'Objekt kurz gegen das Ankaufsprofil prüfen.',Vorqualifikation:'Verkäufer/Makler anrufen: Baujahr, Miete, Zustand erfragen.',Kalkulieren:'Kalkulation aufsetzen (Kaufpreis, Sanierung, Verkaufserlös).','Angebot vorbereiten':'Angebot final machen und rausschicken.','Angebot raus':'Freundlich nachfassen, ggf. Frist setzen.',Verhandlung:'Konditionen abstimmen – Preis und Übergabe klären.',Kaufvertrag:'Notartermin vereinbaren, Unterlagen zusammenstellen.',Beobachten:'Wiedervorlage erreicht: kurz prüfen, ob das Objekt noch am Markt ist – dann reaktivieren oder neu vertagen.'};
+const HZ_VOR={Neu:'Objekt kurz gegen das Ankaufsprofil prüfen.',Vorqualifikation:'Verkäufer/Makler anrufen: Baujahr, Miete, Zustand erfragen.',Kalkulieren:'Kalkulation aufsetzen (Kaufpreis, Sanierung, Verkaufserlös).',Besichtigung:'Vor Ort Zustand, Leerstand und Sanierungsbedarf prüfen – danach Kalkulation anpassen und Angebot vorbereiten.','Angebot vorbereiten':'Angebot final machen und rausschicken.','Angebot raus':'Freundlich nachfassen, ggf. Frist setzen.',Verhandlung:'Konditionen abstimmen – Preis und Übergabe klären.',Kaufvertrag:'Notartermin vereinbaren, Unterlagen zusammenstellen.',Beobachten:'Wiedervorlage erreicht: kurz prüfen, ob das Objekt noch am Markt ist – dann reaktivieren oder neu vertagen.'};
 // „Vorschlag" = kombiniert: bevorzugt der Text aus dem Morning-Briefing-Entwurf (echte Einschätzung), sonst interne Notiz (Spalte W), sonst Phasen-Standard.
 function hzVorschlag(o){
   const k=kanalOf(o);
@@ -1517,6 +1522,7 @@ function hzVorschlag(o){
   if(k==='mail'&&o.mail&&o.mail.state==='open') return 'Freundlich beantworten und offene Punkte klären.';
   if(k==='tel'){
     const t=o.anruf?daysSince(o.anruf):null;
+    if(o.phase==='Besichtigung') return HZ_VOR['Besichtigung'];
     if(o.phase==='Vorqualifikation') return 'Anrufen: Baujahr, Mieten, Zustand und Leerstand erfragen.';
     if(o.phase==='Angebot raus') return 'Kurz anrufen und nach dem Stand des Angebots fragen.';
     if(o.phase==='Verhandlung') return 'Telefonisch abstimmen – Preis und Übergabe klären.';
@@ -4776,25 +4782,33 @@ function listingSectionHTML(o){
 async function calPost(path,body){ return apiPost('https://www.googleapis.com/calendar/v3/'+path,body); }
 function terminSectionHTML(o){
   const today=new Date().toISOString().slice(0,10);
-  return `<div class="section-t" style="margin-top:16px">📅 Termin</div>
-    <button class="phbtn" type="button" id="tmToggle">📅 Termin terminieren (Telefonat / Besichtigung)</button>
-    <div id="tmForm" style="display:none;margin-top:10px">
-      ${hasCalScope()?'':'<div class="erl-err" style="margin-bottom:8px">⚠ Kalender-Berechtigung noch nicht erteilt – bitte oben rechts über ↻ neu anmelden und den Kalender-Zugriff bestätigen.</div>'}
-      <div class="field"><label>Art</label><select id="tmType"><option value="Telefonat">Telefonat</option><option value="Besichtigung">Besichtigung</option><option value="Termin">Sonstiger Termin</option></select></div>
-      <div class="field"><label>Titel</label><input id="tmTitle" type="text" value="Telefonat – ${esc(o.titel).replace(/"/g,'&quot;')}"></div>
-      <div class="field"><label>Datum &amp; Uhrzeit</label><div class="tm-row"><div><input id="tmDate" type="date" value="${today}"></div><div><input id="tmTime" type="time" value="10:00"></div><div><select id="tmDur"><option value="30">30 Min</option><option value="45">45 Min</option><option value="60" selected>1 Std</option><option value="90">1,5 Std</option><option value="120">2 Std</option><option value="240">4 Std</option></select></div></div></div>
-      <div id="tmErr"></div>
-      <button class="savebtn" id="tmSave">📅 In Google Kalender eintragen</button>
-    </div>`;
+  const ankauf=o.kind==='ankauf'&&o._row;
+  /* 24.09.2026 (Wunsch Nele): Terminieren steht im Reiter „Nächster Schritt" direkt vor der Wiedervorlage,
+     das Formular ist offen sichtbar. Art als Knöpfe – Telefonat / Besichtigung / Sonstiges. Jeder Termin geht
+     in den Google Kalender und als datierte Zeile in Spalte W; eine Besichtigung setzt zusätzlich die Phase
+     „Besichtigung" (Spalte J) und trägt das Datum in Spalte E ein.                                          */
+  return `<div class="section-t" style="margin-top:16px">📅 Termin vereinbaren</div>
+    <div style="font-size:12px;color:var(--ink-faint);margin-bottom:4px">Kommt in den Google Kalender und mit Datum in die Leadliste.${ankauf?' Eine <b>Besichtigung</b> stellt das Objekt zusätzlich auf die Phase „Besichtigung".':''}</div>
+    ${hasCalScope()?'':'<div class="erl-err" style="margin-bottom:8px">⚠ Kalender-Berechtigung noch nicht erteilt – bitte oben rechts über ↻ neu anmelden und den Kalender-Zugriff bestätigen.</div>'}
+    <div class="field" style="margin:8px 0"><label>Art</label><div class="phbtns" id="tmArt"><button type="button" class="phbtn on" data-art="Telefonat">📞 Telefonat</button><button type="button" class="phbtn" data-art="Besichtigung">🚪 Besichtigung</button><button type="button" class="phbtn" data-art="Termin">📅 Sonstiger Termin</button></div></div>
+    <div class="field" style="margin:8px 0"><label>Titel</label><input id="tmTitle" type="text" value="Telefonat – ${esc(o.titel).replace(/"/g,'&quot;')}"></div>
+    <div class="field" style="margin:8px 0"><label>Datum &amp; Uhrzeit</label><div class="tm-row"><div><input id="tmDate" type="date" value="${today}"></div><div><input id="tmTime" type="time" value="10:00"></div><div><select id="tmDur"><option value="30" selected>30 Min</option><option value="45">45 Min</option><option value="60">1 Std</option><option value="90">1,5 Std</option><option value="120">2 Std</option><option value="240">4 Std</option></select></div></div></div>
+    <div id="tmErr"></div>
+    <button class="savebtn" id="tmSave" style="margin-top:4px">📅 In Google Kalender eintragen</button>`;
 }
+function tmArt(){ const w=$('tmArt'); const b=w&&w.querySelector('button.on'); return b?b.dataset.art:'Termin'; }
 function wireTerminSection(id,o){
-  const tog=$('tmToggle'); if(tog) tog.onclick=()=>{ const f=$('tmForm'); if(f){ f.style.display=f.style.display==='none'?'':'none'; if(f.style.display!=='none'){ const t=$('tmTitle'); if(t) t.focus(); } } };
-  const ty=$('tmType'); if(ty) ty.onchange=()=>{ const t=$('tmTitle'); if(t) t.value=ty.value+' – '+(o.titel||''); };
+  const w=$('tmArt'); if(w) w.querySelectorAll('button[data-art]').forEach(b=>b.onclick=()=>{
+    w.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+    const t=$('tmTitle'); if(t) t.value=(b.dataset.art==='Termin'?'Termin':b.dataset.art)+' – '+(o.titel||'');
+    const d=$('tmDur'); if(d) d.value=b.dataset.art==='Telefonat'?'30':'60';   // Telefonat kurz, vor Ort länger
+  });
   const sv=$('tmSave'); if(sv) sv.onclick=()=>createTermin(id);
 }
 async function createTermin(id){
   const o=[...OBJ,...SALE].find(x=>x._id===id); if(!o) return;
   const errEl=$('tmErr'); if(errEl) errEl.innerHTML='';
+  const art=tmArt();
   const title=($('tmTitle').value||'').trim(), date=$('tmDate').value, time=$('tmTime').value, dur=+($('tmDur').value||60);
   const fail=m=>{ if(errEl) errEl.innerHTML='<div class="erl-err">'+m+'</div>'; };
   if(!hasCalScope()){ fail('Kalender-Berechtigung fehlt – bitte neu anmelden und Kalender-Zugriff bestätigen.'); return; }
@@ -4804,12 +4818,24 @@ async function createTermin(id){
   try{
     const start=new Date(date+'T'+time+':00');
     const end=new Date(start.getTime()+dur*60000);
+    const kontakt=[o.seller,o.tel].filter(Boolean).join(' · ');
     await calPost('calendars/primary/events',{
-      summary:title, location:o.adresse||'', description:'Termin aus dem Tagescockpit'+(o.titel?' · '+o.titel:''),
+      summary:title, location:o.adresse||'',
+      description:art+' aus dem Tagescockpit'+(o.titel?' · '+o.titel:'')+(kontakt?'\nKontakt: '+kontakt:''),
       start:{dateTime:start.toISOString(),timeZone:'Europe/Berlin'}, end:{dateTime:end.toISOString(),timeZone:'Europe/Berlin'} });
-    // In der Leadliste vermerken (nur Ankauf-Objekte mit Zeile), damit der Termin auch dort dokumentiert ist.
-    if(o.kind==='ankauf'&&o._row){ try{ const c=await appendCell('Leadliste','W',o._row,`[${fmtDate(new Date())}] 📅 ${title} am ${fmtDate(start)} ${time} Uhr`,o.nextStep||''); o.nextStep=c; o.task=c; }catch(e){} }
-    saveToast('✓ Termin im Google Kalender eingetragen',1);
+    // 24.09.2026 (Wunsch Nele): Ein Besichtigungstermin schiebt das Objekt in die Phase „Besichtigung".
+    const ankauf=o.kind==='ankauf'&&o._row;
+    const besichtigung=ankauf&&art==='Besichtigung';
+    const phaseWechsel=besichtigung&&o.phase!=='Besichtigung';
+    const altePhase=o.phase;
+    if(ankauf){
+      // Leadliste: datierte Zeile in Spalte W (nie überschreiben) – dort ist der Termin dokumentiert.
+      try{ const c=await appendCell('Leadliste','W',o._row,`[${fmtDate(new Date())}] 📅 ${title} am ${fmtDate(start)} ${time} Uhr`+(phaseWechsel?`  ·  Phase: ${altePhase} → Besichtigung`:''),o.nextStep||''); o.nextStep=c; o.task=c; }catch(e){}
+      // Besichtigungsdatum zusätzlich in Spalte E („Besichtigung") – die Leadliste ist die Wahrheit.
+      if(besichtigung){ try{ await sheetsWrite('Leadliste!E'+o._row,[fmtDate(start)]); o.besichtigung=start; }catch(e){} }
+      if(phaseWechsel){ o.phase='Besichtigung'; o.score=scoreOf(o); await persistPhase(o); }
+    }
+    saveToast('✓ Termin im Google Kalender eingetragen'+(phaseWechsel?' · Phase → Besichtigung':''),1);
     if(hasCalScope()) loadCalendar();   // heutige Kalenderliste ggf. aktualisieren
     openDetail(id);
   }catch(e){ fail('⚠ Termin nicht eingetragen: '+esc(e.message)); btn.disabled=false; btn.textContent='📅 In Google Kalender eintragen'; }
@@ -5001,16 +5027,18 @@ function openDetail(id){
     const paneNext=`<div class="dt-next"><div style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:${bandColor(o.score)};width:9px;height:9px;border-radius:50%;display:inline-block"></span><span class="kc-line-k" style="width:auto;color:var(--gold-d)">Nächster Schritt</span><span style="margin-left:auto">${urgBadge(o.score)}</span></div>
         <div class="t">${KANAL_ICON[kanalOf(o)]||''} ${esc(hzTodo(o))}</div>
         <div style="font-size:13px;line-height:1.5;color:var(--ink-soft)">${esc(hzVorschlag(o))}</div>
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="savebtn" id="dtDone" style="margin:0;width:auto;background:#fff;color:var(--ink-soft);border:1px solid var(--glass-brd)">${done?'✓ heute erledigt':'✓ Erledigt'}</button></div>
+        <div class="field" style="margin:10px 0 0"><textarea id="dtTodo" placeholder="Was ist erledigt, was steht an? … kommt mit heutigem Datum als neue Zeile in die Leadliste (Spalte W), nichts wird überschrieben"></textarea></div>
+        <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;align-items:center"><button class="savebtn" id="dtTodoSave" style="margin:0;width:auto">💾 In Leadliste eintragen</button><span style="font-size:11.5px;color:var(--ink-faint)">Steht danach im Reiter „Verlauf".</span></div><div id="dtTodoErr"></div>
       </div>
       ${angebotSectionHTML(o)}
+      ${terminSectionHTML(o)}
       ${wvSectionHTML(o)}`;
     const paneVerlauf=`<div class="section-t">📋 Verlauf <small>aus Leadliste Spalte W · neueste zuerst</small></div>
       ${verlaufHTML(wVerlauf(o)||o.task)}
       <div class="field" style="margin-top:12px"><textarea id="dtNote" placeholder="Stand ergänzen … wird mit Datum an Spalte W angehängt, nichts wird überschrieben"></textarea></div>
       <button class="savebtn" id="dtNoteSave">Anhängen</button><div id="dtNoteErr"></div>`;
     const paneMails=mailSec||'<div class="empty">Keine offenen Mails zu diesem Objekt.</div>';
-    const paneUnterlagen=`${listingSectionHTML(o)}${terminSectionHTML(o)}${o.notiz?`<div class="section-t" style="margin-top:16px">📝 Notiz</div><div style="font-size:13px;color:var(--ink-soft)">${esc(o.notiz)}</div>`:''}`;
+    const paneUnterlagen=`${listingSectionHTML(o)}${o.notiz?`<div class="section-t" style="margin-top:16px">📝 Notiz</div><div style="font-size:13px;color:var(--ink-soft)">${esc(o.notiz)}</div>`:''}`;
     const paneAendern=`<div class="section-t">🔀 Phase / Status ändern</div><div class="phbtns">${BOARD_COLS.map(ph=>`<button class="phbtn${o.phase===ph?' on':''}" data-ph="${ph}">${esc(phaseLabelShort(ph))}</button>`).join('')}</div>
       <div class="section-t" style="margin-top:16px">➕ Neues Objekt vom selben Makler</div>
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="savebtn" id="dtFolge" style="margin:0;width:auto">➕ Folgeobjekt anlegen</button><span style="flex:1;min-width:180px;font-size:11.5px;line-height:1.4;color:var(--ink-faint)">Neue Leadliste-Zeile (Vorqualifikation) – Makler &amp; Kontakt werden übernommen.</span></div>
@@ -5026,7 +5054,7 @@ function openDetail(id){
   $('modal').classList.toggle('wide',!isSale);
   $('modal').innerHTML=isSale?altHTML:neuHTML;
   $('modal').querySelectorAll('.dt-tab').forEach(b=>b.onclick=()=>{ DT_TAB=b.dataset.tab; $('modal').querySelectorAll('.dt-tab').forEach(x=>x.classList.toggle('on',x===b)); $('modal').querySelectorAll('.dt-pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===b.dataset.tab)); });
-  { const dn=$('dtDone'); if(dn) dn.onclick=()=>{ handleErledigtClick(id); openDetail(id); }; }
+  { const td=$('dtTodoSave'); if(td) td.onclick=()=>saveDetailNote(id,'dtTodo','dtTodoSave','dtTodoErr'); }   // 24.09.2026: Textfeld statt Erledigt-Knopf
   $('modal').querySelectorAll('[data-ow]').forEach(b=>b.onclick=()=>{ setOwner(id,b.dataset.ow); openDetail(id); });
   $('modal').querySelectorAll('.phbtn[data-ph]').forEach(b=>b.onclick=()=>{ if(o.phase!==b.dataset.ph){ o.phase=b.dataset.ph; o.score=scoreOf(o); persistPhase(o); } openDetail(id); });
   $('modal').querySelectorAll('.phbtn[data-vk]').forEach(b=>b.onclick=async()=>{ await vkPhaseSetzen(o,b.dataset.vk); openDetail(id); });
@@ -5194,17 +5222,18 @@ async function appendCell(tab,col,row,addText,fallbackCur){
   return combined;
 }
 /* ===== Pipeline-Detail: Status/Notiz an die Leadliste (Spalte W) anhängen ===== */
-async function saveDetailNote(id){
+async function saveDetailNote(id,fieldId='dtNote',btnId='dtNoteSave',errId='dtNoteErr'){
+  // 24.09.2026: dieselbe Funktion bedient das Feld im Reiter „Nächster Schritt" (dtTodo) und im „Verlauf" (dtNote).
   const o=OBJ.find(x=>x._id===id); if(!o||!o._row) return;
-  const txt=($('dtNote').value||'').trim(), errEl=$('dtNoteErr'); errEl.innerHTML='';
+  const txt=($(fieldId).value||'').trim(), errEl=$(errId); errEl.innerHTML='';
   if(!txt){ errEl.innerHTML='<div class="erl-err">Bitte einen Text eingeben.</div>'; return; }
-  const btn=$('dtNoteSave'); btn.disabled=true; btn.textContent='Speichere …';
+  const btn=$(btnId), alt=btn.textContent; btn.disabled=true; btn.textContent='Speichere …';
   try{
     const combined=await appendCell('Leadliste','W',o._row,`[${fmtDate(new Date())}] ${txt}`,o.nextStep||'');
     o.nextStep=combined; o.task=combined;
     saveToast('✓ In Leadliste ergänzt',1);
     openDetail(id);   // Detail neu aufbauen: zeigt aktualisierten Stand, Feld ist leer
-  }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent='In Leadliste ergänzen'; }
+  }catch(e){ errEl.innerHTML='<div class="erl-err">⚠ Nicht gespeichert: '+esc(e.message)+'</div>'; btn.disabled=false; btn.textContent=alt; }
 }
 /* ===== Kontakt-Detail: CRM-Infos zeigen + Notiz in die CRM-Notizspalte anhängen ===== */
 function openKontakt(id){
