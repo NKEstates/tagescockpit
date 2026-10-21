@@ -1371,20 +1371,22 @@ function renderMaklercall(){
 function ensureSnapshot(){ if(focusSnapshot) return;
   /* 12.09.2026 (Regel Nele, verschärft): Der Tagesfokus folgt festen RÄNGEN, nicht
      nur der Punktzahl – vorher standen drei Beobachten-Wiedervorlagen ganz oben.
-     Rang 0: Verhandlung – schlägt alles.
-     Rang 1: alles Aktive (Angefragt-Fristen, Deals, Aufwertung, Verkauf, Mail-Anfragen),
+     Rang 0: Angebot vorbereiten – schlägt alles (Nele 21.10.2026: das ist immer das
+             Wichtigste, z. B. Barther Straße: Kalkulation fertigstellen, Angebot vorbesprechen).
+     Rang 1: Verhandlung.
+     Rang 2: alles Aktive (Angefragt-Fristen, Deals, Aufwertung, Verkauf, Mail-Anfragen),
              innerhalb nach Dringlichkeit (Score).
-     Rang 2: Beobachten – geht NIE vor Deals oder angefragte Objekte. */
+     Rang 3: Beobachten – geht NIE vor Deals oder angefragte Objekte. */
   const kand=activeObjs().filter(o=>inTagesliste(o)&&mine(o)&&!focusSuppressed(o))
-    .map(o=>({id:o._id,score:o.score,tier:o.phase==='Verhandlung'?0:(o.phase==='Beobachten'?2:1),
+    .map(o=>({id:o._id,score:o.score,tier:o.phase==='Angebot vorbereiten'?0:(o.phase==='Verhandlung'?1:(o.phase==='Beobachten'?3:2)),
               label:phaseLabelShort(o.phase)+' · '+actionKeyword(o)+' – '+o.titel}));
   const SEV_PTS={rot:100,heute:65,bald:35};
   try{
-    aufItems().forEach(it=>kand.push({id:it.id,score:SEV_PTS[it.sev]||35,tier:1,label:'🏗️ '+it.titel}));
-    vkItems().filter(it=>!aufDone(it.id)).forEach(it=>kand.push({id:it.id,score:SEV_PTS[it.sev]||100,tier:1,label:'💰 '+it.titel}));
+    aufItems().forEach(it=>kand.push({id:it.id,score:SEV_PTS[it.sev]||35,tier:2,label:'🏗️ '+it.titel}));
+    vkItems().filter(it=>!aufDone(it.id)).forEach(it=>kand.push({id:it.id,score:SEV_PTS[it.sev]||100,tier:2,label:'💰 '+it.titel}));
     if(hasGmailScope()&&GMAIL.state==='ready') angefragtMailItems().forEach(x=>{
       const r=exposeRang(x.info);
-      kand.push({id:'anf|'+x.t.tid,score:r===0?100:r===1?60:20,tier:1,label:x.info.todo+' – '+x.t.subj,gmail:x.t.tid});
+      kand.push({id:'anf|'+x.t.tid,score:r===0?100:r===1?60:20,tier:2,label:x.info.todo+' – '+x.t.subj,gmail:x.t.tid});
     });
   }catch(e){}
   const snap=kand.filter(k=>!doneSet.has(dkey(k.id))).sort((a,b)=>(a.tier-b.tier)||(b.score-a.score)).slice(0,3);
@@ -1672,11 +1674,13 @@ function fokusStern(id){
   return (focusSnapshot||[]).some(f=>String(f.id)===String(id))
     ?'<div class="fstern" title="Tagesfokus – eines deiner Top-3-Themen">⭐</div>':'';
 }
+// 21.10.2026 (Nele): Name des Deals-Blocks – hier aendern, wenn ein anderer Name gewuenscht ist.
+const HZ_DEALS_TITEL='💼 Weitere Deals', HZ_DEALS_HINWEIS='Kalkulieren bis Kaufvertrag · ohne Prio A';
 function hztRow(o){
   const d=isDone(o);
   return `<tr class="hzt-row${d?' done':''}" data-id="${o._id}">`
     +`<td>${fokusStern(o._id)}<input type="checkbox" class="hzt-chk"${d?' checked':''} onclick="event.stopPropagation();event.preventDefault();handleErledigtClick('${o._id}')"></td>`
-    +`<td><span class="hzt-dot" style="background:${bandColor(o.score)}"></span><span class="hzt-obj">${esc(o.titel)}</span><div class="hzt-meta">${o.seller?esc(kurz(o.seller,26))+' · ':''}${esc(phaseLabelShort(o.phase))} · <span class="owner ${effOwner(o)}">${effOwner(o)}</span></div></td>`
+    +`<td><span class="hzt-dot" style="background:${bandColor(o.score)}"></span><span class="hzt-obj">${esc(o.titel)}</span>${o.phase==='Neu'?'<span class="kc-star dim" style="margin-left:6px;vertical-align:middle">neu</span>':''}<div class="hzt-meta">${o.seller?esc(kurz(o.seller,26))+' · ':''}${esc(phaseLabelShort(o.phase))} · <span class="owner ${effOwner(o)}">${effOwner(o)}</span></div></td>`
     +`<td class="stand">${esc(hzStandSatz(o))}${hzBadgesHtml(hzBadges(o))}</td>`
     +`<td class="todo">${esc(hzTodo(o))}</td>`
     +`<td class="vor">${esc(hzVorschlag(o))}</td>`
@@ -1777,7 +1781,9 @@ function renderHeuteZuerst(){
   // Deals: Rotes (Ampel) zuerst, darunter Phasenreihenfolge. Vorgänge, deren jüngste
   // Notiz „abgesagt/nicht sinnvoll" sagt, stehen HINTER den frischen (Korrektur Nele).
   const byPhase=(a,b)=>(FUNNEL.indexOf(a.phase)-FUNNEL.indexOf(b.phase))||(b.score-a.score);
-  deals.sort((a,b)=>((notizNegativ(a)?1:0)-(notizNegativ(b)?1:0))||((b.score>=100)-(a.score>=100))||byPhase(a,b)); beob.sort(byScore);
+  // 21.10.2026 (Nele): „Angebot vorbereiten" steht in jedem Block ganz oben – vor Ampel und Phasenreihenfolge.
+  const angebotZuerst=(a,b)=>(b.phase==='Angebot vorbereiten'?1:0)-(a.phase==='Angebot vorbereiten'?1:0);
+  deals.sort((a,b)=>angebotZuerst(a,b)||((notizNegativ(a)?1:0)-(notizNegativ(b)?1:0))||((b.score>=100)-(a.score>=100))||byPhase(a,b)); beob.sort(byScore);
   /* 05.10.2026 (Wunsch Nele): Der Block „Beobachten" zeigt ALLE eigenen beobachteten Objekte.
      Vorher standen nur die mit erreichter Wiedervorlage drin (Regel 31.07.2026) – Objekte wie
      „Im Sieke 1" (Wiedervorlage 29.10.) waren auf der Heute-Seite unsichtbar und wirkten verschwunden.
@@ -1826,7 +1832,14 @@ function renderHeuteZuerst(){
   // abstand bis 45 %). Die bestehende Sortierung darunter bleibt unverändert – A verdrängt
   // keine überfällige Frist, es steht daneben. Erledigte und abgesagte fallen heraus.
   const chancen=OBJ.filter(o=>o.prio==='A'&&o.active&&!o.rejected&&!o.uebergeben&&!isDone(o))
-                   .sort((a,b)=>(b.score-a.score)||byPhase(a,b));
+                   .sort((a,b)=>angebotZuerst(a,b)||(b.score-a.score)||byPhase(a,b));
+  /* 21.10.2026 (Nele): Ein Objekt steht nur in EINEM Block. „Beste Chancen" gewinnt, dann
+     „Angefragt – zu prüfen", der Rest bildet den Deals-Block. Vorher stand ein Prio-A-Objekt
+     doppelt (oben als Chance, unten als Deal). Im Dringend-Filter ist der Chancen-Block
+     ausgeblendet – dann bleiben die A-Objekte in ihren Blöcken, sonst wären sie weg. */
+  const chancenIds=new Set(nurDringend?[]:chancen.map(o=>o._id));
+  fDeals=fDeals.filter(o=>!chancenIds.has(o._id));
+  fAng=fAng.filter(x=>!chancenIds.has(x.o._id));
   if(chancen.length&&!nurDringend){
     body+=kopf('var(--gold-d)','⭐ Beste Chancen – Prio A',chancen.length,'Verhandlungsabstand bis 45 %');
     body+=blockRows(chancen.map(hztRow),'chancen');
@@ -1838,9 +1851,9 @@ function renderHeuteZuerst(){
     body+=kopf('#0D9488','🧐 Angefragt – zu prüfen',fAng.length+fAnfM.length,'');
     body+=blockRows(fAng.map(x=>hztRow(x.o)).concat(fAnfM.map(hztAngefragtRow)),'ang');
   }
-  // 2 – Deals in Arbeit: Kalkulation bis Kaufvertrag; Rotes oben, Abgesagtes/Nicht-Sinnvolles unten
+  // 2 – Deals ohne Prio A und ohne Anfrage-Status: Kalkulieren bis Kaufvertrag; Rotes oben, Abgesagtes/Nicht-Sinnvolles unten
   if(fDeals.length){
-    body+=kopf('var(--band-orange)','💰 Deals in Arbeit',fDeals.length,'');
+    body+=kopf('var(--band-orange)',HZ_DEALS_TITEL,fDeals.length,HZ_DEALS_HINWEIS);
     body+=blockRows(fDeals.map(hztRow),'deals');
   }
   // 3b – Verkaufs-Wächter (Reservierung ohne Notartermin, Kaufpreis nicht eingegangen)
