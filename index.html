@@ -436,6 +436,29 @@ body{background:var(--bg1)}
 .dt-pane{display:none}.dt-pane.on{display:block}
 .dt-next{background:#FCFBF6;border:1px solid rgba(180,137,43,.35);border-radius:12px;padding:12px 14px;margin-bottom:14px}
 .dt-next .t{font-size:15px;font-weight:800;line-height:1.3;margin:6px 0}
+/* 21.10.2026: Checkliste und Datumsfelder im Aufwertungs-Detailfenster */
+.ck-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.ck-table th{text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);padding:4px 6px;border-bottom:1px solid var(--glass-brd)}
+.ck-table td{padding:5px 6px;border-bottom:1px solid rgba(40,32,12,.07);vertical-align:middle}
+.ck-table input[type=text],.ck-table select{width:100%;box-sizing:border-box;font:inherit;font-size:12.5px;padding:4px 6px;border:1px solid var(--glass-brd);border-radius:7px;background:#FFFDF7;color:var(--ink)}
+.ck-table .ck-budget{text-align:right;max-width:110px}
+.ck-table .ck-wer{max-width:140px}
+.ck-table input[type=checkbox]{width:16px;height:16px;cursor:pointer}
+.ck-row.done .ck-arbeit,.ck-row.done .ck-paket{text-decoration:line-through;color:var(--ink-faint)}
+.ck-paket{white-space:nowrap;color:var(--ink-faint);font-size:11px}
+.ck-row.hinweis td{background:rgba(214,164,0,.10)}
+.ck-row.hinweis .ck-bem{color:#8A6A1F;font-weight:600}
+.ck-bem{font-size:11px;color:var(--ink-faint);margin-top:2px;line-height:1.35}
+.ck-sum td{font-weight:800;border-top:2px solid var(--glass-brd);border-bottom:0}
+.ck-add{margin-top:14px;padding:10px 12px;background:#FCFBF6;border:1px dashed var(--glass-brd);border-radius:10px;font-size:12.5px}
+.ck-add .tm-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.ck-add input{font:inherit;font-size:12.5px;padding:5px 7px;border:1px solid var(--glass-brd);border-radius:7px;background:#fff}
+.dt-date{font:inherit;font-size:12.5px;padding:4px 6px;border:1px solid var(--glass-brd);border-radius:7px;background:#FFFDF7;color:var(--ink)}
+.dt-date.warn{border-color:var(--band-red);color:var(--band-red)}
+.aufo-task{display:grid;grid-template-columns:14px minmax(0,1fr) 150px;gap:8px;align-items:start;padding:5px 0;border-top:1px solid rgba(40,32,12,.07);font-size:12.5px}
+.aufo-task .d{width:9px;height:9px;border-radius:50%;margin-top:4px}
+.aufo-task .z{font-size:11.5px;color:var(--ink-faint);text-align:right}
+
 @media(max-width:860px){.dt-grid{grid-template-columns:1fr}.dt-left{border-right:0;padding-right:0;border-bottom:1px solid var(--glass-brd);padding-bottom:12px;margin-bottom:12px}.dt-right{padding-left:0}}
 .erl-cur{background:#F5F2E9;border:1px solid var(--glass-brd);border-radius:10px;padding:9px 11px;font-size:12px;color:var(--ink-soft);white-space:pre-wrap;max-height:120px;overflow:auto;margin-top:4px}
 .erl-err{color:var(--red);font-size:12px;font-weight:700;margin-top:8px}
@@ -469,6 +492,16 @@ body{background:var(--bg1)}
    Zweitzeile eines Partners. */
 .kon-last{font-size:11.5px;color:var(--ink-soft)}
 .pt-sub{font-size:12px;color:var(--ink-soft)}
+</style>
+<style>/* 19.10.2026 kompakte Pipeline-Karten */
+.kc-mini{margin-bottom:7px}
+.kc-mini .kc-bar{min-height:20px;padding:2px 9px;font-size:10.5px}
+.kc-mini .kc-body{padding:7px 10px 8px}
+.kc-mini .kc-title{font-size:12.5px;line-height:1.3}
+.kc-mini .kc-sub{font-size:11px;margin-top:1px}
+.kc-mini .kc-chips{margin-top:5px}
+.kc-mini .kc-foot{margin-top:5px}
+.kc-mini .kc-foot .link{font-size:11px}
 </style>
 </head>
 <body>
@@ -1702,7 +1735,9 @@ function renderHeuteZuerst(){
      Vorqualifikation eines frischen Objekts. Jetzt gibt der Block die Reihenfolge
      vor; die Ampelfarbe bleibt als Punkt vor jedem Eintrag und sortiert INNERHALB
      eines Blocks. Reihenfolge von Nele festgelegt:
-     Reißt heute · Deals in Arbeit · Aufwertung · Neue Objekte · Beobachten · Absagen. */
+     Reißt heute · Deals in Arbeit · Aufwertung · Neue Objekte · Beobachten · Absagen.
+     05.10.2026 (Nele): Aufwertung rückt hinter Beobachten – Reihenfolge jetzt
+     Beste Chancen · Angefragt · Deals · Verkauf · Neue Objekte · Beobachten · Aufwertung · Absagen. */
   // 21.08.2026 (Korrektur Nele): ALLE Vorgänge aus der Leadliste gehören in „Deals in Arbeit" –
   // auch frisch angelegte und solche in der Vorqualifikation. Der Block „Neue Objekte anfragen"
   // ist ausschließlich für Nele und enthält nur, was noch NICHT in der Leadliste steht:
@@ -1725,6 +1760,15 @@ function renderHeuteZuerst(){
     if(o.phase==='Neu'||o.phase==='Vorqualifikation'){ angefragt.push({o,ex:null}); return; }
     deals.push(o);
   });
+  /* 05.10.2026 (Nele): „Angefragt – zu prüfen" zeigt die „Neu"-Objekte bei BEIDEN Personen.
+     Phase „Neu" gehört Nele; Niklas sah die vier neuen Objekte deshalb nicht und hielt sie für
+     verschwunden. Jetzt stehen sie auch in seiner Ansicht, die Zuständigkeit bleibt in der Zeile.
+     Alles andere (Vorqualifikation, Deals, Beobachten, Absagen) bleibt wie gehabt eigene To-dos. */
+  const angIds=new Set(angefragt.map(x=>x.o._id));
+  activeObjs().filter(o=>o.phase==='Neu'&&!mine(o)&&!angIds.has(o._id)&&!isDone(o)&&!isSnoozed(o)).forEach(o=>{
+    const fa=folgeAnfrageInfo(o); if(fa){ angefragt.push({o,ex:fa.zustand}); return; }
+    angefragt.push({o,ex:angefragtInfo(o)||null});
+  });
   const anfMails=gmailReady?angefragtMailItems():[];
   const aufAlle=aufItems();
   const vkAlle=vkItems();
@@ -1734,6 +1778,16 @@ function renderHeuteZuerst(){
   // Notiz „abgesagt/nicht sinnvoll" sagt, stehen HINTER den frischen (Korrektur Nele).
   const byPhase=(a,b)=>(FUNNEL.indexOf(a.phase)-FUNNEL.indexOf(b.phase))||(b.score-a.score);
   deals.sort((a,b)=>((notizNegativ(a)?1:0)-(notizNegativ(b)?1:0))||((b.score>=100)-(a.score>=100))||byPhase(a,b)); beob.sort(byScore);
+  /* 05.10.2026 (Wunsch Nele): Der Block „Beobachten" zeigt ALLE eigenen beobachteten Objekte.
+     Vorher standen nur die mit erreichter Wiedervorlage drin (Regel 31.07.2026) – Objekte wie
+     „Im Sieke 1" (Wiedervorlage 29.10.) waren auf der Heute-Seite unsichtbar und wirkten verschwunden.
+     Jetzt: fällige Wiedervorlagen oben (offen, max. 5), alle noch nicht fälligen dahinter
+     eingeklappt, sortiert nach dem Wiedervorlage-Datum. Manuell geparkte bleiben in „Wiedervorlage geplant". */
+  const beobIds=new Set(beob.map(o=>o._id));
+  const beobRest=activeObjs().filter(o=>o.phase==='Beobachten'&&!beobIds.has(o._id)&&!isDone(o)&&mine(o)&&!isSnoozed(o))
+    .sort((a,b)=>{ const da=wvDateOf(a),db=wvDateOf(b); return (da&&db)?(da-db):(da?-1:(db?1:0)); });
+  const beobFaellig=beob.length;
+  beob.push(...beobRest);
   // Rangfolge im Angefragt-Block: überfällig/nachfassen → prüfen → wartet → Vorqualifikation ohne Frist-Info
   const angRang=x=>x.ex?exposeRang(x.ex):3;
   angefragt.sort((a,b)=>(angRang(a)-angRang(b))||(b.o.score-a.o.score));
@@ -1789,16 +1843,6 @@ function renderHeuteZuerst(){
     body+=kopf('var(--band-orange)','💰 Deals in Arbeit',fDeals.length,'');
     body+=blockRows(fDeals.map(hztRow),'deals');
   }
-  // 3 – Aufwertung: ALLE Aufgaben aus Projektzeitplan, Handwerkern und Terminvorschlägen (rot zuerst)
-  if(fAuf.length){
-    const aufTitel=AUFS.filter(a=>a.state==='ready').length>1
-      ? '🏗️ Aufwertung <small style="font-weight:600">('+AUFS.filter(a=>a.state==='ready').length+' Objekte)</small>'
-      : '🏗️ Aufwertung '+esc(aufObjektName());
-    body+=kopf('#B45309',aufTitel,fAuf.length,aufLage());
-    body+=blockRows(fAuf.map(hztAufRow),'auf');
-  } else if(!nurDringend&&AUF.state==='error'){
-    body+=kopf('var(--ink-faint)','🏗️ Aufwertung',0,'Plan nicht lesbar: '+esc(AUF.error||''));
-  }
   // 3b – Verkaufs-Wächter (Reservierung ohne Notartermin, Kaufpreis nicht eingegangen)
   if(fVk.length){
     body+=kopf('var(--band-red)','💰 Verkauf',fVk.length,'');
@@ -1820,8 +1864,19 @@ function renderHeuteZuerst(){
   }
   // 5 – Beobachten: nicht im Dringend-Filter; im Fokus-Filter nur mit Stern
   if(!nurDringend&&fBeob.length){
-    body+=kopf('var(--ink-faint)','👁️ Beobachten',fBeob.length,'');
+    const bf=nurFokus?fBeob.filter(wvFaellig).length:beobFaellig;
+    body+=kopf('var(--ink-faint)','👁️ Beobachten',fBeob.length,bf+' fällig · '+(fBeob.length-bf)+' noch nicht fällig');
     body+=blockRows(fBeob.map(hztRow),'beob');
+  }
+  // 5b – Aufwertung (05.10.2026, Wunsch Nele: hinter „Beobachten"): ALLE Aufgaben aus Projektzeitplan, Handwerkern und Terminvorschlägen (rot zuerst)
+  if(fAuf.length){
+    const aufTitel=AUFS.filter(a=>a.state==='ready').length>1
+      ? '🏗️ Aufwertung <small style="font-weight:600">('+AUFS.filter(a=>a.state==='ready').length+' Objekte)</small>'
+      : '🏗️ Aufwertung '+esc(aufObjektName());
+    body+=kopf('#B45309',aufTitel,fAuf.length,aufLage());
+    body+=blockRows(fAuf.map(hztAufRow),'auf');
+  } else if(!nurDringend&&AUF.state==='error'){
+    body+=kopf('var(--ink-faint)','🏗️ Aufwertung',0,'Plan nicht lesbar: '+esc(AUF.error||''));
   }
   // 6 – Absagen (bleiben auch im Dringend-Filter – sie sind eine offene Handlung)
   const abs=nurFokus?[]:absagen();
@@ -2244,12 +2299,24 @@ function parseAufPlan(rows,objKey){
            ende:colIdx(h,'ende'),status:colIdx(h,'status')};
   const out=[];
   out._headRow=hi+1; out._cols=c;
+  // 21.10.2026: Die Zelle „Schluesseluebergabe" oberhalb der Kopfzeile ist der Anker des
+  // ganzen Zeitplans. Gemerkt wird, WO sie steht, damit das Cockpit sie beschreiben kann.
+  out._uebergabe=null;
+  for(let ri=0;ri<hi&&!out._uebergabe;ri++){ const r=rows[ri]||[];
+    for(let ci=0;ci<r.length;ci++){ if(!/schl[üu]ssel[üu]bergabe/.test(norm(r[ci]))) continue;
+      let j=ci+1; while(j<r.length&&!String(r[j]||'').trim()) j++;
+      if(j>=r.length) j=ci+2;
+      out._uebergabe={row:ri+1,col:j,date:parseDate(r[j])}; break; } }
+  // Die Phase steht nur in der ersten Zeile eines Blocks (verbundene Zellen) - sie gilt
+  // fuer alle Zeilen darunter, bis die naechste Phase beginnt.
+  let lastPhase='';
   rows.slice(hi+1).forEach((r,i)=>{
     const titel=String(r[c.aufgabe]||'').trim(); if(!titel) return;
     const status=String(r[c.status]||'').trim();
     const nrT=(r[c.nr]||'').toString().trim()||('z'+i);
+    const phRaw=String(r[c.phase]||'').replace(/\s+/g,' ').trim(); if(phRaw) lastPhase=phRaw;
     out.push({ id:'auf|'+objKey+'|task|'+nrT, lid:'auf|task|'+nrT, _obj:objKey, _row:hi+2+i,
-      phase:String(r[c.phase]||'').trim(), nr:String(r[c.nr]||'').trim(), titel,
+      phase:lastPhase, nr:String(r[c.nr]||'').trim(), titel,
       art:String(r[c.art]||'').trim(), gewerk:String(r[c.gewerk]||'').trim(),
       verantw:String(r[c.verantw]||'').trim(), start:parseDate(r[c.start]), ende:parseDate(r[c.ende]),
       status, erledigt:AUF_DONE_RE.test(norm(status)), laeuft:AUF_LAUFEND_RE.test(norm(status)),
@@ -2284,40 +2351,62 @@ function parseAufHw(rows,objKey){
   return out;
 }
 function parseAufKosten(rows){
-  const k={budget:null,angebote:null,verfuegbar:null,luecke:null,pakete:[],_statusCol:-1};
+  /* 21.10.2026 (Entscheidung Nele): Die Kostenuebersicht ist eine BRUTTO-CHECKLISTE,
+     eine Zeile je Arbeit: Paket · Arbeit · Budget brutto · Beauftragt an · Status ·
+     Erledigt (Haekchen) · Bemerkung. Keine Differenz-, keine Angebotsspalte mehr - das
+     Budget wird mit dem echten Betrag ueberschrieben. Unterhalb der Summe steht der
+     Abgleich mit dem Finanzierungsrahmen („Verfuegbar", „Luecke ohne/mit Home Staging").
+     Alte Tabellen (Spalte „Gewerk", ohne „Erledigt") werden weiter gelesen.               */
+  const k={budget:null,angebote:null,verfuegbar:null,luecke:null,lueckeMit:null,lueckeLabel:'Lücke',pakete:[],_statusCol:-1,_cols:null,_headRow:-1,_summeRow:-1};
   const hi=findHead(rows,['paket','budget']);
   if(hi>=0){
-    const h=rows[hi], cB=colIdx(h,'budget'), cA=colIdx(h,'angebot'), cP=colIdx(h,'paket'),
-          cG=colIdx(h,'gewerk'), cS=colIdx(h,'status'), cV=colIdx(h,'beauftragt');
-    k._statusCol=cS;
+    const h=rows[hi];
+    const c={paket:colIdx(h,'paket'),arbeit:colIdx(h,'arbeit')>=0?colIdx(h,'arbeit'):colIdx(h,'gewerk'),gewerk:colIdx(h,'gewerk'),
+             budget:colIdx(h,'budget'),angebot:colIdx(h,'angebot'),vergeben:colIdx(h,'beauftragt'),status:colIdx(h,'status'),
+             erledigt:colIdx(h,'erledigt'),bemerkung:colIdx(h,'bemerk')};
+    k._cols=c; k._statusCol=c.status; k._headRow=hi+1;
     rows.slice(hi+1).forEach((r,i)=>{
-      const p=String(r[cP]||'').trim(); if(!p) return;
-      if(/summe/.test(norm(p))){ k.budget=euroNum(r[cB]); k.angebote=euroNum(r[cA]); return; }
-      // _row = echte Zeilennummer in der Tabelle, damit ein verschobenes Paket in DIESE Zeile zurueckgeschrieben wird.
-      k.pakete.push({paket:p,gewerk:String(r[cG]||'').trim(),budget:euroNum(r[cB]),_row:hi+2+i,
-                     angebot:euroNum(r[cA]),vergeben:String(r[cV]||'').trim(),status:String(r[cS]||'').trim()});
+      const p=String(r[c.paket]||'').trim(); if(!p) return;
+      if(/summe/.test(norm(p))){ k.budget=euroNum(r[c.budget]); k.angebote=c.angebot>=0?euroNum(r[c.angebot]):null; k._summeRow=hi+2+i; return; }
+      if(k._summeRow>0) return;   // unterhalb der Summe steht der Abgleich, keine Arbeiten
+      const erlRaw=c.erledigt>=0?norm(r[c.erledigt]):'';
+      // _row = echte Zeilennummer in der Tabelle, damit ein Haken in DIESE Zeile zurueckgeschrieben wird.
+      k.pakete.push({paket:p,arbeit:String(r[c.arbeit]||'').trim(),gewerk:String(r[c.gewerk>=0?c.gewerk:c.arbeit]||'').trim(),
+                     budget:euroNum(r[c.budget]),_row:hi+2+i,
+                     angebot:c.angebot>=0?euroNum(r[c.angebot]):null,
+                     vergeben:c.vergeben>=0?String(r[c.vergeben]||'').trim():'',
+                     status:c.status>=0?String(r[c.status]||'').trim():'',
+                     erledigt:/^(true|wahr|ja|x|✓)$/.test(erlRaw)||/fertig|erledigt/.test(c.status>=0?norm(r[c.status]):''),
+                     bemerkung:c.bemerkung>=0?String(r[c.bemerkung]||'').trim():''});
     });
   }
-  // Kennzahlen unterhalb der Tabelle: „Verfügbar (mitfinanziert)" und die erste „Lücke"-Zeile.
-  // Die erste Lücke-Zeile ist die ohne Home Staging – das ist die Zahl, die für die Bauleistung zählt.
+  // Kennzahlen unterhalb der Tabelle: „Verfügbar (mitfinanziert)", „Lücke ohne Home Staging" (= die Zahl,
+  // die fuer die Bauleistung zaehlt) und „Lücke mit Home Staging".
   rows.forEach(r=>{
     const first=norm(r&&r[0]);
     const val=(r||[]).slice(1).map(euroNum).find(x=>x!=null);
     if(/verf[üu]gbar/.test(first)&&k.verfuegbar==null) k.verfuegbar=val;
-    if(/l[üu]cke/.test(first)&&k.luecke==null){ k.luecke=val; k.lueckeLabel=String(r[0]||'').trim(); }
+    if(/l[üu]cke/.test(first)){
+      if(/\bmit\b/.test(first)){ if(k.lueckeMit==null) k.lueckeMit=val; }
+      else if(k.luecke==null){ k.luecke=val; k.lueckeLabel=String(r[0]||'').trim(); }
+    }
   });
   return k;
 }
 // Reiternamen je Tabelle erkennen. Das Ergebnis gilt fuer diese Sitzung - bei mehreren
 // Objekten spart das je eine Anfrage pro Neuladen und pro Detail-Fenster.
 async function aufTabs(sheetId){
-  const ck='auftabs:'+sheetId;
+  // 21.10.2026: auftabs3 - jetzt mit sheetId je Reiter (fuer das Einfuegen von Zeilen) und
+  // ohne die ARCHIV-Reiter, die sonst als Zeitplan/Kostenuebersicht erkannt wuerden.
+  const ck='auftabs3:'+sheetId;
   try{ const c=sessionStorage.getItem(ck); if(c) return JSON.parse(c); }catch(e){}
-  const meta=await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'?fields=sheets.properties.title');
-  const titles=(meta.sheets||[]).map(x=>x.properties.title);
-  const find=re=>titles.find(t=>re.test(norm(t)))||'';
-  const t={plan:find(/zeitplan|projektplan|ablauf|termin/),hw:find(/handwerk|dienstleist|kontaktstatus/),
-           kosten:find(/kosten|budget/),alle:titles};
+  const meta=await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'?fields=sheets.properties(title,sheetId)');
+  const props=(meta.sheets||[]).map(x=>x.properties).filter(p=>!/^archiv/.test(norm(p.title)));
+  const titles=props.map(p=>p.title);
+  const findP=re=>props.find(p=>re.test(norm(p.title)))||null;
+  const pP=findP(/zeitplan|projektplan|ablauf|termin/), pH=findP(/handwerk|dienstleist|kontaktstatus/), pK=findP(/kosten|budget/);
+  const t={plan:pP?pP.title:'',hw:pH?pH.title:'',kosten:pK?pK.title:'',
+           planId:pP?pP.sheetId:-1,hwId:pH?pH.sheetId:-1,kostenId:pK?pK.sheetId:-1,alle:titles};
   try{ sessionStorage.setItem(ck,JSON.stringify(t)); }catch(e){}
   return t;
 }
@@ -2338,6 +2427,7 @@ async function loadAufwertung(){
         a.tabs.kosten? aufRead(a.sheetId,a.tabs.kosten,'A1:H80'): Promise.resolve(null),
       ]);
       a.tasks =plan ?parseAufPlan(plan,a.key):[];
+      a.uebergabeCell=a.tasks._uebergabe||null; a.uebergabe=a.uebergabeCell?a.uebergabeCell.date:null;   // 21.10.2026
       a.hw    =hw   ?parseAufHw(hw,a.key)    :[];
       a.kosten=kost ?parseAufKosten(kost)    :null;
       a.state='ready';
@@ -2985,21 +3075,29 @@ function toggleAufDone(id){
 
 
 /* ============================================================================
-   AUFWERTUNGS-PIPELINE  (Stand 21.08.2026)
+   AUFWERTUNGS-PIPELINE  (Umbau 21.10.2026, Entscheidung Nele)
    Zweites Kanban-Board. Referenz ist die Aufwertungstabelle – so wie die
    Ankaufs-Pipeline die Leadliste als Referenz hat.
-   Eine Kachel = ein Gewerk-Paket (P1 bis P8). Oben auf der Kachel steht das
-   Objekt, darunter das Gewerk. Klick öffnet alle Details aus der Tabelle.
-   Spalten: Angefragt · Angebot da · Beauftragt · In Ausführung · Fertig
-   21.08.2026 (Entscheidung 4.1): Verkauf, Übergabe und Geldeingang sind HIER RAUS -
-   sie haben eine eigene Ansicht bekommen (VERKAUFS-PIPELINE weiter unten). Grund:
-   Aufwertung und Verkauf laufen PARALLEL, nicht nacheinander. In Kühlungsborn ist
-   „Fotos und Vermarktungsstart" Schritt 21 des Aufwertungsplans - die Vermarktung
-   beginnt vor der Fertigstellung. Ein Objekt steht also gleichzeitig in beiden Boards.
+   EINE Kachel = EIN OBJEKT (bis 21.10.2026: eine Kachel je Gewerk-Paket). Aufbau wie
+   die Deal-Kachel: Balken = Spalte, darunter Objekt, Budget, Fortschritt, Warnungen.
+   Spalten: Angebote einholen · Bestellung & Vorbereitung · Umbau · Staging · Vermarktung
+   Die Spalte ergibt sich aus dem Zeitplan (hoechste Phase, in der eine Aufgabe schon
+   begonnen hat oder erledigt ist); Ziehen uebersteuert (META 'aufo:<Kuerzel>|phase').
+   Klick oeffnet das zweispaltige Fenster: links Kennzahlen, Budget brutto gegen den
+   mitfinanzierten Rahmen, Schluesseluebergabe und Vermarktungsstart (beide schreiben in
+   den Zeitplan); rechts Reiter „Kostenuebersicht" (Checkliste: abhaken, Budget,
+   Beauftragt an, Status, neue Arbeit), „Zeitplan", je Paket Betriebe/Angebote/Mails,
+   „Aendern". Abgehakt wird NUR in der Kostenuebersicht (Entscheidung Nele 21.10.2026),
+   die P-Reiter der Tabelle bleiben das Leistungsverzeichnis fuer Angebotsanfragen.
+   21.08.2026 (Entscheidung 4.1): Verkauf, Uebergabe und Geldeingang sind HIER RAUS -
+   sie haben eine eigene Ansicht (VERKAUFS-PIPELINE weiter unten). Aufwertung und
+   Verkauf laufen PARALLEL; „Vermarktung" heisst hier nur: die Aufwertung ist durch,
+   die Fotos stehen an.
    ========================================================================== */
-const AUF_COLS=['Angefragt','Angebot da','Beauftragt','In Ausführung','Fertig'];
-
-const AUF_COL_ICON={'Angefragt':'✉️','Angebot da':'📄','Beauftragt':'🤝','In Ausführung':'🔨','Fertig':'✅'};
+const AUFO_COLS=['Angebote einholen','Bestellung & Vorbereitung','Umbau','Staging','Vermarktung'];
+const AUFO_ICON={'Angebote einholen':'✉️','Bestellung & Vorbereitung':'📦','Umbau':'🔨','Staging':'🛋️','Vermarktung':'📸'};
+const AUF_SEV_BAR={rot:'var(--band-red)',gelb:'var(--band-yellow)',gruen:'var(--band-green)'};
+let AUFO_TAB='kosten';
 
 /* ---- Gewerke zusammenführen ---------------------------------------------
    Die Tabelle nennt dasselbe Gewerk an drei Stellen unterschiedlich:
@@ -3032,53 +3130,57 @@ function paketKey(v){
   return m?('P'+m[1]):'';
 }
 
-/* ---- Ein Paket = eine Kachel -------------------------------------------- */
-function aufPakete(){
-  const out=[];
-  AUFS.filter(a=>a.state==='ready').forEach(a=>{
-    const k=a.kosten||{pakete:[]};
-    // key = „<Objektkuerzel>|P1". Der Objektteil ist Pflicht: ohne ihn teilen sich zwei
-    // Objekte denselben Zustand (siehe Kommentar oben bei AUFS).
-    let basis=(k.pakete||[]).map(x=>({key:a.key+'|'+paketKey(x.paket),pk:paketKey(x.paket),_obj:a.key,
-      objName:a.name,paket:x.paket,gewerk:x.gewerk,budget:x.budget,angebot:x.angebot,
-      vergebenAn:x.vergeben,statusTxt:x.status,_row:x._row}));
-    // Faellt die Kostenuebersicht aus, bauen wir die Pakete ersatzweise aus der Handwerkerliste.
-    if(!basis.length){
-      const seen={};
-      a.hw.forEach(h=>{ const kk=paketKey(h.paket); if(!kk||seen[kk]) return; seen[kk]=1;
-        basis.push({key:a.key+'|'+kk,pk:kk,_obj:a.key,objName:a.name,paket:'Paket '+kk.slice(1),
-          gewerk:h.gewerk,budget:null,angebot:null,vergebenAn:'',statusTxt:'',_row:null}); });
-    }
-    basis.filter(x=>x.pk).forEach(x=>{
-      const betriebe=a.hw.filter(h=>paketKey(h.paket)===x.pk||(!h.paket&&gewerkMatch(h.gewerk,x.gewerk)));
-      const aufgaben=a.tasks.filter(t=>gewerkMatch(t.gewerk,x.gewerk));
-      const angebote=betriebe.filter(h=>h.angebot!=null&&h.angebot>0);
-      const angeschrieben=betriebe.filter(h=>h.kontaktiert);
-      const still=angeschrieben.filter(h=>!h.rueck&&!hwAntwort(h)&&daysSince(h.kontaktiert)>=AUF_STALE);
-      // Antworten, die einen Handgriff verlangen (anderer Termin / Absage) bzw. bestaetigte Termine.
-      const antOffen=betriebe.filter(h=>{const x=hwAntwort(h);return x&&(x.art==='termin_neu'||x.art==='absage');});
-      const antOk=betriebe.filter(h=>{const x=hwAntwort(h);return x&&x.art==='termin_ok';});
-      const offenAnzufragen=betriebe.filter(h=>!h.kontaktiert&&/offen/.test(norm(h.status)));
-      const mails=aufPaketMails(betriebe);
-      const ueberfaellig=aufgaben.filter(t=>!t.erledigt&&t.ende&&daysUntil(t.ende)<0);
-      const laufend=aufgaben.filter(t=>!t.erledigt&&t.start&&daysUntil(t.start)<=0);
-      const alleFertig=aufgaben.length>0&&aufgaben.every(t=>t.erledigt);
-      const o={...x, betriebe, aufgaben, angebote, angeschrieben, still, offenAnzufragen, mails,
-               ueberfaellig, laufend, alleFertig, antOffen, antOk};
-      o.phase=paketPhase(o);
-      o.sev=paketSev(o);
-      out.push(o);
-    });
-  });
-  return out;
+
+/* ---- Zeitplan-Aufgabe -> Spalte des Boards ---------------------------------
+   Phase 1 -> Angebote einholen · Phase 2 -> Bestellung & Vorbereitung · Phase 3 und 4
+   -> Umbau · Bauendreinigung und Home Staging -> Staging · Fotos -> Vermarktung.   */
+function aufTaskSpalte(t){
+  const ph=normLoose(t.phase), ti=normLoose(t.titel);
+  if(/fotos|vermarktung/.test(ti)) return 4;
+  if(/reinigung|staging/.test(ti)||/phase 5|abschluss/.test(ph)) return 3;
+  if(/phase 1|angebot/.test(ph)) return 0;
+  if(/phase 2|bestellung|vorlauf/.test(ph)) return 1;
+  return 2;
 }
-// Wie viele Gewerke eines Objekts sind fertig? Wird auf der Verkaufskachel und im
-// Aufwertungsstand der Objektliste angezeigt.
+
+/* ---- Ein Objekt = eine Kachel: alles, was Kachel und Fenster brauchen ---- */
+/* Ein HINWEIS ist eine Zeile der Kostenuebersicht, deren Bemerkung mit „⚠" beginnt und
+   die noch nicht abgehakt ist (Nele, 21.10.2026) - z. B. „erst nach dem Fliesen bestellen".
+   Mit dem Erledigt-Haken verschwindet er. Unterzeilen beginnen mit „↳"; fuer die Anzeige
+   auf der Kachel wird der Pfeil entfernt.                                              */
+function istHinweis(r){ return !r.erledigt&&/^\s*⚠/.test(r.bemerkung||''); }
+function hinweisText(r){ return String(r.bemerkung||'').replace(/^\s*⚠\s*/,'').trim(); }
+function arbeitKurz(r){ return String(r.arbeit||r.gewerk||'').replace(/^\s*↳\s*/,'').trim(); }
+function aufObjektStand(a){
+  const k=a.kosten||{pakete:[]}; const rows=k.pakete||[];
+  const erledigt=rows.filter(r=>r.erledigt).length;
+  const hinweise=rows.filter(istHinweis);
+  const budget=rows.reduce((s,r)=>s+(r.budget||0),0);
+  const tasks=a.tasks||[];
+  const ueberfaellig=tasks.filter(t=>!t.erledigt&&t.ende&&daysUntil(t.ende)<0);
+  const laufend=tasks.filter(t=>!t.erledigt&&t.start&&daysUntil(t.start)<=0&&(!t.ende||daysUntil(t.ende)>=0));
+  const naechste=tasks.filter(t=>!t.erledigt&&t.start&&daysUntil(t.start)>0).sort((x,y)=>x.start-y.start)[0]||null;
+  const offen=h=>!/beauftragt|abgesagt|abgelehnt/.test(norm(h.status));
+  const still=a.hw.filter(h=>offen(h)&&h.kontaktiert&&!h.rueck&&!hwAntwort(h)&&daysSince(h.kontaktiert)>=AUF_STALE);
+  const antOffen=a.hw.filter(h=>{ if(!offen(h)) return false; const x=hwAntwort(h); return x&&(x.art==='termin_neu'||x.art==='absage'); });
+  // Spalte: die hoechste Phase, in der schon etwas laeuft oder erledigt ist. Von Hand gezogen sticht.
+  let auto=0; tasks.forEach(t=>{ if(t.erledigt||(t.start&&daysUntil(t.start)<=0)) auto=Math.max(auto,aufTaskSpalte(t)); });
+  const manuell=META['aufo:'+a.key+'|phase'];
+  const phase=(manuell&&AUFO_COLS.includes(manuell))?manuell:AUFO_COLS[auto];
+  const fotos=tasks.find(t=>/fotos|vermarktungsstart/.test(normLoose(t.titel)))||null;
+  const umbauEnde=tasks.filter(t=>aufTaskSpalte(t)===2&&t.ende).reduce((m,t)=>(!m||t.ende>m)?t.ende:m,null);
+  const vermarktungKollision=!!(fotos&&fotos.start&&umbauEnde&&fotos.start<umbauEnde);
+  const sev=(ueberfaellig.length||still.length||antOffen.length||vermarktungKollision)?'rot':((k.luecke!=null&&k.luecke>0)?'gelb':'gruen');
+  return {key:a.key,a,name:a.name,sale:a.sale,rows,erledigt,budget,k,tasks,ueberfaellig,laufend,naechste,still,antOffen,hinweise,
+          phase,auto:AUFO_COLS[auto],manuell:manuell||'',fotos,umbauEnde,vermarktungKollision,sev,uebergabe:a.uebergabe||null};
+}
+function aufObjektKarten(){ return AUFS.filter(a=>a.state==='ready').map(aufObjektStand); }
+// Fortschritt eines Objekts: erledigte Arbeiten der Checkliste. Steht auf der
+// Verkaufskachel und im Aufwertungsstand der Objektliste.
 function aufFortschritt(objKey){
-  const pak=aufPakete().filter(x=>x._obj===objKey);
-  if(!pak.length) return null;
-  return {fertig:pak.filter(x=>x.phase==='Fertig').length, gesamt:pak.length,
-          rot:pak.filter(x=>x.sev==='rot').length};
+  const a=aufEintrag(objKey); if(!a||a.state!=='ready') return null;
+  const o=aufObjektStand(a); if(!o.rows.length) return null;
+  return {fertig:o.erledigt,gesamt:o.rows.length,rot:o.ueberfaellig.length+o.still.length+o.antOffen.length};
 }
 function aufPaketMails(betriebe){
   if(!(typeof GMAIL!=='undefined'&&hasGmailScope()&&GMAIL.state==='ready')) return [];
@@ -3086,87 +3188,59 @@ function aufPaketMails(betriebe){
   if(!adr.size) return [];
   return GMAIL.threads.filter(t=>adr.has(norm(t.fromEmail))).sort((a,b)=>(b.ts||0)-(a.ts||0));
 }
-// Spalte des Pakets. Von Hand verschoben sticht immer; sonst aus dem Stand in der Tabelle abgeleitet.
-function paketPhase(o){
-  // Neuer Schluessel „aufp:S14021|P1|phase"; fuer die Tabelle aus config.js gilt beim
-  // LESEN zusaetzlich der alte „aufp:P1|phase", damit bestehende Staende erhalten bleiben.
-  let manuell=META['aufp:'+o.key+'|phase'];
-  if(!manuell&&aufLegacy(o._obj)) manuell=META['aufp:'+o.pk+'|phase'];
-  if(manuell&&AUF_COLS.includes(manuell)) return manuell;
-  const st=norm(o.statusTxt);
-  if(/fertig|abgeschlossen|abgenommen|erledigt/.test(st)||o.alleFertig) return 'Fertig';
-  if(/beauftragt|vergeben/.test(st)||o.vergebenAn) return o.laufend.length?'In Ausführung':'Beauftragt';
-  if(o.angebote.length) return 'Angebot da';
-  return 'Angefragt';
+function lueckeHTML(lk,kurz){
+  if(lk==null) return '';
+  return lk>0?`<b style="color:var(--band-red)">+${euroTxt(lk)}${kurz?'':' über Rahmen'}</b>`:`<b style="color:var(--green)">${euroTxt(-lk)} Reserve</b>`;
 }
-function paketSev(o){
-  if(o.ueberfaellig.length||o.still.length||(o.antOffen&&o.antOffen.length)) return 'rot';
-  if(o.phase==='Angefragt'&&o.offenAnzufragen.length) return 'gelb';
-  if(o.phase==='Angebot da'&&o.angebote.length<3) return 'gelb';
-  return 'gruen';
-}
-const AUF_SEV_BAR={rot:'var(--band-red)',gelb:'var(--band-yellow)',gruen:'var(--band-green)'};
-function paketWarnung(o){
-  if(o.antOffen&&o.antOffen.length){
-    const a=hwAntwort(o.antOffen[0]);
-    return (ANT_ART[a.art]||ANT_ART.antwort).icon+' '+o.antOffen[0].firma+': '+(ANT_ART[a.art]||ANT_ART.antwort).txt;
-  }
-  if(o.ueberfaellig.length) return '⏰ '+o.ueberfaellig.length+' '+(o.ueberfaellig.length===1?'Termin':'Termine')+' überschritten';
-  if(o.still.length) return '📞 '+o.still.length+' '+(o.still.length===1?'Betrieb meldet sich nicht':'Betriebe melden sich nicht');
-  if(o.phase==='Angefragt'&&o.offenAnzufragen.length) return '✉️ '+o.offenAnzufragen.length+' noch nicht angefragt';
-  if(o.phase==='Angebot da'&&o.angebote.length<3) return '📄 erst '+o.angebote.length+' von 3 Angeboten';
-  return '';
-}
-function paketCard(o){
-  const diff=(o.budget!=null&&o.angebot!=null&&o.angebot>0)?(o.angebot-o.budget):null;
-  const diffTxt=diff==null?'':(diff<=0?' · <b style="color:var(--green)">'+euroTxt(diff)+'</b>':' · <b style="color:var(--band-red)">+'+euroTxt(diff)+'</b>');
-  const warn=paketWarnung(o);
-  const mailFlag=o.mails.some(m=>m.hasDraft)?'<div class="mail-flag draft">✏️ Entwurf offen – in Gmail abschicken</div>'
-    :(o.mails.some(m=>m.weOwe&&!m.noise)?'<div class="mail-flag open">✉️ Rückmeldung offen</div>':'');
-  return `<div class="kc-card" draggable="true" data-paket="${esc(o.key)}">`
-    +`<div class="kc-bar" style="background:${AUF_SEV_BAR[o.sev]}">🏗️ ${esc(o.objName||aufObjektName(o._obj))}</div>`
-    +`<div class="kc-body">`
-    +`<div class="kc-title">${esc(o.key)} · ${esc(o.gewerk||o.paket)}</div>`
-    +`<div class="kc-sub">Budget ${euroTxt(o.budget)} · Angebot ${o.angebot?euroTxt(o.angebot):'—'}${diffTxt}</div>`
-    +mailFlag
-    +(warn?`<div class="kc-follow"><span class="kc-follow-k">⚠</span><span class="kc-follow-t">${esc(warn)}</span></div>`:'')
-    +(o.antOk&&o.antOk.length?`<div class="kc-follow"><span class="kc-follow-k">✅</span><span class="kc-follow-t">${o.antOk.length===1?esc(o.antOk[0].firma)+' hat den Termin bestätigt':o.antOk.length+' Betriebe haben den Termin bestätigt'}</span></div>`:'')
-    +(o.vergebenAn?`<div class="kc-follow"><span class="kc-follow-k">🤝</span><span class="kc-follow-t">vergeben an ${esc(o.vergebenAn)}</span></div>`:'')
-    +`<div class="kc-foot"><span class="kc-due" style="color:var(--ink-faint)">${o.betriebe.length} ${o.betriebe.length===1?'Betrieb':'Betriebe'} · ${o.angebote.length} ${o.angebote.length===1?'Angebot':'Angebote'}${o.aufgaben.length?' · '+o.aufgaben.filter(t=>t.erledigt).length+'/'+o.aufgaben.length+' Schritte':''}</span><span class="sp"></span>${ownerAv('Niklas')}</div>`
+function aufObjektCard(o){
+  const k=o.k, s=o.sale;
+  const warn=t=>`<div class="kc-follow"><span class="kc-follow-k">⚠</span><span class="kc-follow-t">${esc(t)}</span></div>`;
+  const zeilen=[];
+  zeilen.push(`<div class="kc-follow"><span class="kc-follow-k">✅</span><span class="kc-follow-t">${o.erledigt}/${o.rows.length} Arbeiten erledigt${k.luecke!=null?' · '+lueckeHTML(k.luecke,true):''}</span></div>`);
+  // Hinweise aus der Kostenuebersicht (⚠ in der Bemerkung, nicht abgehakt): bis zwei im
+  // Volltext, darueber die Zahl und der erste.
+  if(o.hinweise.length>2) zeilen.push(warn('⚠ '+o.hinweise.length+' Hinweise · '+arbeitKurz(o.hinweise[0])));
+  else o.hinweise.forEach(r=>zeilen.push(warn(arbeitKurz(r)+': '+hinweisText(r))));
+  if(o.vermarktungKollision) zeilen.push(warn('📸 Vermarktungsstart '+fmtDate(o.fotos.start)+' liegt vor dem Umbau-Ende '+fmtDate(o.umbauEnde)));
+  if(o.ueberfaellig.length) zeilen.push(warn('⏰ '+o.ueberfaellig.length+(o.ueberfaellig.length===1?' Termin':' Termine')+' überschritten: '+o.ueberfaellig[0].titel));
+  if(o.antOffen.length){ const an=hwAntwort(o.antOffen[0]), am=ANT_ART[an.art]||ANT_ART.antwort; zeilen.push(warn(am.icon+' '+o.antOffen[0].firma+': '+am.txt)); }
+  if(o.still.length) zeilen.push(warn('📞 '+o.still.length+(o.still.length===1?' Betrieb meldet sich nicht':' Betriebe melden sich nicht')));
+  if(o.laufend.length) zeilen.push(`<div class="kc-follow"><span class="kc-follow-k">🔨</span><span class="kc-follow-t">läuft: ${esc(o.laufend.map(t=>t.titel).slice(0,2).join(' · '))}${o.laufend.length>2?' …':''}</span></div>`);
+  else if(o.naechste) zeilen.push(`<div class="kc-follow"><span class="kc-follow-k">▶</span><span class="kc-follow-t">ab ${fmtDate(o.naechste.start)}: ${esc(o.naechste.titel)}</span></div>`);
+  const mails=aufPaketMails(o.a.hw);
+  const mailFlag=mails.some(m=>m.hasDraft)?'<div class="mail-flag draft">✏️ Entwurf offen – in Gmail abschicken</div>'
+    :(mails.some(m=>m.weOwe&&!m.noise)?'<div class="mail-flag open">✉️ Rückmeldung offen</div>':'');
+  return `<div class="kc-card" draggable="true" data-aufobj="${esc(o.key)}">`
+    +`<div class="kc-bar" style="background:${AUF_SEV_BAR[o.sev]}">${AUFO_ICON[o.phase]} ${esc(o.phase)}</div>`
+    +`<div class="kc-body"><div class="kc-title">🏗️ ${esc(o.name)}</div>`
+    +`<div class="kc-sub">${s&&s.kuerzel?esc(s.kuerzel)+' · ':''}Budget brutto ${euroTxt(o.budget)}${k.verfuegbar!=null?' von '+euroTxt(k.verfuegbar):''}</div>`
+    +mailFlag+zeilen.slice(0,5).join('')
+    +`<div class="kc-foot"><span class="kc-due" style="color:var(--ink-faint)">${o.uebergabe?'🔑 '+fmtDate(o.uebergabe):'🔑 Übergabe offen'}${o.fotos&&o.fotos.start?' · 📸 '+fmtDate(o.fotos.start):''}</span><span class="sp"></span>${ownerAv('Niklas')}</div>`
     +`</div></div>`;
 }
 
-/* (21.08.2026 entfernt) aufObjektKarte() - die Objektkachel fuer Verkauf/Uebergabe/
-   Geldeingang. Sie stand im Aufwertungsboard und ist mit Entscheidung 4.1 in die
-   eigene Verkaufsansicht gewandert, wo sie aus der Objektliste kommt statt aus
-   config.js - und damit fuer beliebig viele Objekte funktioniert.               */
-
-/* ---- Phase speichern ----------------------------------------------------
-   Doppelt: im Cockpit-State (wirkt sofort, auch ohne Neuladen) und – wenn die
-   Kostenübersicht eine Status-Spalte hat – in der Aufwertungstabelle selbst. */
-async function persistPaketPhase(key,neu){
-  META['aufp:'+key+'|phase']=neu;
-  persistStateSilent('aufp:'+key,'phase',neu);
-  saveToast('Speichere Stand …');
-  try{
-    const {obj,rest}=splitKey(key);
-    const a=aufEintrag(obj);
-    const p=(a&&a.kosten&&a.kosten.pakete||[]).find(x=>paketKey(x.paket)===rest);
-    if(a&&p&&p._row&&a.kosten._statusCol>=0&&a.tabs.kosten){
-      const sp=colLetter(a.kosten._statusCol);
-      await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+a.sheetId+'/values/'
-        +encodeURIComponent(a.tabs.kosten+'!'+sp+p._row)+'?valueInputOption=USER_ENTERED',
-        {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({values:[[neu]]})});
-      p.status=neu;
-      saveToast('✓ Gespeichert – auch in der Aufwertungstabelle',1);
-    } else {
-      saveToast('✓ Gespeichert (im Cockpit; die Tabelle hat keine Status-Spalte)',1);
-    }
-  }catch(e){ saveToast('⚠ Nur im Cockpit gespeichert: '+e.message,0,1); }
+/* ---- Spalte speichern: im Cockpit-State. Die Tabelle kennt keine Objektphase -
+   sie ergibt sich dort aus dem Zeitplan. Leerer Wert = zurueck auf Automatik.      */
+async function persistAufObjPhase(key,neu){
+  META['aufo:'+key+'|phase']=neu;
+  await persistState('aufo:'+key,'phase',neu);
 }
 
+/* ---- Schreiben in die Aufwertungstabelle, danach neu lesen -------------- */
+async function aufWrite(a,tab,a1,values){
+  return apiPut('https://sheets.googleapis.com/v4/spreadsheets/'+a.sheetId+'/values/'+encodeURIComponent(tab+'!'+a1)+'?valueInputOption=USER_ENTERED',{values});
+}
+async function aufReloadKosten(a){
+  if(!a.tabs.kosten) return;
+  a.kosten=parseAufKosten(await aufRead(a.sheetId,a.tabs.kosten,'A1:H80')); aufAggregat();
+}
+async function aufReloadPlan(a){
+  if(!a.tabs.plan) return;
+  a.tasks=parseAufPlan(await aufRead(a.sheetId,a.tabs.plan,'A1:L300'),a.key);
+  a.uebergabeCell=a.tasks._uebergabe||null; a.uebergabe=a.uebergabeCell?a.uebergabeCell.date:null; aufAggregat();
+}
 
-/* ---- Das Aufwertungs- und Verkaufsboard --------------------------------- */
+/* ---- Das Aufwertungsboard ----------------------------------------------- */
 function renderAufBoard(board){
   if(!hasAufwertung()){
     const ohne=objekteOhnePlan();
@@ -3182,28 +3256,24 @@ function renderAufBoard(board){
     board.innerHTML=`<div class="col" style="width:100%"><div class="empty">Lade die Aufwertungspläne …</div></div>`;
     return;
   }
-  const pak=aufPakete();
+  const karten=aufObjektKarten();
   const fehler=AUFS.filter(a=>a.state==='error');
   const ohnePlan=objekteOhnePlan();
-  if(!pak.length&&fehler.length){
+  if(!karten.length&&fehler.length){
     board.innerHTML=`<div class="col" style="width:100%"><div class="empty">Kein Aufwertungsplan lesbar: ${esc(fehler[0].error||'')}<br><a class="link" target="_blank" href="${aufSheetUrl(fehler[0].key)}">Tabelle öffnen</a></div></div>`;
     return;
   }
-  board.innerHTML=AUF_COLS.map(ph=>{
-    const arr=pak.filter(x=>x.phase===ph);
-    return `<div class="col${arr.length?'':' col-leer'}" data-aufcol="${esc(ph)}"><div class="col-head"><span>${AUF_COL_ICON[ph]} ${esc(ph)}</span><span class="cnt">${arr.length}</span></div>${arr.map(paketCard).join('')}</div>`;
+  board.innerHTML=AUFO_COLS.map(ph=>{
+    const arr=karten.filter(x=>x.phase===ph);
+    return `<div class="col${arr.length?'':' col-leer'}" data-aufcol="${esc(ph)}"><div class="col-head"><span>${AUFO_ICON[ph]} ${esc(ph)}</span><span class="cnt">${arr.length}</span></div>${arr.map(aufObjektCard).join('')}</div>`;
   }).join('');
   // Ein Plan, der nicht laedt, darf nicht stumm fehlen - sonst faellt sein Objekt
   // einfach vom Board, ohne dass jemand es merkt.
   if(fehler.length){
     board.insertAdjacentHTML('afterbegin',`<div class="col" style="width:100%"><div class="empty">⚠ ${fehler.length} ${fehler.length===1?'Plan ist':'Pläne sind'} nicht lesbar: ${fehler.map(a=>`<a class="link" target="_blank" href="${aufSheetUrl(a.key)}">${esc(a.name)}</a>`).join(' · ')}</div></div>`);
   }
-  if(!pak.length){
-    board.insertAdjacentHTML('afterbegin',`<div class="col" style="width:100%"><div class="empty">Im Reiter „Kostenübersicht" der Aufwertungstabelle wurden keine Pakete gefunden. Es braucht dort eine Kopfzeile mit <b>Paket</b> und <b>Budget netto</b>.</div></div>`);
-  }
   // Objekte, die in Aufwertung sind, aber noch keinen Plan haben. Sie stehen ganz
-  // links, weil genau hier der nächste Handgriff liegt - nicht in einer Spalte
-  // weiter hinten, wo man sie erst suchen müsste.
+  // links, weil genau hier der naechste Handgriff liegt.
   if(ohnePlan.length){
     board.insertAdjacentHTML('afterbegin',`<div class="col" style="border:1px dashed var(--gold)"><div class="col-head"><span>🏗️ Kein Plan</span><span class="cnt">${ohnePlan.length}</span></div>`
       +ohnePlan.map(o=>`<div class="kc-card"><div class="kc-bar" style="background:var(--band-yellow)">📋 Aufwertungsplan fehlt</div><div class="kc-body">`
@@ -3213,9 +3283,9 @@ function renderAufBoard(board){
         +`</div></div>`).join('')+`</div>`);
   }
   board.querySelectorAll('.kc-card').forEach(card=>{
-    if(!card.dataset.paket) return;
-    card.onclick=e=>{ if(e.target.tagName==='A'||e.target.tagName==='BUTTON') return; openPaket(card.dataset.paket); };
-    card.addEventListener('dragstart',ev=>{ ev.dataTransfer.setData('id',card.dataset.paket||''); card.classList.add('dragging'); });
+    if(!card.dataset.aufobj) return;
+    card.onclick=e=>{ if(e.target.tagName==='A'||e.target.tagName==='BUTTON') return; openAufObjekt(card.dataset.aufobj); };
+    card.addEventListener('dragstart',ev=>{ ev.dataTransfer.setData('id',card.dataset.aufobj||''); card.classList.add('dragging'); });
     card.addEventListener('dragend',()=>card.classList.remove('dragging'));
   });
   board.querySelectorAll('.col').forEach(col=>{
@@ -3224,47 +3294,12 @@ function renderAufBoard(board){
     col.addEventListener('drop',async e=>{
       e.preventDefault(); col.classList.remove('drop');
       const ziel=col.dataset.aufcol, id=e.dataTransfer.getData('id');
-      if(!ziel||!id||!AUF_COLS.includes(ziel)) return;
-      await persistPaketPhase(id,ziel); renderAll();
+      if(!ziel||!id||!AUFO_COLS.includes(ziel)) return;
+      await persistAufObjPhase(id,ziel); renderAll();
     });
   });
 }
 
-let AUF_POS_CACHE={};
-async function ladePositionen(key){
-  if(AUF_POS_CACHE[key]) return AUF_POS_CACHE[key];
-  const {obj,rest}=splitKey(key);
-  const a=aufEintrag(obj);
-  if(!a){ AUF_POS_CACHE[key]=[]; return []; }
-  try{
-    const titles=(await aufTabs(a.sheetId)).alle||[];
-    const nr=rest.slice(1);
-    /* 22.08.2026 — Fehler behoben. Die Reiter heissen „P1 Sanitär-Heizung", nach dem
-       Normalisieren also „p1sanitär-heizung". Die alte Suche verlangte entweder genau
-       „p1", oder „paket1", oder einen Binde- bzw. Gedankenstrich direkt hinter der
-       Nummer — nichts davon trifft zu. Das Leistungsverzeichnis im Detailfenster
-       wurde deshalb NIE gefunden; es stand immer „kein Reiter gefunden".
-       Jetzt: der Reitername muss mit p<Nummer> beginnen, gefolgt von etwas, das
-       KEINE Ziffer ist. Das „keine Ziffer" ist der Grund, warum P1 nicht auf P10
-       und P11 mitanspringt — mit den neuen Paketen ab P9 wäre das sonst passiert. */
-    const nrRe=new RegExp('^p'+nr+'(?![0-9])');
-    const tab=titles.find(t=>{ const n=norm(t).replace(/\s/g,''); return nrRe.test(n)||n==='paket'+nr; });
-    if(!tab){ AUF_POS_CACHE[key]=[]; return []; }
-    const rows=await aufRead(a.sheetId,tab,'A1:L120');
-    const hi=findHead(rows,['pos','leistung']); if(hi<0){ AUF_POS_CACHE[key]=[]; return []; }
-    const h=rows[hi], cP=colIdx(h,'pos'), cL=colIdx(h,'leistung'), cM=colIdx(h,'menge'),
-          cE=colIdx(h,'einheit'), cB=colIdx(h,'ep netto (budget)')>=0?colIdx(h,'ep netto (budget)'):colIdx(h,'budget'),
-          cA=colIdx(h,'ep netto (angebot)')>=0?colIdx(h,'ep netto (angebot)'):colIdx(h,'angebot'), cBe=colIdx(h,'betrieb');
-    const out=[];
-    rows.slice(hi+1).forEach(r=>{
-      const l=String(r[cL]||'').trim(); if(!l) return;
-      if(/^summe/.test(norm(r[cP]||r[cL]))) return;
-      out.push({pos:String(r[cP]||'').trim(),leistung:l,menge:String(r[cM]||'').trim(),einheit:String(r[cE]||'').trim(),
-                budget:euroNum(r[cB]),angebot:euroNum(r[cA]),betrieb:String(r[cBe]||'').trim()});
-    });
-    AUF_POS_CACHE[key]=out; return out;
-  }catch(e){ AUF_POS_CACHE[key]=[]; return []; }
-}
 function hwZeile(h,key){
   const an=hwAntwort(h);
   const am=an?(ANT_ART[an.art]||ANT_ART.antwort):null;
@@ -3318,51 +3353,195 @@ function angebotsVergleichHTML(o){
     +(spanne!=null&&spanne>=40?`<div class="wt-hint" style="color:var(--band-orange)">Die Angebote liegen ${spanne} % auseinander — meist ein Zeichen dafür, dass die Leistung unterschiedlich verstanden wurde. Vor der Vergabe klären, ob alle dasselbe angeboten haben.</div>`:'')
     ;
 }
-async function openPaket(key){
-  const o=aufPakete().find(p=>p.key===key); if(!o) return;
-  const diff=(o.budget!=null&&o.angebot!=null&&o.angebot>0)?(o.angebot-o.budget):null;
-  const phasen=AUF_COLS;
-  $('erlModal').innerHTML=`<button class="modal-close" onclick="closeErledigt()">✕ schließen</button>
-    <div class="detail-head">
-      <div style="font-size:12px;color:var(--ink-faint);font-weight:700;letter-spacing:.03em">🏗️ ${esc(o.objName||aufObjektName(o._obj))}</div>
-      <h2>${esc(o.pk)} · ${esc(o.gewerk||o.paket)}</h2>
-      <div class="deeplinks"><a class="link" target="_blank" href="${aufSheetUrl(o._obj)}">📊 Aufwertungstabelle öffnen</a></div>
+
+/* ---- Reiter „Kostenuebersicht": die Checkliste ---------------------------
+   Jede Aenderung geht SOFORT in die Aufwertungstabelle (Haken -> Spalte Erledigt
+   plus Status „fertig"; Budget, Beauftragt an, Status in ihre Spalten). Danach wird
+   der Reiter neu gelesen, damit Summe und Luecke aus der Tabelle stimmen - das
+   Cockpit rechnet nichts selbst (Rolle Prozessmanagement, Regel 8).            */
+const CK_STATI=['offen','angefragt','Angebote da','beauftragt','in Arbeit','fertig'];
+function aufChecklisteHTML(o){
+  const k=o.k;
+  const tr=o.rows.map(r=>{
+    const bekannt=CK_STATI.some(x=>norm(x)===norm(r.status));
+    const hinweis=istHinweis(r);
+    return `<tr class="ck-row${r.erledigt?' done':''}${hinweis?' hinweis':''}" data-row="${r._row}">
+      <td><input type="checkbox" class="ck-done" ${r.erledigt?'checked':''} title="erledigt"></td>
+      <td class="ck-paket">${esc(r.paket)}</td>
+      <td class="ck-arbeit">${esc(r.arbeit||r.gewerk)}${r.bemerkung?`<div class="ck-bem">${esc(r.bemerkung)}</div>`:''}</td>
+      <td><input type="text" class="ck-budget" value="${r.budget!=null?escA(r.budget.toLocaleString('de-DE',{maximumFractionDigits:2})):''}" placeholder="€"></td>
+      <td><input type="text" class="ck-wer" value="${escA(r.vergeben)}" placeholder="Firma / selbst"></td>
+      <td><select class="ck-status">${CK_STATI.map(x=>`<option${norm(x)===norm(r.status)?' selected':''}>${x}</option>`).join('')}${bekannt||!r.status?'':`<option selected>${esc(r.status)}</option>`}</select></td></tr>`;
+  }).join('');
+  const sum=`<tr class="ck-sum"><td></td><td colspan="2">Summe brutto</td><td style="text-align:right">${euroTxt(k.budget!=null?k.budget:o.budget)}</td><td colspan="2">${k.verfuegbar!=null?'Rahmen '+euroTxt(k.verfuegbar):''}</td></tr>`;
+  return `<div class="section-t">🧾 Kostenübersicht <small>brutto · eine Zeile je Arbeit · Änderungen gehen sofort in die Tabelle</small></div>
+    <table class="ck-table"><thead><tr><th></th><th>Paket</th><th>Arbeit</th><th style="text-align:right">Budget brutto</th><th>Beauftragt an</th><th>Status</th></tr></thead>
+    <tbody>${tr||'<tr><td colspan="6" class="empty">Noch keine Arbeiten in der Kostenübersicht.</td></tr>'}${sum}</tbody></table>
+    ${k.luecke!=null?`<div class="wt-hint" style="margin-top:6px">ohne Home Staging: ${lueckeHTML(k.luecke)}${k.lueckeMit!=null?' · mit Home Staging: '+lueckeHTML(k.lueckeMit):''} · inkl. Puffer laut Tabelle</div>`:''}
+    <div class="ck-add"><b>Arbeit ergänzen</b>
+      <div class="tm-row"><input id="ckNeuPaket" type="text" placeholder="Paket 1" style="width:84px"><input id="ckNeuArbeit" type="text" placeholder="Arbeit, z. B. Silikonfugen Bad" style="flex:1;min-width:160px"><input id="ckNeuBudget" type="text" placeholder="Budget brutto" style="width:110px"><input id="ckNeuWer" type="text" placeholder="Firma / selbst" style="width:120px"><button class="savebtn" id="ckNeuSave" style="margin:0;width:auto;padding:6px 12px">＋</button></div>
+      <div class="wt-hint">Wird als neue Zeile oberhalb der Summe in die Kostenübersicht geschrieben.</div><div id="ckErr"></div></div>`;
+}
+function wireCheckliste(o){
+  const a=o.a, k=o.k, c=k._cols||{};
+  const tab=a.tabs.kosten;
+  const save=async(data)=>{
+    saveToast('Speichere …');
+    try{
+      await aufBatchWrite(a.sheetId,data.map(d=>({range:tab+'!'+d.a1,values:[[d.v]]})));
+      saveToast('✓ In der Aufwertungstabelle gespeichert',1);
+      await aufReloadKosten(a); renderAll(); openAufObjekt(o.key);
+    }catch(e){ saveToast('⚠ Nicht gespeichert: '+e.message,0,1); }
+  };
+  const fehlt=sp=>saveToast('⚠ Spalte „'+sp+'" fehlt in der Kostenübersicht – bitte dort anlegen.',0,1);
+  $('modal').querySelectorAll('.ck-row').forEach(tr=>{
+    const row=+tr.dataset.row, r=o.rows.find(x=>x._row===row); if(!r) return;
+    const cb=tr.querySelector('.ck-done');
+    cb.onchange=()=>{ const v=cb.checked; const data=[];
+      if(c.erledigt>=0) data.push({a1:colLetter(c.erledigt)+row,v});
+      if(c.status>=0) data.push({a1:colLetter(c.status)+row,v:v?'fertig':(norm(r.status)==='fertig'?'in Arbeit':(r.status||'offen'))});
+      if(!data.length){ fehlt('Erledigt'); cb.checked=!v; return; }
+      if(v&&typeof burst==='function') burst();
+      save(data); };
+    const bd=tr.querySelector('.ck-budget');
+    bd.onchange=()=>{ if(!(c.budget>=0)){ fehlt('Budget brutto'); return; } const n=euroNum(bd.value); save([{a1:colLetter(c.budget)+row,v:n==null?'':n}]); };
+    const wer=tr.querySelector('.ck-wer');
+    wer.onchange=()=>{ if(!(c.vergeben>=0)){ fehlt('Beauftragt an'); return; } save([{a1:colLetter(c.vergeben)+row,v:wer.value.trim()}]); };
+    const st=tr.querySelector('.ck-status');
+    st.onchange=()=>{ if(!(c.status>=0)){ fehlt('Status'); return; } const data=[{a1:colLetter(c.status)+row,v:st.value}];
+      if(c.erledigt>=0&&((st.value==='fertig')!==!!r.erledigt)) data.push({a1:colLetter(c.erledigt)+row,v:st.value==='fertig'});
+      save(data); };
+  });
+  const add=$('ckNeuSave');
+  if(add) add.onclick=async()=>{
+    const err=$('ckErr'); err.innerHTML='';
+    const paket=($('ckNeuPaket').value||'').trim(), arbeit=($('ckNeuArbeit').value||'').trim(), bud=euroNum($('ckNeuBudget').value), wer=($('ckNeuWer').value||'').trim();
+    if(!arbeit){ err.innerHTML='<div class="erl-err">Bitte die Arbeit benennen.</div>'; return; }
+    if(!(k._summeRow>0)||!(a.tabs.kostenId>=0)){ err.innerHTML='<div class="erl-err">Die Summenzeile der Kostenübersicht wurde nicht gefunden – bitte die Zeile direkt in der Tabelle einfügen.</div>'; return; }
+    add.disabled=true; saveToast('Füge Zeile ein …');
+    try{
+      // Neue Zeile direkt VOR der Summe (0-basiert = Summenzeile-1). inheritFromBefore uebernimmt
+      // Format, Auswahlliste und Haekchen der Zeile darueber. Die Summenformel in der Tabelle
+      // reicht bis zur Zeile ueber der Summe (OFFSET), deshalb zaehlt die neue Zeile sofort mit.
+      const idx=k._summeRow-1;
+      await apiPost('https://sheets.googleapis.com/v4/spreadsheets/'+a.sheetId+':batchUpdate',{requests:[{insertDimension:{range:{sheetId:a.tabs.kostenId,dimension:'ROWS',startIndex:idx,endIndex:idx+1},inheritFromBefore:true}}]});
+      const vals=[]; const put=(ci,v)=>{ if(ci>=0) vals.push({range:tab+'!'+colLetter(ci)+k._summeRow,values:[[v]]}); };
+      put(c.paket,paket||'Paket'); put(c.arbeit,arbeit); put(c.budget,bud==null?'':bud); put(c.vergeben,wer); put(c.status,'offen'); put(c.erledigt,false);
+      await aufBatchWrite(a.sheetId,vals);
+      saveToast('✓ Arbeit in die Kostenübersicht eingetragen',1);
+      await aufReloadKosten(a); renderAll(); openAufObjekt(o.key);
+    }catch(e){ err.innerHTML='<div class="erl-err">⚠ '+esc(e.message)+'</div>'; add.disabled=false; saveToast('⚠ Nicht gespeichert: '+e.message,0,1); }
+  };
+}
+
+/* ---- Reiter „Zeitplan": alle Aufgaben mit Ampel --------------------------- */
+function aufZeitplanHTML(o){
+  if(!o.tasks.length) return '<div class="empty">Kein Zeitplan lesbar.</div>';
+  let lastPh=''; let h=`<div class="section-t">🗓️ Zeitplan <small>aus dem Reiter Projektzeitplan · hängt an der Schlüsselübergabe</small></div>`;
+  o.tasks.forEach(t=>{
+    if(t.phase!==lastPh){ lastPh=t.phase; h+=`<div style="font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);margin:10px 0 2px">${esc(t.phase||'')} <span style="font-weight:600;letter-spacing:0;text-transform:none">→ ${esc(AUFO_COLS[aufTaskSpalte(t)])}</span></div>`; }
+    const ampel=t.erledigt?'var(--green)':(t.ende&&daysUntil(t.ende)<0?'var(--band-red)':(t.start&&daysUntil(t.start)<=0?'var(--band-orange)':'var(--ink-faint)'));
+    const zeit=[t.start?fmtDate(t.start):'',t.ende&&(!t.start||+t.ende!==+t.start)?fmtDate(t.ende):''].filter(Boolean).join(' – ');
+    h+=`<div class="aufo-task"><span class="d" style="background:${ampel}"></span><span>${t.meilenstein?'🚩 ':''}<b>${esc(t.titel)}</b>${t.gewerk&&t.gewerk!=='-'?` <span style="color:var(--ink-faint)">· ${esc(t.gewerk)}</span>`:''}${t.status?` <span style="color:var(--ink-faint)">· ${esc(t.status)}</span>`:''}</span><span class="z">${esc(zeit)}</span></div>`;
+  });
+  return h+`<div class="wt-hint" style="margin-top:8px">Status und Dauer werden in der Tabelle gepflegt; Schlüsselübergabe und Vermarktungsstart links im Fenster.</div>`;
+}
+
+/* ---- Reiter je Paket: Arbeiten, Angebote im Vergleich, Betriebe, Mails ----- */
+function aufPakete(o){
+  const pks={};
+  const hol=pk=>(pks[pk]=pks[pk]||{pk,rows:[],hw:[],name:''});
+  o.rows.forEach(r=>{ const pk=paketKey(r.paket); if(pk) hol(pk).rows.push(r); });
+  o.a.hw.forEach(h=>{ const pk=paketKey(h.paket); if(!pk) return; const p=hol(pk); p.hw.push(h); if(!p.name) p.name=h.gewerk; });
+  return Object.values(pks).sort((x,y)=>(+x.pk.slice(1))-(+y.pk.slice(1))).map(p=>{
+    if(!p.name) p.name=(p.rows[0]&&(p.rows[0].gewerk||p.rows[0].arbeit))||'';
+    p.key=o.key+'|'+p.pk; p._obj=o.key;
+    p.betriebe=p.hw; p.angebote=p.hw.filter(h=>h.angebot!=null&&h.angebot>0);
+    p.budget=p.rows.reduce((s,r)=>s+(r.budget||0),0); p.mails=aufPaketMails(p.hw); p.hinweise=p.rows.filter(istHinweis);
+    return p; });
+}
+function aufPaketPaneHTML(p){
+  return `<div class="section-t">${esc(p.pk)} · ${esc(p.name)} <small>Budget brutto ${euroTxt(p.budget)}</small></div>`
+    +(p.rows.length?p.rows.map(r=>`<div class="mini"><span class="dot" style="background:${r.erledigt?'var(--green)':'var(--ink-faint)'}"></span><span class="mt">${esc(r.arbeit||r.gewerk)}<br><span style="color:var(--ink-soft);font-weight:500">${euroTxt(r.budget)}${r.vergeben?' · '+esc(r.vergeben):''}${r.status?' · '+esc(r.status):''}</span></span></div>`).join('')
+                   :'<div class="empty">Keine Arbeit dieses Pakets in der Kostenübersicht.</div>')
+    +angebotsVergleichHTML(p)
+    +`<div class="section-t" style="margin-top:16px">🔧 Betriebe <small>– ${p.betriebe.length} in der Liste · ${p.angebote.length} mit Angebot</small></div>`
+    +(p.betriebe.length?p.betriebe.map(h=>hwZeile(h,p.key)).join(''):'<div class="empty">Für dieses Paket sind noch keine Betriebe erfasst.</div>')
+    +`<div class="section-t" style="margin-top:16px">✉️ Mails zu diesem Paket</div>`
+    +(p.mails.length?p.mails.slice(0,8).map(m=>`<div class="mini" onclick="window.open('${gmailThreadLink(m.tid)}','_blank')" style="cursor:pointer"><span class="dot" style="background:${m.hasDraft?'var(--band-yellow)':'#93C5FD'}"></span><span class="mt"><b>${esc(m.subj)}</b><br><span style="color:var(--ink-soft)">${esc(m.fromEmail||'')}${m.ts?' · '+fmtDate(new Date(m.ts)):''}${m.hasDraft?' · Entwurf offen':''}</span></span></div>`).join('')
+      :'<div class="empty">Noch keine Mails von diesen Betrieben im Label „Aufwertung" oder im Posteingang.</div>')
+    +(p.hinweise.length?`<div class="section-t" style="margin-top:16px">⚠ Hinweise <small>– aus der Kostenübersicht, verschwinden mit dem Erledigt-Haken</small></div>`
+      +p.hinweise.map(r=>`<div class="mini" style="border-left:3px solid var(--band-yellow)"><span class="dot" style="background:var(--band-yellow)"></span><span class="mt"><b>${esc(arbeitKurz(r))}</b><br><span style="color:var(--ink-soft);font-weight:500">${esc(hinweisText(r))}</span></span></div>`).join(''):'');
+}
+
+/* ---- Das Detailfenster: links Kennzahlen, rechts Reiter -------------------- */
+function openAufObjekt(key){
+  const a=aufEintrag(key); if(!a||a.state!=='ready') return;
+  const o=aufObjektStand(a), k=o.k, s=o.sale||{};
+  const zeile=(kk,v)=>`<div class="dt-row"><b>${kk}</b><span>${v||'—'}</span></div>`;
+  const iso=d=>d?new Date(+d-d.getTimezoneOffset()*60000).toISOString().slice(0,10):'';
+  const left=`<div class="dt-left">
+    <div class="detail-head"><h2>🏗️ ${esc(o.name)}</h2><div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="dt-pill" style="background:${AUF_SEV_BAR[o.sev]}">${AUFO_ICON[o.phase]} ${esc(o.phase)}</span>${o.manuell?'<small style="color:var(--ink-faint)">von Hand gesetzt</small>':''}${ownerAv('Niklas')}</div></div>
+    <div style="margin-top:12px">
+      ${zeile('Kürzel',esc([s.kuerzel,s.einheit].filter(Boolean).join(' · ')))}
+      ${zeile('Kaufpreis',esc(s.kaufpreis||'')+(s.kaufdatum?` <small style="color:var(--ink-faint)">· ${fmtDate(s.kaufdatum)}</small>`:''))}
+      ${zeile('Zielpreis',esc(s.zielpreis||''))}
+      ${zeile('Budget brutto',`<b>${euroTxt(k.budget!=null?k.budget:o.budget)}</b>${k.verfuegbar!=null?`<br><small style="color:var(--ink-faint)">von ${euroTxt(k.verfuegbar)} mitfinanziert</small>`:''}`)}
+      ${zeile('Lücke / Reserve',k.luecke!=null?lueckeHTML(k.luecke)+(k.lueckeMit!=null?`<br><small style="color:var(--ink-faint)">mit Home Staging: ${k.lueckeMit>0?'+'+euroTxt(k.lueckeMit):euroTxt(-k.lueckeMit)+' Reserve'}</small>`:''):'')}
+      ${zeile('Arbeiten',`<b>${o.erledigt}/${o.rows.length}</b> erledigt`)}
+      ${zeile('Schlüsselübergabe',`<input type="date" id="aufUebergabe" class="dt-date" value="${iso(o.uebergabe)}">`)}
+      ${zeile('Vermarktungsstart',o.fotos?`<input type="date" id="aufVermarktung" class="dt-date${o.vermarktungKollision?' warn':''}" value="${iso(o.fotos.start)}">${o.vermarktungKollision?`<br><small style="color:var(--band-red)">liegt vor dem Umbau-Ende ${fmtDate(o.umbauEnde)}</small>`:(o.umbauEnde?`<br><small style="color:var(--ink-faint)">Umbau endet ${fmtDate(o.umbauEnde)}</small>`:'')}`:'<small style="color:var(--ink-faint)">keine Zeile „Fotos und Vermarktungsstart" im Zeitplan</small>')}
+      ${zeile('Termine',o.ueberfaellig.length?`<b style="color:var(--band-red)">${o.ueberfaellig.length} überschritten</b>`:(o.laufend.length?`${o.laufend.length} ${o.laufend.length===1?'läuft':'laufen'}`:'im Plan'))}
     </div>
-    <div class="section-t" style="margin-top:12px">💶 Budget und Angebote</div>
-    <div class="mini"><span class="dot" style="background:#93C5FD"></span><span class="mt">
-      Budget netto <b>${euroTxt(o.budget)}</b> · Angebot netto <b>${o.angebot?euroTxt(o.angebot):'—'}</b>
-      ${diff!=null?(diff<=0?' · <b style="color:var(--green)">'+euroTxt(diff)+' unter Budget</b>':' · <b style="color:var(--band-red)">'+euroTxt(diff)+' über Budget</b>'):''}
-      ${o.vergebenAn?'<br>vergeben an <b>'+esc(o.vergebenAn)+'</b>':''}</span></div>
-    <div class="section-t" style="margin-top:16px">📍 Stand</div>
-    <div class="phbtns" id="paketPhasen">${phasen.map(c=>`<button class="phbtn${c===o.phase?' on':''}" data-ph="${esc(c)}">${AUF_COL_ICON[c]} ${esc(c)}</button>`).join('')}</div>
-    ${angebotsVergleichHTML(o)}
-    <div class="section-t" style="margin-top:16px">🔧 Betriebe <small>– ${o.betriebe.length} in der Liste · ${o.angebote.length} mit Angebot</small></div>
-    ${o.betriebe.length?o.betriebe.map(h=>hwZeile(h,key)).join(''):'<div class="empty">Für dieses Paket sind noch keine Betriebe erfasst.</div>'}
-    <div class="section-t" style="margin-top:16px">🗓️ Schritte im Zeitplan</div>
-    ${o.aufgaben.length?o.aufgaben.map(t=>{
-        const ampel=t.erledigt?'var(--green)':(t.ende&&daysUntil(t.ende)<0?'var(--band-red)':(t.start&&daysUntil(t.start)<=0?'var(--band-orange)':'var(--ink-faint)'));
-        const zeit=[t.start?fmtDate(t.start):'',t.ende&&(!t.start||+t.ende!==+t.start)?fmtDate(t.ende):''].filter(Boolean).join(' – ');
-        return `<div class="mini"><span class="dot" style="background:${ampel}"></span><span class="mt">${t.meilenstein?'🚩 ':''}<b>${esc(t.titel)}</b><br><span style="color:var(--ink-soft)">${esc(t.phase)}${zeit?' · '+esc(zeit):''}${t.status?' · '+esc(t.status):''}</span></span></div>`;
-      }).join(''):'<div class="empty">Keine Schritte im Zeitplan diesem Gewerk zugeordnet.</div>'}
-    <div class="section-t" style="margin-top:16px">✉️ Mails zu diesem Paket</div>
-    ${o.mails.length?o.mails.slice(0,8).map(m=>`<div class="mini" onclick="window.open('${gmailThreadLink(m.tid)}','_blank')" style="cursor:pointer"><span class="dot" style="background:${m.hasDraft?'var(--band-yellow)':'#93C5FD'}"></span><span class="mt"><b>${esc(m.subj)}</b><br><span style="color:var(--ink-soft)">${esc(m.fromEmail||'')}${m.ts?' · '+fmtDate(new Date(m.ts)):''}${m.hasDraft?' · Entwurf offen':''}</span></span></div>`).join('')
-      :'<div class="empty">Noch keine Mails von diesen Betrieben im Label „Aufwertung" oder im Posteingang.</div>'}
-    <div class="section-t" style="margin-top:16px">📋 Leistungen aus dem Leistungsverzeichnis</div>
-    <div id="paketPos"><div class="empty">Lade …</div></div>`;
-  $('erlOverlay').classList.add('open');
-  $('paketPhasen').querySelectorAll('.phbtn').forEach(b=>b.onclick=async()=>{
-    await persistPaketPhase(key,b.dataset.ph); closeErledigt(); renderAll(); });
-  const pos=await ladePositionen(key);
-  const box=$('paketPos'); if(!box) return;
-  box.innerHTML=pos.length?pos.map(pp=>`<div class="mini"><span class="dot" style="background:var(--ink-faint)"></span><span class="mt">
-      <b>${esc(pp.pos)}</b> ${esc(pp.leistung)}<br>
-      <span style="color:var(--ink-soft)">${esc(pp.menge)} ${esc(pp.einheit)} · Budget ${euroTxt(pp.budget)}${pp.angebot?' · Angebot '+euroTxt(pp.angebot):''}${pp.betrieb?' · '+esc(pp.betrieb):''}</span></span></div>`).join('')
-    :'<div class="empty">Kein Leistungsverzeichnis-Reiter zu '+esc(o.pk)+' gefunden.</div>';
+    <div class="deeplinks" style="margin-top:12px"><a class="link" target="_blank" href="${aufSheetUrl(key)}">📊 Aufwertungstabelle öffnen</a>${s._id?`<a class="link" href="#" id="aufZumVerkauf">💰 Verkaufsobjekt</a>`:''}</div>
+    <div class="wt-hint" style="margin-top:8px">Die Übergabe verschiebt alle Aufgaben im Zeitplan. Der Vermarktungsstart wird als fester Termin in die Zeile „Fotos und Vermarktungsstart" geschrieben.</div></div>`;
+  const pakete=aufPakete(o);
+  const tabs=[['kosten','Kostenübersicht'+(o.rows.length?` <small>${o.erledigt}/${o.rows.length}</small>`:'')],['plan','Zeitplan'+(o.ueberfaellig.length?` <small style="background:var(--band-red);color:#fff">${o.ueberfaellig.length}</small>`:'')]]
+    .concat(pakete.map(p=>[p.pk,p.pk+(p.name?' '+p.name:'')+(p.hinweise.length?` <small style="background:var(--band-yellow);color:#fff">⚠ ${p.hinweise.length}</small>`:(p.angebote.length?` <small>${p.angebote.length}</small>`:''))]))
+    .concat([['aendern','Ändern']]);
+  const aktiv=tabs.some(t=>t[0]===AUFO_TAB)?AUFO_TAB:'kosten';
+  const paneAendern=`<div class="section-t">🔀 Spalte auf dem Board</div>
+    <div class="phbtns">${AUFO_COLS.map(c=>`<button class="phbtn${c===o.phase?' on':''}" data-aufph="${esc(c)}">${AUFO_ICON[c]} ${esc(c)}</button>`).join('')}</div>
+    <div class="wt-hint" style="margin-top:6px">Automatisch aus dem Zeitplan: <b>${esc(o.auto)}</b>.${o.manuell?' Von Hand gesetzt – <a class="link" href="#" id="aufAuto">zurück auf Automatik</a>.':''}</div>
+    <div class="section-t" style="margin-top:16px">📋 Aufwertungsstand in der Objektliste</div>
+    <div class="mini"><span class="dot" style="background:var(--ink-faint)"></span><span class="mt">${o.erledigt}/${o.rows.length} Arbeiten fertig${aufFortschritt(key)&&aufFortschritt(key).rot?' · '+aufFortschritt(key).rot+' kritisch':''}</span></div>
+    <div class="wt-hint">Schreibt das Cockpit von selbst in die Spalte „Aufwertungsstand".</div>`;
+  const panes=`<div class="dt-pane${aktiv==='kosten'?' on':''}" data-pane="kosten">${aufChecklisteHTML(o)}</div>`
+    +`<div class="dt-pane${aktiv==='plan'?' on':''}" data-pane="plan">${aufZeitplanHTML(o)}</div>`
+    +pakete.map(p=>`<div class="dt-pane${aktiv===p.pk?' on':''}" data-pane="${p.pk}">${aufPaketPaneHTML(p)}</div>`).join('')
+    +`<div class="dt-pane${aktiv==='aendern'?' on':''}" data-pane="aendern">${paneAendern}</div>`;
+  const right=`<div class="dt-right"><div class="dt-tabs">${tabs.map(t=>`<button type="button" class="dt-tab${t[0]===aktiv?' on':''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>${panes}</div>`;
+  const m=$('modal');
+  m.classList.add('wide');
+  m.innerHTML=`<button class="modal-close" onclick="closeDetail()">✕ schließen</button><div class="dt-grid">${left}${right}</div>`;
+  m.querySelectorAll('.dt-tab').forEach(b=>b.onclick=()=>{ AUFO_TAB=b.dataset.tab; m.querySelectorAll('.dt-tab').forEach(x=>x.classList.toggle('on',x===b)); m.querySelectorAll('.dt-pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===b.dataset.tab)); });
+  m.querySelectorAll('.phbtn[data-aufph]').forEach(b=>b.onclick=async()=>{ await persistAufObjPhase(key,b.dataset.aufph); renderAll(); openAufObjekt(key); });
+  { const au=$('aufAuto'); if(au) au.onclick=async e=>{ e.preventDefault(); await persistAufObjPhase(key,''); renderAll(); openAufObjekt(key); }; }
+  { const zv=$('aufZumVerkauf'); if(zv) zv.onclick=e=>{ e.preventDefault(); openDetail(s._id); }; }
+  const ue=$('aufUebergabe');
+  if(ue) ue.onchange=async()=>{
+    const d=parseISO(ue.value); if(!d) return;
+    const cell=a.uebergabeCell;
+    if(!cell||!a.tabs.plan){ saveToast('⚠ Im Zeitplan fehlt die Zelle „Schlüsselübergabe" – bitte in der Tabelle anlegen.',0,1); return; }
+    saveToast('Verschiebe den Zeitplan …');
+    try{ await aufWrite(a,a.tabs.plan,colLetter(cell.col)+cell.row,[[fmtDate(d)]]); await aufReloadPlan(a); saveToast('✓ Zeitplan an die neue Übergabe angepasst',1); renderAll(); openAufObjekt(key); }
+    catch(e){ saveToast('⚠ Nicht gespeichert: '+e.message,0,1); }
+  };
+  const vs=$('aufVermarktung');
+  if(vs) vs.onchange=async()=>{
+    const d=parseISO(vs.value); if(!d||!o.fotos) return;
+    const c2=a.tasks._cols||{};
+    if(!(c2.start>=0)||!a.tabs.plan){ saveToast('⚠ Spalte „Start" im Zeitplan nicht gefunden.',0,1); return; }
+    saveToast('Setze Vermarktungsstart …');
+    try{ await aufWrite(a,a.tabs.plan,colLetter(c2.start)+o.fotos._row,[[fmtDate(d)]]); await aufReloadPlan(a); saveToast('✓ Vermarktungsstart als fester Termin gesetzt',1); renderAll(); openAufObjekt(key); }
+    catch(e){ saveToast('⚠ Nicht gespeichert: '+e.message,0,1); }
+  };
+  wireCheckliste(o);
+  $('overlay').classList.add('open');
 }
 // Nachfass-Entwurf aus dem Detail-Fenster heraus
 async function aufDraftHw(key,hwId){
-  const o=aufPakete().find(p=>p.key===key); if(!o) return;
-  const h=o.betriebe.find(x=>x.id===hwId); if(!h) return;
+  const h=AUF.hw.find(x=>x.id===hwId); if(!h) return;   // 21.10.2026: Betriebe haengen am Objekt, nicht mehr an einer Paket-Kachel
   if(!h.mail){ saveToast('⚠ Für '+h.firma+' ist keine E-Mail hinterlegt – bitte anrufen.',0,1); return; }
   if(!hasComposeScope()){ saveToast('⚠ Entwurf-Berechtigung fehlt – bitte neu anmelden.',0,1); return; }
   saveToast('Lege Entwurf an …');
@@ -3580,7 +3759,11 @@ async function objektUebergeben(id){
    WAS DAS COCKPIT DANN TUT
    - die Kopie umbenennen auf „Aufwertung_<Ort>_<Kuerzel>"
    - alle Platzhalter «Ort» «Straße Hausnummer» «WE» «Kürzel» «Objekt» «Datum»
-     «Start» «Ende» «Betrag» in ALLEN Reitern durch die echten Werte ersetzen
+     «Betrag» in ALLEN Reitern durch die echten Werte ersetzen
+   - die Schluesseluebergabe als Datum nach Projektzeitplan!C3 schreiben (21.10.2026:
+     der Zeitplan der Vorlage haengt an dieser Zelle; «Start» «Ende» gibt es nicht mehr)
+   - den mitfinanzierten Betrag zusaetzlich als Zahl in die Zeile „Mitfinanzierter
+     Betrag (brutto)" der Kostenuebersicht schreiben
    - die Kennung in die Spalte „Aufwertungstabelle" der Objektliste schreiben
    - das Board neu laden
 
@@ -3619,8 +3802,7 @@ function openPlanAnlegen(saleId){
     <div class="section-t" style="margin-top:16px">Schritt 3 — Kopfdaten</div>
     <div class="field"><label>Name der neuen Tabelle</label><input id="apName" type="text" value="${esc(name)}"></div>
     <div class="field"><label>Angebotsfrist für die Handwerker</label><input id="apFrist" type="text" placeholder="TT.MM.JJJJ"></div>
-    <div class="field"><label>Projektzeitraum von</label><input id="apStart" type="text" placeholder="TT.MM."></div>
-    <div class="field"><label>Projektzeitraum bis</label><input id="apEnde" type="text" placeholder="TT.MM.JJJJ"></div>
+    <div class="field"><label>Schlüsselübergabe (TT.MM.JJJJ) – Anker des Zeitplans, später im Detailfenster änderbar</label><input id="apUebergabe" type="text" placeholder="TT.MM.JJJJ"></div>
     <div class="field"><label>Mitfinanzierter Betrag (brutto, nur Zahl)</label><input id="apBetrag" type="text" placeholder="30000"></div>
     <div style="font-size:12px;color:var(--ink-faint);margin-top:4px">Leer gelassene Felder bleiben als Platzhalter stehen und lassen sich später in der Tabelle ausfüllen.</div>
 
@@ -3653,11 +3835,13 @@ async function planFertigstellen(saleId){
       '«WE»': o.einheit||'',
       '«Kürzel»': o.kuerzel||'',
       '«Datum»': $('apFrist').value.trim(),
-      '«Start»': $('apStart').value.trim(),
-      '«Ende»': $('apEnde').value.trim(),
       '«Betrag»': $('apBetrag').value.trim()?($('apBetrag').value.trim()+' €'):''
     };
     const ersetzt=await platzhalterFuellen(neueId,werte);
+    // ── b2) Schluesseluebergabe und Betrag als Werte (21.10.2026) ──
+    const ueb=parseDate($('apUebergabe').value);
+    if($('apUebergabe').value.trim()&&!ueb) throw new Error('Die Schlüsselübergabe bitte als TT.MM.JJJJ eingeben.');
+    await planKopfdatenSchreiben(neueId,ueb,euroNum($('apBetrag').value));
 
     // ── c) Kennung in die Objektliste ──
     const sp=colLetter(o._idx?o._idx.sheet:-1);
@@ -3675,6 +3859,30 @@ async function planFertigstellen(saleId){
   }
 }
 
+/* Schluesseluebergabe nach Projektzeitplan!C3 (Anker aller Termine) und den mitfinanzierten
+   Betrag als reine Zahl in die Kostenuebersicht. Leer gelassen bleibt C3 leer - dann rechnet
+   der Zeitplan bewusst nicht, bis das Datum feststeht (im Detailfenster nachtragbar).        */
+async function planKopfdatenSchreiben(sheetId,uebergabe,betrag){
+  if(!uebergabe&&betrag==null) return;
+  const meta=await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'?fields=sheets.properties.title');
+  const titel=(meta.sheets||[]).map(x=>x.properties.title);
+  const find=re=>titel.find(t=>re.test(norm(t)))||'';
+  const plan=find(/zeitplan|projektplan/), kosten=find(/kosten|budget/);
+  const daten=[];
+  if(uebergabe&&plan){
+    // Die Zelle wird ueber ihre Beschriftung gesucht, nicht fest als C3 angenommen.
+    const rows=(await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'/values/'+encodeURIComponent(plan+'!A1:L6'))).values||[];
+    let ziel='C3';
+    rows.forEach((r,ri)=>(r||[]).forEach((z,ci)=>{ if(/schl[üu]ssel[üu]bergabe/.test(norm(z))&&/→|->|:$/.test(String(z))) ziel=colLetter(ci+2)+(ri+1); }));
+    daten.push({range:plan+'!'+ziel,values:[[fmtDate(uebergabe)]]});
+  }
+  if(betrag!=null&&kosten){
+    const rows=(await gjson('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'/values/'+encodeURIComponent(kosten+'!A1:A60'))).values||[];
+    const zi=rows.findIndex(r=>/mitfinanziert/.test(norm(r&&r[0]))&&/betrag/.test(norm(r&&r[0])));
+    if(zi>=0) daten.push({range:kosten+'!C'+(zi+1),values:[[betrag]]});
+  }
+  if(daten.length) await apiPost('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'/values:batchUpdate',{valueInputOption:'USER_ENTERED',data:daten});
+}
 /* Ersetzt die Platzhalter in ALLEN Reitern der neuen Tabelle.
    Geschrieben werden ausschliesslich Zellen, in denen ein « vorkommt - Formeln
    enthalten so etwas nie, sie koennen also nicht getroffen werden.
@@ -3786,7 +3994,7 @@ async function syncAufStand(){
       const a=AUFS.find(x=>x.sheetId===o.aufSheetId);
       if(!a||a.state!=='ready') return;
       const f=aufFortschritt(a.key); if(!f) return;
-      const txt=f.fertig+'/'+f.gesamt+' Gewerke fertig'+(f.rot?' · '+f.rot+' kritisch':'');
+      const txt=f.fertig+'/'+f.gesamt+' Arbeiten fertig'+(f.rot?' · '+f.rot+' kritisch':'');
       if(String(o.aufStand||'').trim()===txt) return;
       o.aufStand=txt;
       data.push({range:CFG.TABS.objektliste+'!'+colLetter(o._standCol)+o._row,values:[[txt]]});
@@ -3861,11 +4069,19 @@ function kcPrioHTML(o){
   if(o.prio==='B'||o.prio==='C') return '<span class="kc-star dim">Prio '+o.prio+'</span>';
   return '';
 }
+/* 19.10.2026 (Entscheidung Nele): Farbe der Karte = Chance, nicht Zeitdruck.
+   Rot = Prio A · Gelb = Prio B · Grau = Prio C · Hellgrau = noch keine Prio.
+   Nächster Schritt, Vorschlag und Zuletzt stehen nur noch im Detailfenster,
+   die Wiedervorlage-Meldung entfällt auf der Karte (Zeitdruck nur im Detail). */
+const PRIO_BAR={A:['var(--band-red)','★ A · Beste Chance'],B:['var(--band-yellow)','Prio B'],C:['#B9B2A3','Prio C'],'':['#E6E1D6','Prio offen']};
+const PRIO_RANG={A:0,B:1,C:2,'':3};
 function pipeCard(o){
   const lnk=objAnzeigeLink(o);
+  const [bar,lbl]=PRIO_BAR[o.prio||'']||PRIO_BAR[''];
   const snz=isSnoozed(o)?`<div class="kc-snooze">⏳ pausiert bis ${esc(snoozeTxt(o))}</div>`:'';
-  return `<div class="kc-card${isSnoozed(o)?' snoozed':''}${o.prio==='A'?' prioA':''}" draggable="true" data-id="${o._id}"><div class="kc-bar" style="background:${bandColor(o.score)}">${urgency(o.score)[1]}${kcPrioHTML(o)}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}</div><div class="kc-sub">${esc(o.typ||'')}${o.kaufpreis?' · '+esc(o.kaufpreis):''}</div>${kcChipsHTML(o)}${mailFlagHTML(o._id)}${kcLinesHTML(o)}${snz}${lnk?`<div style="margin-top:6px"><a class="link" target="_blank" href="${lnk.href}" onclick="event.stopPropagation()" ondragstart="event.stopPropagation()">${lnk.txt}</a></div>`:''}<div class="kc-foot">${o.fael.state!=='none'&&o.fael.state!=='later'?`<span class="kc-due">🔥 ${esc(o.fael.txt)}</span>`:''}<span class="sp"></span>${ownerAv(effOwner(o))}</div></div></div>`;
+  return `<div class="kc-card kc-mini${isSnoozed(o)?' snoozed':''}${o.prio==='A'?' prioA':''}" draggable="true" data-id="${o._id}"><div class="kc-bar" style="background:${bar}">${lbl}</div><div class="kc-body"><div class="kc-title">${esc(o.titel)}</div><div class="kc-sub">${esc(o.typ||'')}${o.kaufpreis?' · '+esc(o.kaufpreis):''}</div>${kcChipsHTML(o)}${mailFlagHTML(o._id)}${snz}<div class="kc-foot">${lnk?`<a class="link" target="_blank" href="${lnk.href}" onclick="event.stopPropagation()" ondragstart="event.stopPropagation()">${lnk.txt}</a>`:''}<span class="sp"></span>${ownerAv(effOwner(o))}</div></div></div>`;
 }
+
 /* ============================================================================
    VERKAUFS-PIPELINE  (Arbeitspaket B, 21.08.2026) - dritte Ansicht
    Referenz ist der Reiter „Objektliste". Eine Kachel = eine Zeile = eine Einheit;
@@ -3984,7 +4200,7 @@ function vkCard(o){
   const a=o.aufSheetId?AUFS.find(x=>x.sheetId===o.aufSheetId):null;
   if(a&&a.state==='ready'){
     const f=aufFortschritt(a.key);
-    if(f) plan=`<div class="kc-follow" title="Aus dem Aufwertungsplan"><span class="kc-follow-k">🏗️</span><span class="kc-follow-t">${f.fertig}/${f.gesamt} Gewerke fertig${f.rot?' · '+f.rot+' kritisch':''}</span><span class="kc-follow-src">Plan</span></div>`;
+    if(f) plan=`<div class="kc-follow" title="Aus dem Aufwertungsplan"><span class="kc-follow-k">🏗️</span><span class="kc-follow-t">${f.fertig}/${f.gesamt} Arbeiten fertig${f.rot?' · '+f.rot+' kritisch':''}</span><span class="kc-follow-src">Plan</span></div>`;
   }
   const wegTxt=o.weg?(/makler/.test(norm(o.weg))?('🤝 '+(o.makler||'über Makler')):'🏠 Eigenvermarktung'):'';
   const preis=o.erzielt?('erzielt '+esc(o.erzielt)):(o.zielpreis?('Ziel '+esc(o.zielpreis)):'');
@@ -4104,7 +4320,7 @@ function renderBoard(){
   { const b=$('objSetupBtn'); if(b) b.style.display=(pipeView==='verkauf')?'':'none'; }
   if(pipeView==='aufwertung'){ renderAufBoard(board); return; }
   if(pipeView==='verkauf'){ renderVerkaufBoard(board); return; }
-  board.innerHTML=BOARD_COLS.map(ph=>{ const objs=activeObjs().filter(o=>o.phase===ph).sort((a,b)=>b.score-a.score);
+  board.innerHTML=BOARD_COLS.map(ph=>{ const objs=activeObjs().filter(o=>o.phase===ph).sort((a,b)=>(PRIO_RANG[a.prio||'']-PRIO_RANG[b.prio||''])||(b.score-a.score));
     return `<div class="col${objs.length?'':' col-leer'}" data-phase="${ph}"><div class="col-head"><span title="${esc(phaseLabel(ph))}">${esc(phaseLabelShort(ph))}</span><span class="cnt">${objs.length}</span></div>${objs.map(pipeCard).join('')}</div>`; }).join('');
   // Uebergebene Objekte sind hier weg - aber nicht spurlos. Sonst wirkt es wie ein Verlust.
   const ueb=OBJ.filter(o=>o.uebergeben);
@@ -4892,7 +5108,7 @@ function vkSectionHTML(o){
   if(a&&a.state==='ready'){
     const f=aufFortschritt(a.key);
     auf=`<div class="mini"><span class="dot" style="background:${f&&f.rot?'var(--band-red)':'var(--green)'}"></span><span class="mt">`
-      +(f?`<b>${f.fertig}/${f.gesamt} Gewerke fertig</b>${f.rot?' · <b style="color:var(--band-red)">'+f.rot+' kritisch</b>':''}`:'Plan geladen')
+      +(f?`<b>${f.fertig}/${f.gesamt} Arbeiten fertig</b>${f.rot?' · <b style="color:var(--band-red)">'+f.rot+' kritisch</b>':''}`:'Plan geladen')
       +`<br><a class="link" target="_blank" href="${aufSheetUrl(a.key)}">📊 Aufwertungsplan öffnen</a></span></div>`;
   } else if(o.aufSheetId){
     auf=`<div class="mini"><span class="dot" style="background:var(--band-yellow)"></span><span class="mt">Plan hinterlegt, aber nicht geladen.<br><a class="link" target="_blank" href="https://docs.google.com/spreadsheets/d/${esc(o.aufSheetId)}/edit">📊 Öffnen</a></span></div>`;
@@ -5026,7 +5242,7 @@ function openDetail(id){
     const aktiv=(typeof DT_TAB==='string'&&tabs.some(t=>t[0]===DT_TAB))?DT_TAB:'next';
     const paneNext=`<div class="dt-next"><div style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:${bandColor(o.score)};width:9px;height:9px;border-radius:50%;display:inline-block"></span><span class="kc-line-k" style="width:auto;color:var(--gold-d)">Nächster Schritt</span><span style="margin-left:auto">${urgBadge(o.score)}</span></div>
         <div class="t">${KANAL_ICON[kanalOf(o)]||''} ${esc(hzTodo(o))}</div>
-        <div style="font-size:13px;line-height:1.5;color:var(--ink-soft)">${esc(hzVorschlag(o))}</div>
+        <div style="font-size:13px;line-height:1.5;color:var(--ink-soft)">${esc(hzVorschlag(o))}</div>${kcZuletzt(o)?`<div style="font-size:12px;line-height:1.45;color:var(--ink-faint);margin-top:6px"><b style="font-size:10px;letter-spacing:.06em;text-transform:uppercase">Zuletzt</b> ${esc(kcZuletzt(o))}</div>`:''}
         <div class="field" style="margin:10px 0 0"><textarea id="dtTodo" placeholder="Was ist erledigt, was steht an? … kommt mit heutigem Datum als neue Zeile in die Leadliste (Spalte W), nichts wird überschrieben"></textarea></div>
         <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;align-items:center"><button class="savebtn" id="dtTodoSave" style="margin:0;width:auto">💾 In Leadliste eintragen</button><span style="font-size:11.5px;color:var(--ink-faint)">Steht danach im Reiter „Verlauf".</span></div><div id="dtTodoErr"></div>
       </div>
